@@ -28,7 +28,7 @@ php -S 127.0.0.1:8080 -t public
 
 Open `http://127.0.0.1:8080/setup` and complete the initialization form. Do not edit config files during deployment: the form saves OAuth2, Afdian, VoiceHub, and data-database settings into `storage/settings.sqlite`.
 
-OAuth2 is configured in the same first-run form. Copy the displayed callback URL into your OAuth provider, then paste the provider's authorize/token/userinfo URLs and client credentials back into Web UI.
+OAuth2 is configured in the same first-run form. Copy the displayed callback URL into your OAuth provider, then paste the provider's authorize/token/userinfo URLs and client credentials back into Web UI. If your provider only returns `name` from UserInfo, put that name in `允许 OAuth 标识`; the allowlist matches `name`, `email`, `sub`, or `id`.
 
 The first setup request is unauthenticated so a fresh install can be configured. After setup is complete, `/setup` requires OAuth2 login.
 

@@ -30,7 +30,7 @@
             <label class="field"><span>Redirect URI</span><input name="OAUTH_REDIRECT_URI" value="<?= htmlspecialchars($settings['OAUTH_REDIRECT_URI'] ?? '') ?>"></label>
             <label class="field"><span>Scopes</span><input name="OAUTH_SCOPES" value="<?= htmlspecialchars($settings['OAUTH_SCOPES'] ?? '') ?>"></label>
             <label class="field"><span>Token Type</span><input name="OAUTH_TOKEN_TYPE" value="<?= htmlspecialchars($settings['OAUTH_TOKEN_TYPE'] ?? '') ?>"></label>
-            <label class="field"><span>允许邮箱，逗号分隔</span><input name="OAUTH_ALLOWED_EMAILS" value="<?= htmlspecialchars($settings['OAUTH_ALLOWED_EMAILS'] ?? '') ?>" placeholder="admin@example.com"></label>
+            <label class="field"><span>允许 OAuth 标识，逗号分隔</span><input name="OAUTH_ALLOWED_IDENTIFIERS" value="<?= htmlspecialchars($settings['OAUTH_ALLOWED_IDENTIFIERS'] ?? $settings['OAUTH_ALLOWED_EMAILS'] ?? '') ?>" placeholder="Campux 用户名 或 admin@example.com"><small>会匹配 UserInfo 返回的 <code>name</code>、<code>email</code>、<code>sub</code> 或 <code>id</code>；留空表示允许所有 OAuth 用户。</small></label>
         </div>
     </section>
 
