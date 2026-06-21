@@ -113,15 +113,13 @@ POST /api/open/card-codes
 x-api-key: <VoiceHub Open API Key>
 ```
 
-The JSON body asks VoiceHub to generate available card codes:
+The JSON body imports the Afdian order number as a card code:
 
 ```json
 {
-  "count": 1,
-  "prefix": "AFD",
-  "length": 12,
-  "note": "voicehubpay | source=afdian | order=... | amount=... | count=1"
+  "codes": "202106232138371083454010626",
+  "note": "voicehubpay | source=afdian | order=202106232138371083454010626 | amount=5.00"
 }
 ```
 
-`count` is derived from the Afdian paid amount with a minimum of 1. Configure the endpoint, prefix, length, and optional charset in Web UI.
+`codes` is always the Afdian `out_trade_no`, so the paid order number itself becomes the VoiceHub card code. This keeps the code traceable and idempotent across webhook retries and API polling.

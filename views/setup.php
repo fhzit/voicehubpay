@@ -73,14 +73,11 @@
 
     <section class="setup-section">
         <h2>VoiceHub</h2>
-        <p class="muted">订单同步成功后会调用这里配置的接口创建点歌券。</p>
+        <p class="muted">订单同步成功后会调用 VoiceHub 开放接口，将爱发电订单号导入为点歌券。</p>
         <div class="grid two">
             <label class="field"><span>API Base</span><input name="VOICEHUB_API_BASE" value="<?= htmlspecialchars($settings['VOICEHUB_API_BASE'] ?? '') ?>" placeholder="https://voicehub.example.com"></label>
             <label class="field"><span>开放接口</span><input name="VOICEHUB_TICKET_ENDPOINT" value="<?= htmlspecialchars($settings['VOICEHUB_TICKET_ENDPOINT'] ?? '') ?>"></label>
-            <label class="field"><span>Open API Key</span><input type="password" name="VOICEHUB_API_TOKEN" value="<?= htmlspecialchars($settings['VOICEHUB_API_TOKEN'] ?? '') ?>"><small>VoiceHub 开放 API 使用 <code>x-api-key</code> 请求头。</small></label>
-            <label class="field"><span>券码前缀</span><input name="VOICEHUB_CODE_PREFIX" value="<?= htmlspecialchars($settings['VOICEHUB_CODE_PREFIX'] ?? '') ?>"></label>
-            <label class="field"><span>随机长度</span><input name="VOICEHUB_CODE_LENGTH" value="<?= htmlspecialchars($settings['VOICEHUB_CODE_LENGTH'] ?? '') ?>"></label>
-            <label class="field"><span>字符集，可选</span><input name="VOICEHUB_CODE_CHARSET" value="<?= htmlspecialchars($settings['VOICEHUB_CODE_CHARSET'] ?? '') ?>" placeholder="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"></label>
+            <label class="field"><span>Open API Key</span><input type="password" name="VOICEHUB_API_TOKEN" value="<?= htmlspecialchars($settings['VOICEHUB_API_TOKEN'] ?? '') ?>"><small>使用 <code>x-api-key</code> 请求头；请求体会发送 <code>{"codes":"爱发电订单号"}</code>。</small></label>
         </div>
     </section>
 

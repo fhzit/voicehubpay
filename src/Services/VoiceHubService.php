@@ -19,27 +19,25 @@ final class VoiceHubService
     {
         $base = rtrim($this->required('VOICEHUB_API_BASE'), '/');
         $endpoint = $this->config->get('VOICEHUB_TICKET_ENDPOINT', '/api/open/card-codes');
-        $count = max(1, (int) floor((float) $order['amount']));
-        $payload = [
-            'count' => $count,
-            'prefix' => $this->config->get('VOICEHUB_CODE_PREFIX', 'AFD'),
-            'length' => $this->config->int('VOICEHUB_CODE_LENGTH', 12),
-            'note' => $this->note($order, $count),
-        ];
-        $charset = trim((string) ($this->config->get('VOICEHUB_CODE_CHARSET', '') ?? ''));
-        if ($charset !== '') {
-            $payload['charset'] = $charset;
+        $orderNo = trim((string) ($order['order_no'] ?? ''));
+        if ($orderNo === '') {
+            throw new \RuntimeException('order_no is required to import VoiceHub card code');
         }
+
+        $payload = [
+            'codes' => $orderNo,
+            'note' => $this->note($order),
+        ];
 
         $headers = ['x-api-key: ' . $this->required('VOICEHUB_API_TOKEN')];
         $response = $this->http->request('POST', $base . $endpoint, $headers, $payload);
         if ($response['status'] >= 400 || (($response['body']['success'] ?? true) !== true)) {
-            throw new \RuntimeException('VoiceHub card-code creation failed with HTTP ' . $response['status'] . ': ' . json_encode($response['body'], JSON_UNESCAPED_UNICODE));
+            throw new \RuntimeException('VoiceHub card-code import failed with HTTP ' . $response['status'] . ': ' . json_encode($response['body'], JSON_UNESCAPED_UNICODE));
         }
         return $response['body'];
     }
 
-    private function note(array $order, int $count): string
+    private function note(array $order): string
     {
         $parts = [
             'voicehubpay',
@@ -48,7 +46,6 @@ final class VoiceHubService
             'afdian_user=' . ($order['afdian_user_id'] ?? ''),
             'buyer=' . ($order['buyer_name'] ?? ''),
             'amount=' . ($order['amount'] ?? ''),
-            'count=' . $count,
         ];
         return implode(' | ', array_filter($parts, static fn (string $part): bool => !str_ends_with($part, '=')));
     }
