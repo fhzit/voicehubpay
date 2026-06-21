@@ -7,6 +7,7 @@
 - Afdian order ingestion through both webhook and API polling.
 - VoiceHub API dispatch with retryable order status tracking.
 - Setup and runtime configuration from Web UI; no manual config-file editing required.
+- shadcn-inspired Web UI using design tokens, cards, buttons, badges, and form controls.
 - Configuration is always stored in `storage/settings.sqlite`.
 - Order/data storage can use SQLite or PostgreSQL via PDO.
 - OAuth2-only admin authentication; no built-in account/password system.
@@ -25,7 +26,9 @@
 php -S 127.0.0.1:8080 -t public
 ```
 
-Open `http://127.0.0.1:8080/setup` and complete the initialization form. The form saves OAuth2, Afdian, VoiceHub, and data-database settings into `storage/settings.sqlite`.
+Open `http://127.0.0.1:8080/setup` and complete the initialization form. Do not edit config files during deployment: the form saves OAuth2, Afdian, VoiceHub, and data-database settings into `storage/settings.sqlite`.
+
+OAuth2 is configured in the same first-run form. Copy the displayed callback URL into your OAuth provider, then paste the provider's authorize/token/userinfo URLs and client credentials back into Web UI.
 
 The first setup request is unauthenticated so a fresh install can be configured. After setup is complete, `/setup` requires OAuth2 login.
 

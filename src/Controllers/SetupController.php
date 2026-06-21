@@ -22,10 +22,11 @@ final class SetupController
             return $redirect;
         }
 
-        $settings = $this->config->settings()->all() + $this->defaults();
+        $settings = $this->config->settings()->all() + $this->defaults($request);
         return $this->view('setup', [
             'settings' => $settings,
             'isConfigured' => $this->config->isConfigured(),
+            'oauthRedirectUri' => $settings['OAUTH_REDIRECT_URI'] ?? '',
             'user' => SessionAuth::user(),
         ]);
     }
@@ -81,10 +82,11 @@ final class SetupController
         return $settings;
     }
 
-    private function defaults(): array
+    private function defaults(Request $request): array
     {
+        $appUrl = $this->defaultAppUrl($request);
         return [
-            'APP_URL' => 'http://127.0.0.1:8080',
+            'APP_URL' => $appUrl,
             'APP_KEY' => 'generate',
             'DATA_DB_CONNECTION' => 'sqlite',
             'DATA_DB_DATABASE' => 'storage/voicehubpay.sqlite',
@@ -92,6 +94,7 @@ final class SetupController
             'DATA_DB_PORT' => '5432',
             'OAUTH_SCOPES' => 'openid profile email',
             'OAUTH_TOKEN_TYPE' => 'Bearer',
+            'OAUTH_REDIRECT_URI' => $appUrl . '/auth/callback',
             'AFDIAN_API_BASE' => 'https://afdian.com',
             'AFDIAN_ORDER_ENDPOINT' => '/api/open/query-order',
             'AFDIAN_POLL_LIMIT' => '20',
@@ -107,6 +110,17 @@ final class SetupController
             $fn = require $migration;
             $fn($pdo);
         }
+    }
+
+    private function defaultAppUrl(Request $request): string
+    {
+        $host = (string) ($request->server['HTTP_X_FORWARDED_HOST'] ?? $request->server['HTTP_HOST'] ?? '127.0.0.1:8080');
+        $proto = (string) ($request->server['HTTP_X_FORWARDED_PROTO'] ?? '');
+        if ($proto === '') {
+            $https = strtolower((string) ($request->server['HTTPS'] ?? ''));
+            $proto = ($https === 'on' || $https === '1') ? 'https' : 'http';
+        }
+        return rtrim($proto . '://' . $host, '/');
     }
 
     private function view(string $name, array $data): Response

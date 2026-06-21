@@ -1,7 +1,11 @@
-<section class="card">
-    <h1>管理面板</h1>
-    <p class="muted">当前用户：<?= htmlspecialchars($user['name'] ?? 'OAuth user') ?> · 数据库：<?= htmlspecialchars($dbDriver) ?></p>
-    <form method="post" action="/sync/afdian"><button>立即轮询爱发电订单</button></form>
+<section class="card hero">
+    <div class="card-header">
+        <div>
+            <h1>管理面板</h1>
+            <p class="muted">当前用户：<?= htmlspecialchars($user['name'] ?? 'OAuth user') ?> · 数据库：<?= htmlspecialchars($dbDriver) ?></p>
+        </div>
+        <form method="post" action="/sync/afdian"><button>立即轮询爱发电订单</button></form>
+    </div>
 </section>
 <section class="grid">
     <?php foreach ($stats as $status => $count): ?>
@@ -9,7 +13,13 @@
     <?php endforeach; ?>
 </section>
 <section class="card">
-    <h2>最近订单</h2>
+    <div class="card-header">
+        <div>
+            <h2>最近订单</h2>
+            <p class="muted">展示最近 10 条爱发电订单及 VoiceHub 派发状态。</p>
+        </div>
+        <a class="button secondary" href="/orders">查看全部</a>
+    </div>
     <?php require __DIR__ . '/partials/order-table.php'; ?>
 </section>
 <section class="card">
