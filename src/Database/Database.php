@@ -21,9 +21,9 @@ final class Database
             return $this->pdo;
         }
 
-        $connection = $this->config->get('DB_CONNECTION', 'sqlite');
+        $connection = $this->config->get('DATA_DB_CONNECTION', $this->config->get('DB_CONNECTION', 'sqlite'));
         if ($connection === 'sqlite') {
-            $database = $this->config->path($this->config->get('DB_DATABASE', 'storage/voicehubpay.sqlite'));
+            $database = $this->config->path($this->config->get('DATA_DB_DATABASE', $this->config->get('DB_DATABASE', 'storage/voicehubpay.sqlite')));
             if (!is_dir(dirname($database))) {
                 mkdir(dirname($database), 0775, true);
             }
@@ -33,14 +33,14 @@ final class Database
         } elseif ($connection === 'pgsql') {
             $dsn = sprintf(
                 'pgsql:host=%s;port=%s;dbname=%s',
-                $this->config->get('DB_HOST', '127.0.0.1'),
-                $this->config->get('DB_PORT', '5432'),
-                $this->config->get('DB_DATABASE', 'voicehubpay')
+                $this->config->get('DATA_DB_HOST', $this->config->get('DB_HOST', '127.0.0.1')),
+                $this->config->get('DATA_DB_PORT', $this->config->get('DB_PORT', '5432')),
+                $this->config->get('DATA_DB_DATABASE', $this->config->get('DB_DATABASE', 'voicehubpay'))
             );
-            $username = $this->config->get('DB_USERNAME');
-            $password = $this->config->get('DB_PASSWORD');
+            $username = $this->config->get('DATA_DB_USERNAME', $this->config->get('DB_USERNAME'));
+            $password = $this->config->get('DATA_DB_PASSWORD', $this->config->get('DB_PASSWORD'));
         } else {
-            throw new \RuntimeException('Unsupported DB_CONNECTION: ' . $connection);
+            throw new \RuntimeException('Unsupported DATA_DB_CONNECTION: ' . $connection);
         }
 
         $this->pdo = new PDO($dsn, $username, $password, [

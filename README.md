@@ -6,26 +6,34 @@
 
 - Afdian order ingestion through both webhook and API polling.
 - VoiceHub API dispatch with retryable order status tracking.
-- SQLite and PostgreSQL database support via PDO.
+- Setup and runtime configuration from Web UI; no manual config-file editing required.
+- Configuration is always stored in `storage/settings.sqlite`.
+- Order/data storage can use SQLite or PostgreSQL via PDO.
 - OAuth2-only admin authentication; no built-in account/password system.
-- Minimal Web UI for configuration visibility, order status, and manual sync/retry.
 
 ## Requirements
 
 - PHP 8.2+
-- PDO driver for SQLite or PostgreSQL
+- PDO SQLite driver for the settings database
+- PDO SQLite or PDO PostgreSQL driver for order data
 - cURL extension
-- Composer is optional for future dependencies; current code has a small PSR-4 autoloader fallback.
+- Composer is optional; current code has a small PSR-4 autoloader fallback.
 
 ## Quick start
 
 ```bash
-cp .env.example .env
-php scripts/migrate.php
 php -S 127.0.0.1:8080 -t public
 ```
 
-Open `http://127.0.0.1:8080` and sign in through your OAuth2 provider.
+Open `http://127.0.0.1:8080/setup` and complete the initialization form. The form saves OAuth2, Afdian, VoiceHub, and data-database settings into `storage/settings.sqlite`.
+
+The first setup request is unauthenticated so a fresh install can be configured. After setup is complete, `/setup` requires OAuth2 login.
+
+## Storage model
+
+- `storage/settings.sqlite`: fixed SQLite database for application configuration.
+- `DATA_DB_CONNECTION=sqlite`: stores order data in the configured SQLite file, default `storage/voicehubpay.sqlite`.
+- `DATA_DB_CONNECTION=pgsql`: stores order data in PostgreSQL using the host, port, database, username, and password configured in Web UI.
 
 ## Polling
 
@@ -49,11 +57,11 @@ Configure Afdian to send order webhooks to:
 POST https://your-domain.example.com/webhook/afdian
 ```
 
-The webhook handler validates `AFDIAN_WEBHOOK_SECRET` when Afdian sends a signature header. If your Afdian webhook format differs, update `AfdianService::verifyWebhook()` and `AfdianService::normalizeWebhookOrder()`.
+The webhook handler validates the configured Afdian webhook secret when Afdian sends a signature header. If your Afdian webhook format differs, update `AfdianService::verifyWebhook()` and `AfdianService::normalizeWebhookOrder()`.
 
 ## VoiceHub payload
 
-By default, `VoiceHubService` posts JSON to `VOICEHUB_API_BASE + VOICEHUB_TICKET_ENDPOINT`:
+By default, `VoiceHubService` posts JSON to configured `VOICEHUB_API_BASE + VOICEHUB_TICKET_ENDPOINT`:
 
 ```json
 {
