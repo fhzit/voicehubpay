@@ -60,8 +60,14 @@
             <label class="field"><span>API Token</span><input type="password" name="AFDIAN_API_TOKEN" value="<?= htmlspecialchars($settings['AFDIAN_API_TOKEN'] ?? '') ?>"></label>
             <label class="field"><span>API Base</span><input name="AFDIAN_API_BASE" value="<?= htmlspecialchars($settings['AFDIAN_API_BASE'] ?? '') ?>"></label>
             <label class="field"><span>订单接口</span><input name="AFDIAN_ORDER_ENDPOINT" value="<?= htmlspecialchars($settings['AFDIAN_ORDER_ENDPOINT'] ?? '') ?>"></label>
-            <label class="field"><span>Webhook Secret</span><input type="password" name="AFDIAN_WEBHOOK_SECRET" value="<?= htmlspecialchars($settings['AFDIAN_WEBHOOK_SECRET'] ?? '') ?>"></label>
-            <label class="field"><span>轮询条数</span><input name="AFDIAN_POLL_LIMIT" value="<?= htmlspecialchars($settings['AFDIAN_POLL_LIMIT'] ?? '') ?>"></label>
+            <label class="field"><span>Webhook 签名校验</span>
+                <select name="AFDIAN_WEBHOOK_REQUIRE_SIGNATURE">
+                    <option value="1" <?= ($settings['AFDIAN_WEBHOOK_REQUIRE_SIGNATURE'] ?? '1') === '1' ? 'selected' : '' ?>>要求 RSA 签名</option>
+                    <option value="0" <?= ($settings['AFDIAN_WEBHOOK_REQUIRE_SIGNATURE'] ?? '1') === '0' ? 'selected' : '' ?>>允许无签名旧回调</option>
+                </select>
+            </label>
+            <label class="field"><span>轮询最多处理订单数</span><input name="AFDIAN_POLL_LIMIT" value="<?= htmlspecialchars($settings['AFDIAN_POLL_LIMIT'] ?? '') ?>"></label>
+            <label class="field"><span>API 每页条数</span><input name="AFDIAN_POLL_PER_PAGE" value="<?= htmlspecialchars($settings['AFDIAN_POLL_PER_PAGE'] ?? '') ?>"></label>
         </div>
     </section>
 

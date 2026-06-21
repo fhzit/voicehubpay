@@ -46,6 +46,8 @@ Run manually:
 php scripts/poll-afdian.php
 ```
 
+The poller calls `https://ifdian.net/api/open/query-order` by default and signs requests as `md5(token + sorted key/value payload)` according to Afdian's OpenAPI documentation.
+
 Cron example:
 
 ```cron
@@ -60,7 +62,13 @@ Configure Afdian to send order webhooks to:
 POST https://your-domain.example.com/webhook/afdian
 ```
 
-The webhook handler validates the configured Afdian webhook secret when Afdian sends a signature header. If your Afdian webhook format differs, update `AfdianService::verifyWebhook()` and `AfdianService::normalizeWebhookOrder()`.
+The webhook handler verifies Afdian's RSA signature by default. Afdian signs `out_trade_no + user_id + plan_id + total_amount` with SHA256, and the handler responds with the required JSON shape:
+
+```json
+{"ec":200,"em":""}
+```
+
+If you need to accept legacy unsigned callbacks temporarily, set `Webhook 签名校验` to `允许无签名旧回调` in Web UI.
 
 ## VoiceHub payload
 
