@@ -106,16 +106,22 @@ If you need to accept legacy unsigned callbacks temporarily, set `Webhook 签名
 
 ## VoiceHub payload
 
-By default, `VoiceHubService` posts JSON to configured `VOICEHUB_API_BASE + VOICEHUB_TICKET_ENDPOINT`:
+By default, `VoiceHubService` calls VoiceHub's real Open API:
+
+```text
+POST /api/open/card-codes
+x-api-key: <VoiceHub Open API Key>
+```
+
+The JSON body asks VoiceHub to generate available card codes:
 
 ```json
 {
-  "source": "afdian",
-  "order_no": "...",
-  "user_id": "...",
-  "amount": 1,
-  "metadata": { "...": "..." }
+  "count": 1,
+  "prefix": "AFD",
+  "length": 12,
+  "note": "voicehubpay | source=afdian | order=... | amount=... | count=1"
 }
 ```
 
-Adjust `src/Services/VoiceHubService.php` if the live VoiceHub API contract uses different field names.
+`count` is derived from the Afdian paid amount with a minimum of 1. Configure the endpoint, prefix, length, and optional charset in Web UI.

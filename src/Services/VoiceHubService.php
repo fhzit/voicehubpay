@@ -18,24 +18,39 @@ final class VoiceHubService
     public function createTicket(array $order): array
     {
         $base = rtrim($this->required('VOICEHUB_API_BASE'), '/');
-        $endpoint = $this->config->get('VOICEHUB_TICKET_ENDPOINT', '/api/song-tickets');
+        $endpoint = $this->config->get('VOICEHUB_TICKET_ENDPOINT', '/api/open/card-codes');
+        $count = max(1, (int) floor((float) $order['amount']));
         $payload = [
-            'source' => 'afdian',
-            'order_no' => $order['order_no'],
-            'user_id' => $order['afdian_user_id'] ?: $order['buyer_name'],
-            'amount' => max(1, (int) floor((float) $order['amount'])),
-            'metadata' => [
-                'buyer_name' => $order['buyer_name'] ?? '',
-                'afdian_status' => $order['status'] ?? '',
-                'raw' => $order['raw'] ?? [],
-            ],
+            'count' => $count,
+            'prefix' => $this->config->get('VOICEHUB_CODE_PREFIX', 'AFD'),
+            'length' => $this->config->int('VOICEHUB_CODE_LENGTH', 12),
+            'note' => $this->note($order, $count),
         ];
-        $headers = ['Authorization: ' . $this->config->get('VOICEHUB_AUTH_SCHEME', 'Bearer') . ' ' . $this->required('VOICEHUB_API_TOKEN')];
+        $charset = trim((string) ($this->config->get('VOICEHUB_CODE_CHARSET', '') ?? ''));
+        if ($charset !== '') {
+            $payload['charset'] = $charset;
+        }
+
+        $headers = ['x-api-key: ' . $this->required('VOICEHUB_API_TOKEN')];
         $response = $this->http->request('POST', $base . $endpoint, $headers, $payload);
-        if ($response['status'] >= 400) {
-            throw new \RuntimeException('VoiceHub ticket creation failed with HTTP ' . $response['status'] . ': ' . json_encode($response['body'], JSON_UNESCAPED_UNICODE));
+        if ($response['status'] >= 400 || (($response['body']['success'] ?? true) !== true)) {
+            throw new \RuntimeException('VoiceHub card-code creation failed with HTTP ' . $response['status'] . ': ' . json_encode($response['body'], JSON_UNESCAPED_UNICODE));
         }
         return $response['body'];
+    }
+
+    private function note(array $order, int $count): string
+    {
+        $parts = [
+            'voicehubpay',
+            'source=afdian',
+            'order=' . ($order['order_no'] ?? ''),
+            'afdian_user=' . ($order['afdian_user_id'] ?? ''),
+            'buyer=' . ($order['buyer_name'] ?? ''),
+            'amount=' . ($order['amount'] ?? ''),
+            'count=' . $count,
+        ];
+        return implode(' | ', array_filter($parts, static fn (string $part): bool => !str_ends_with($part, '=')));
     }
 
     private function required(string $key): string

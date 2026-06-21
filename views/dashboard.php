@@ -25,5 +25,5 @@
 <section class="card">
     <h2>接口</h2>
     <p>爱发电 Webhook：<code>POST /webhook/afdian</code></p>
-    <p>VoiceHub 目标：<code><?= htmlspecialchars(($config->get('VOICEHUB_API_BASE') ?? '') . ($config->get('VOICEHUB_TICKET_ENDPOINT', '/api/song-tickets') ?? '')) ?></code></p>
+    <p>VoiceHub 目标：<code><?= htmlspecialchars(($config->get('VOICEHUB_API_BASE') ?? '') . ($config->get('VOICEHUB_TICKET_ENDPOINT', '/api/open/card-codes') ?? '')) ?></code></p>
 </section>

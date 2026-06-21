@@ -63,7 +63,7 @@ final class SetupController
             'DATA_DB_CONNECTION', 'DATA_DB_DATABASE', 'DATA_DB_HOST', 'DATA_DB_PORT', 'DATA_DB_USERNAME', 'DATA_DB_PASSWORD',
             'OAUTH_AUTHORIZE_URL', 'OAUTH_TOKEN_URL', 'OAUTH_USERINFO_URL', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET', 'OAUTH_REDIRECT_URI', 'OAUTH_SCOPES', 'OAUTH_ALLOWED_IDENTIFIERS', 'OAUTH_ALLOWED_EMAILS', 'OAUTH_TOKEN_TYPE',
             'AFDIAN_USER_ID', 'AFDIAN_API_TOKEN', 'AFDIAN_API_BASE', 'AFDIAN_ORDER_ENDPOINT', 'AFDIAN_WEBHOOK_REQUIRE_SIGNATURE', 'AFDIAN_POLL_LIMIT', 'AFDIAN_POLL_PER_PAGE',
-            'VOICEHUB_API_BASE', 'VOICEHUB_TICKET_ENDPOINT', 'VOICEHUB_API_TOKEN', 'VOICEHUB_AUTH_SCHEME',
+            'VOICEHUB_API_BASE', 'VOICEHUB_TICKET_ENDPOINT', 'VOICEHUB_API_TOKEN', 'VOICEHUB_CODE_PREFIX', 'VOICEHUB_CODE_LENGTH', 'VOICEHUB_CODE_CHARSET',
         ];
         $settings = [];
         foreach ($keys as $key) {
@@ -76,10 +76,9 @@ final class SetupController
         $settings['AFDIAN_WEBHOOK_REQUIRE_SIGNATURE'] = $settings['AFDIAN_WEBHOOK_REQUIRE_SIGNATURE'] === '0' ? '0' : '1';
         $settings['OAUTH_SCOPES'] = $settings['OAUTH_SCOPES'] ?: 'openid profile email';
         $settings['OAUTH_TOKEN_TYPE'] = $settings['OAUTH_TOKEN_TYPE'] ?: 'Bearer';
-        $settings['VOICEHUB_AUTH_SCHEME'] = $settings['VOICEHUB_AUTH_SCHEME'] ?: 'Bearer';
-        $settings['AFDIAN_API_BASE'] = $settings['AFDIAN_API_BASE'] ?: 'https://ifdian.net';
-        $settings['AFDIAN_ORDER_ENDPOINT'] = $settings['AFDIAN_ORDER_ENDPOINT'] ?: '/api/open/query-order';
-        $settings['VOICEHUB_TICKET_ENDPOINT'] = $settings['VOICEHUB_TICKET_ENDPOINT'] ?: '/api/song-tickets';
+        $settings['VOICEHUB_CODE_PREFIX'] = $settings['VOICEHUB_CODE_PREFIX'] ?: 'AFD';
+        $settings['VOICEHUB_CODE_LENGTH'] = $settings['VOICEHUB_CODE_LENGTH'] ?: '12';
+        $settings['VOICEHUB_TICKET_ENDPOINT'] = $settings['VOICEHUB_TICKET_ENDPOINT'] ?: '/api/open/card-codes';
         $settings['DATA_DB_DATABASE'] = $settings['DATA_DB_DATABASE'] ?: 'storage/voicehubpay.sqlite';
         return $settings;
     }
@@ -102,8 +101,9 @@ final class SetupController
             'AFDIAN_WEBHOOK_REQUIRE_SIGNATURE' => '1',
             'AFDIAN_POLL_LIMIT' => '20',
             'AFDIAN_POLL_PER_PAGE' => '50',
-            'VOICEHUB_TICKET_ENDPOINT' => '/api/song-tickets',
-            'VOICEHUB_AUTH_SCHEME' => 'Bearer',
+            'VOICEHUB_TICKET_ENDPOINT' => '/api/open/card-codes',
+            'VOICEHUB_CODE_PREFIX' => 'AFD',
+            'VOICEHUB_CODE_LENGTH' => '12',
         ];
     }
 
