@@ -1,0 +1,22 @@
+{
+  "name": "voicehub/voicehubpay",
+  "description": "Afdian order bridge for VoiceHub song-ticket creation.",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.2",
+    "ext-pdo": "*",
+    "ext-json": "*",
+    "ext-curl": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "VoiceHubPay\\": "src/"
+    }
+  },
+  "scripts": {
+    "serve": "php -S 127.0.0.1:8080 -t public",
+    "migrate": "php scripts/migrate.php",
+    "poll": "php scripts/poll-afdian.php"
+  }
+}
