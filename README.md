@@ -40,7 +40,15 @@ The first setup request is unauthenticated so a fresh install can be configured.
 
 ## 1Panel deployment notes
 
-Use a PHP 8.2+ runtime with `pdo_sqlite`, `curl`, and `openssl` enabled. If order data uses PostgreSQL, also enable `pdo_pgsql`.
+Use a PHP 8.2+ runtime with `pdo_sqlite`, `curl`, and `openssl` enabled. If order data uses PostgreSQL, also enable both `pdo_pgsql` and `pgsql`. In 1Panel this is under PHP runtime → Extensions, then restart the PHP runtime and OpenResty/Nginx.
+
+Check the active PHP runtime from SSH:
+
+```bash
+php -m | grep -E 'PDO|pdo_sqlite|pdo_pgsql|sqlite|pgsql|curl|openssl'
+```
+
+For PostgreSQL mode, `PDO`, `pdo_pgsql`, and `pgsql` must appear in the output.
 
 Set the website root to the project's `public` directory. If 1Panel requires the project root as the site directory, set the running directory/document root to `public`. Requests like `/setup` must be routed to `public/index.php` instead of being treated as static files.
 

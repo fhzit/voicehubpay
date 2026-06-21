@@ -23,6 +23,7 @@ final class Database
 
         $connection = $this->config->get('DATA_DB_CONNECTION', $this->config->get('DB_CONNECTION', 'sqlite'));
         if ($connection === 'sqlite') {
+            $this->ensureDriver('sqlite', 'pdo_sqlite / sqlite3');
             $database = $this->config->path($this->config->get('DATA_DB_DATABASE', $this->config->get('DB_DATABASE', 'storage/voicehubpay.sqlite')));
             if (!is_dir(dirname($database))) {
                 mkdir(dirname($database), 0775, true);
@@ -31,6 +32,7 @@ final class Database
             $username = null;
             $password = null;
         } elseif ($connection === 'pgsql') {
+            $this->ensureDriver('pgsql', 'pdo_pgsql / pgsql');
             $dsn = sprintf(
                 'pgsql:host=%s;port=%s;dbname=%s',
                 $this->config->get('DATA_DB_HOST', $this->config->get('DB_HOST', '127.0.0.1')),
@@ -54,5 +56,16 @@ final class Database
     public function driver(): string
     {
         return $this->pdo()->getAttribute(PDO::ATTR_DRIVER_NAME);
+    }
+
+    private function ensureDriver(string $driver, string $extensionHint): void
+    {
+        if (!in_array($driver, PDO::getAvailableDrivers(), true)) {
+            throw new \RuntimeException(sprintf(
+                'PDO driver "%s" is not enabled. Enable %s in the 1Panel PHP runtime, then restart PHP/OpenResty.',
+                $driver,
+                $extensionHint
+            ));
+        }
     }
 }
