@@ -38,6 +38,32 @@ The first setup request is unauthenticated so a fresh install can be configured.
 - `DATA_DB_CONNECTION=sqlite`: stores order data in the configured SQLite file, default `storage/voicehubpay.sqlite`.
 - `DATA_DB_CONNECTION=pgsql`: stores order data in PostgreSQL using the host, port, database, username, and password configured in Web UI.
 
+## 1Panel deployment notes
+
+Use a PHP 8.2+ runtime with `pdo_sqlite`, `curl`, and `openssl` enabled. If order data uses PostgreSQL, also enable `pdo_pgsql`.
+
+Set the website root to the project's `public` directory. If 1Panel requires the project root as the site directory, set the running directory/document root to `public`. Requests like `/setup` must be routed to `public/index.php` instead of being treated as static files.
+
+Recommended Nginx rewrite rule:
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.php?$query_string;
+}
+```
+
+Ensure PHP-FPM can write the storage directory before opening `/setup`:
+
+```bash
+cd /www/sites/vhpay/index
+mkdir -p storage/logs
+chmod -R 775 storage
+# If 775 is still denied, make the directory owned by the PHP-FPM user shown in 1Panel.
+# Common examples: chown -R www:www storage  OR  chown -R 1000:1000 storage
+```
+
+`storage/settings.sqlite` is created automatically on first request, so `mkdir(): Permission denied` or `SQLSTATE[HY000] [14] unable to open database file` means the PHP-FPM user cannot write `storage/`.
+
 ## Polling
 
 Run manually:
