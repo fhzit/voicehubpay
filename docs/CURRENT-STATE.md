@@ -120,8 +120,8 @@ API Poll scripts/poll-afdian.php─┤→ AfdianService(验签/轮询) → Order
 上文第 1-6 节为旧版勘察基线（历史事实），第 7 节计划已全部落地：
 
 - ✅ 核心基础设施 / 双库迁移（sqlite+pgsql 001-014）/ Repositories / 领域服务
-- ✅ Auth：Argon2id 密码 + QQ/微信 `social_identities`（UNIQUE provider+social_uid）、
-  `session_regenerate_id(true)`、登录限流、全 POST CSRF
+- ✅ Auth：Argon2id 密码 + 任性聚合登录 QQ/微信 `social_identities`（UNIQUE provider+social_uid）、
+  `session_regenerate_id(true)`、登录限流、一次性 OAuth state、全 POST CSRF
 - ✅ Shop：登录必购、服务端 `price×qty` 整数分、一单→N 单元 `-001..-00N`、
   库存事务原子预占（`FOR UPDATE`）、`release-reservations.php` 释放、paid_stockout→manual_review
 - ✅ SG65 V2（RSA-SHA256）支付：create/notify(GET，解耦立即回 success)/query 回填/对账，无退款

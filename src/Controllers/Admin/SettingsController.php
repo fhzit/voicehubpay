@@ -158,13 +158,12 @@ final class SettingsController extends Controller
         }
         $config = $this->app->config;
         $secretStore = new SecretStore($config->basePath, $config->settings());
-        $appUrl = $config->appUrl();
+        $social = new \VoiceHubPay\Auth\SocialAuth($this->app);
         return $this->render('admin/settings/auth', [
             'settings' => $config->settings()->all(),
-            'qq_key_placeholder' => $secretStore->placeholder('QQ_APP_KEY'),
-            'wx_key_placeholder' => $secretStore->placeholder('WX_APP_KEY'),
-            'qq_callback' => $appUrl . '/auth/social/callback?provider=qq',
-            'wx_callback' => $appUrl . '/auth/social/callback?provider=wx',
+            'aggregate_key_placeholder' => $secretStore->placeholder('AGGREGATE_OAUTH_APP_KEY'),
+            'qq_callback' => $social->callbackUrl('qq'),
+            'wx_callback' => $social->callbackUrl('wx'),
         ], 'admin');
     }
 
@@ -177,20 +176,33 @@ final class SettingsController extends Controller
             return $redirect;
         }
         $secretStore = new SecretStore($this->app->config->basePath, $this->app->config->settings());
+        $appId = trim($request->string('aggregate_app_id'));
+        $endpoint = trim($request->string('aggregate_endpoint')) ?: 'https://a.idcfx.net/connect.php';
+        $parts = parse_url($endpoint);
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || ($parts['host'] ?? '') === '' || isset($parts['user']) || isset($parts['pass']) || trim((string) ($parts['path'] ?? ''), '/') === '') {
+            return $this->redirect('/admin/settings/auth')->withFlash('聚合登录接口必须是包含路径的 HTTPS URL。', 'error');
+        }
+        $appKeyInput = trim($request->string('aggregate_app_key'));
+        $appKey = $appKeyInput !== '' && $appKeyInput !== '••••••••'
+            ? $appKeyInput
+            : trim((string) $secretStore->get('AGGREGATE_OAUTH_APP_KEY', ''));
+        $qqEnabled = $request->int('qq_enabled', 0) === 1;
+        $wxEnabled = $request->int('wx_enabled', 0) === 1;
+        if (($qqEnabled || $wxEnabled) && ($appId === '' || $appKey === '')) {
+            return $this->redirect('/admin/settings/auth')->withFlash('启用 QQ/微信聚合登录前，请完整填写 AppID 和 AppKey。', 'error');
+        }
         $this->app->config->settings()->setMany([
             'REGISTRATION_ENABLED' => $request->int('registration_enabled', 0) === 1 ? '1' : '0',
-            'QQ_LOGIN_ENABLED' => $request->int('qq_enabled', 0) === 1 ? '1' : '0',
-            'QQ_APP_ID' => trim($request->string('qq_app_id')),
-            'WX_LOGIN_ENABLED' => $request->int('wx_enabled', 0) === 1 ? '1' : '0',
-            'WX_APP_ID' => trim($request->string('wx_app_id')),
+            'QQ_LOGIN_ENABLED' => $qqEnabled ? '1' : '0',
+            'WX_LOGIN_ENABLED' => $wxEnabled ? '1' : '0',
+            'AGGREGATE_OAUTH_APP_ID' => $appId,
+            'AGGREGATE_OAUTH_ENDPOINT' => 'https://' . $parts['host'] . (isset($parts['port']) ? ':' . (int) $parts['port'] : '') . rtrim((string) $parts['path'], '/'),
         ]);
-        $qqKey = trim($request->string('qq_app_key'));
-        if ($qqKey !== '' && $qqKey !== '••••••••') {
-            $secretStore->set('QQ_APP_KEY', $qqKey);
+        if ($appKeyInput !== '' && $appKeyInput !== '••••••••') {
+            $secretStore->set('AGGREGATE_OAUTH_APP_KEY', $appKeyInput);
         }
-        $wxKey = trim($request->string('wx_app_key'));
-        if ($wxKey !== '' && $wxKey !== '••••••••') {
-            $secretStore->set('WX_APP_KEY', $wxKey);
+        foreach (['QQ_APP_ID', 'QQ_APP_KEY', 'WX_APP_ID', 'WX_APP_KEY'] as $legacyKey) {
+            $this->app->config->settings()->delete($legacyKey);
         }
         $this->app->config->reloadSettings();
         $this->audit($this->adminUserId(), 'settings.auth', 'settings', 'auth', [], $request);

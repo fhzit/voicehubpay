@@ -7,182 +7,154 @@ namespace VoiceHubPay\Auth;
 use VoiceHubPay\App;
 
 /**
- * QQ / WeChat OAuth2 login providers (standard OAuth2 code flow).
+ * 任性聚合登录 client (https://a.idcfx.net/doc.php).
+ *
+ * QQ and WeChat share one Aggregate AppID/AppKey. The local provider remains
+ * qq/wx so existing social identity rows stay compatible.
  */
 final class SocialAuth
 {
+    private const DEFAULT_ENDPOINT = 'https://a.idcfx.net/connect.php';
+
     public function __construct(private readonly App $app)
     {
     }
 
     /**
-     * Build the authorize URL for a provider. Stores state in session.
+     * Ask the Aggregate API for the provider authorization URL.
      */
     public function authorizeUrl(string $provider, string $redirectAfter = '/'): string
     {
-        $provider = $provider === 'wx' ? 'wx' : 'qq';
+        $provider = $this->provider($provider);
+        [$appId, $appKey] = $this->credentials();
         $state = bin2hex(random_bytes(16));
         $_SESSION['social_state'] = $state;
         $_SESSION['social_provider'] = $provider;
         $_SESSION['social_redirect'] = $redirectAfter;
 
-        $callback = $this->app->config->appUrl() . '/auth/social/callback?provider=' . $provider;
-
-        if ($provider === 'qq') {
-            $appId = (string) $this->app->config->secret('QQ_APP_ID', $this->app->config->get('QQ_APP_ID', ''));
-            return 'https://graph.qq.com/oauth2.0/authorize?' . http_build_query([
-                'response_type' => 'code',
-                'client_id' => $appId,
-                'redirect_uri' => $callback,
-                'state' => $state,
-                'scope' => 'get_user_info',
-            ]);
-        }
-
-        // WeChat
-        $appId = (string) $this->app->config->secret('WX_APP_ID', $this->app->config->get('WX_APP_ID', ''));
-        return 'https://open.weixin.qq.com/connect/qrconnect?' . http_build_query([
+        // Official SDK: send the one-time state as its own login parameter;
+        // the menu echoes it back on callback and connect.php compares it.
+        $callback = $this->callbackUrl($provider);
+        $response = $this->request([
+            'act' => 'login',
             'appid' => $appId,
+            'appkey' => $appKey,
+            'type' => $provider,
             'redirect_uri' => $callback,
-            'response_type' => 'code',
-            'scope' => 'snsapi_login',
             'state' => $state,
-        ]) . '#wechat_redirect';
+        ]);
+        $url = trim((string) ($response['url'] ?? ''));
+        if ($url === '') {
+            throw new \RuntimeException('聚合登录未返回授权地址。');
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || ($parts['host'] ?? '') === '' || isset($parts['user']) || isset($parts['pass'])) {
+            throw new \RuntimeException('聚合登录返回了无效的授权地址。');
+        }
+        return $url;
     }
 
     /**
-     * Exchange code for a normalized profile.
-     * Returns ['openid' => ..., 'nickname' => ..., 'avatar_url' => ...]
+     * Exchange the Aggregate Authorization Code for normalized profile data.
      *
-     * @throws \RuntimeException on failure
+     * A provider hint is passed through so after SDK-style callbacks that
+     * omit `type` we still identify the intended provider; the exact match is
+     * validated against the session-bound provider before use.
      */
     public function exchangeCode(string $provider, string $code): array
     {
-        $provider = $provider === 'wx' ? 'wx' : 'qq';
-        $callback = $this->app->config->appUrl() . '/auth/social/callback?provider=' . $provider;
-
-        if ($provider === 'qq') {
-            return $this->exchangeQq($code, $callback);
-        }
-        return $this->exchangeWx($code, $callback);
-    }
-
-    private function exchangeQq(string $code, string $callback): array
-    {
-        $appId = (string) $this->app->config->secret('QQ_APP_ID', $this->app->config->get('QQ_APP_ID', ''));
-        $appKey = (string) $this->app->config->secret('QQ_APP_KEY', $this->app->config->get('QQ_APP_KEY', ''));
-        if ($appId === '' || $appKey === '') {
-            throw new \RuntimeException('QQ 登录未配置。');
-        }
-
-        $tokenBody = $this->httpGet('https://graph.qq.com/oauth2.0/token?' . http_build_query([
-            'grant_type' => 'authorization_code',
-            'client_id' => $appId,
-            'client_secret' => $appKey,
-            'code' => $code,
-            'redirect_uri' => $callback,
-        ]), 'application/x-www-form-urlencoded');
-        parse_str($tokenBody, $token);
-        $accessToken = (string) ($token['access_token'] ?? '');
-        if ($accessToken === '') {
-            throw new \RuntimeException('QQ 授权失败（未取得 access_token）。');
-        }
-
-        // openid endpoint returns: callback( {"client_id":"...","openid":"..."} );
-        $meBody = $this->httpGet('https://graph.qq.com/oauth2.0/me?access_token=' . urlencode($accessToken));
-        if (preg_match('/\{"client_id":\s*"([^"]+)",\s*"openid":\s*"([^"]+)"\}/', $meBody, $m)) {
-            $openid = $m[2];
-        } else {
-            $json = json_decode($meBody, true);
-            $openid = (string) ($json['openid'] ?? '');
-        }
-        if ($openid === '') {
-            throw new \RuntimeException('QQ 授权失败（未取得 openid）。');
-        }
-
-        $nickname = '';
-        $avatar = '';
-        try {
-            $info = $this->httpGetJson('https://graph.qq.com/user/get_user_info?' . http_build_query([
-                'access_token' => $accessToken,
-                'oauth_consumer_key' => $appId,
-                'openid' => $openid,
-            ]));
-            $nickname = (string) ($info['nickname'] ?? '');
-            $avatar = (string) ($info['figureurl_qq_2'] ?? $info['figureurl_qq_1'] ?? $info['figureurl'] ?? '');
-        } catch (\Throwable) {
-            // userinfo is best-effort
-        }
-
-        return ['openid' => $openid, 'nickname' => $nickname, 'avatar_url' => $avatar];
-    }
-
-    private function exchangeWx(string $code, string $callback): array
-    {
-        $appId = (string) $this->app->config->secret('WX_APP_ID', $this->app->config->get('WX_APP_ID', ''));
-        $appSecret = (string) $this->app->config->secret('WX_APP_KEY', $this->app->config->get('WX_APP_KEY', ''));
-        if ($appId === '' || $appSecret === '') {
-            throw new \RuntimeException('微信登录未配置。');
-        }
-
-        $token = $this->httpGetJson('https://api.weixin.qq.com/sns/oauth2/access_token?' . http_build_query([
+        $provider = $this->provider($provider);
+        [$appId, $appKey] = $this->credentials();
+        $response = $this->request([
+            'act' => 'callback',
             'appid' => $appId,
-            'secret' => $appSecret,
+            'appkey' => $appKey,
+            'type' => $provider,
             'code' => $code,
-            'grant_type' => 'authorization_code',
-        ]));
-        $accessToken = (string) ($token['access_token'] ?? '');
-        $openid = (string) ($token['openid'] ?? '');
-        if ($accessToken === '' || $openid === '') {
-            throw new \RuntimeException('微信授权失败：' . ($token['errmsg'] ?? 'unknown'));
+        ]);
+        $socialUid = trim((string) ($response['social_uid'] ?? ''));
+        if ($socialUid === '') {
+            throw new \RuntimeException('聚合登录未返回 social_uid。');
         }
-
-        $nickname = '';
-        $avatar = '';
-        try {
-            $info = $this->httpGetJson('https://api.weixin.qq.com/sns/userinfo?' . http_build_query([
-                'access_token' => $accessToken,
-                'openid' => $openid,
-                'lang' => 'zh_CN',
-            ]));
-            $nickname = (string) ($info['nickname'] ?? '');
-            $avatar = (string) ($info['headimgurl'] ?? '');
-        } catch (\Throwable) {
-            // best-effort
+        $returnedType = (string) ($response['type'] ?? $provider);
+        if ($returnedType !== $provider) {
+            throw new \RuntimeException('聚合登录返回的登录方式不匹配。');
         }
-
-        return ['openid' => $openid, 'nickname' => $nickname, 'avatar_url' => $avatar];
+        return [
+            'social_uid' => $socialUid,
+            'nickname' => (string) ($response['nickname'] ?? ''),
+            'avatar_url' => (string) ($response['faceimg'] ?? ''),
+        ];
     }
 
-    private function httpGet(string $url): string
+    public function callbackUrl(string $provider): string
     {
+        return $this->app->config->appUrl() . '/auth/social/callback?' . http_build_query(['provider' => $this->provider($provider)]);
+    }
+
+    private function credentials(): array
+    {
+        $appId = trim((string) $this->app->config->get('AGGREGATE_OAUTH_APP_ID', ''));
+        $appKey = trim((string) $this->app->config->secret(
+            'AGGREGATE_OAUTH_APP_KEY',
+            $this->app->config->get('AGGREGATE_OAUTH_APP_KEY', '')
+        ));
+        if ($appId === '' || $appKey === '') {
+            throw new \RuntimeException('任性聚合登录 AppID/AppKey 尚未配置。');
+        }
+        return [$appId, $appKey];
+    }
+
+    private function provider(string $provider): string
+    {
+        if (!in_array($provider, ['qq', 'wx'], true)) {
+            throw new \InvalidArgumentException('不支持的聚合登录方式。');
+        }
+        return $provider;
+    }
+
+    private function endpoint(): string
+    {
+        $raw = trim((string) $this->app->config->get('AGGREGATE_OAUTH_ENDPOINT', self::DEFAULT_ENDPOINT));
+        $parts = parse_url($raw);
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || ($parts['host'] ?? '') === '' || isset($parts['user']) || isset($parts['pass'])) {
+            throw new \RuntimeException('任性聚合登录接口地址必须是 HTTPS URL。');
+        }
+        $path = rtrim((string) ($parts['path'] ?? ''), '/');
+        if ($path === '') {
+            throw new \RuntimeException('任性聚合登录接口地址缺少路径。');
+        }
+        $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+        return 'https://' . $parts['host'] . $port . $path;
+    }
+
+    private function request(array $params): array
+    {
+        $url = $this->endpoint() . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
-            // OAuth endpoints are fixed HTTPS hosts; do not follow redirects to
-            // an unexpected scheme/host and risk forwarding bearer parameters.
+            CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_USERAGENT => 'VoiceHubPay/1.0',
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
         ]);
         $body = curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         $error = curl_error($ch);
         curl_close($ch);
-        if ($body === false || $status >= 400) {
-            throw new \RuntimeException('HTTP ' . $status . ($error ? ': ' . $error : ''));
+        if ($body === false || $status < 200 || $status >= 300) {
+            throw new \RuntimeException('聚合登录接口请求失败（HTTP ' . $status . ($error !== '' ? '）' : '）。'));
         }
-        return (string) $body;
-    }
-
-    private function httpGetJson(string $url): array
-    {
-        $body = $this->httpGet($url);
-        $json = json_decode($body, true);
-        if (!is_array($json)) {
-            throw new \RuntimeException('Invalid JSON response');
+        $decoded = json_decode((string) $body, true);
+        if (!is_array($decoded)) {
+            throw new \RuntimeException('聚合登录接口返回了无效 JSON。');
         }
-        return $json;
+        if ((int) ($decoded['code'] ?? -1) !== 0) {
+            throw new \RuntimeException('聚合登录失败：' . (string) ($decoded['msg'] ?? 'unknown error'));
+        }
+        return $decoded;
     }
 }

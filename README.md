@@ -28,7 +28,7 @@
 
 **前台（用户）**
 - 商品列表 / 详情 / 多数量购买（一单 → 多个履约单元 `-001..-00N`）
-- 需登录购买；账号密码（Argon2id）+ QQ / 微信扫码登录
+- 需登录购买；账号密码（Argon2id）+ 任性聚合登录提供的 QQ / 微信登录
 - 订单查询（轮询，不依赖支付回调确认）、卡密仓库、我的订单、账号安全（改密/改绑）
 - 返回页只轮询状态，绝不把"跳转回站"当作支付成功
 
@@ -93,9 +93,12 @@ php -S 127.0.0.1:8080 -t public
 
 - 安装时的站点信息（名称、货币、时区）写入 `storage/settings.sqlite` 的
   `app_settings`（SQLite 固定，即使业务库用 PostgreSQL）。
-- 敏感密钥（SG65 私钥/平台公钥、QQ/微信 AppKey、VoiceHub/Afdian Token）经
+- 敏感密钥（SG65 私钥/平台公钥、任性聚合登录 AppKey、VoiceHub/Afdian Token）经
   **APP_MASTER_KEY + libsodium** 加密存储于 `storage/settings.sqlite`，
   后台界面一律以掩码 `••••••••` 展示，绝不回显明文。
+- QQ 与微信登录统一通过[任性聚合登录](https://a.idcfx.net/doc.php)接入，共用
+  `AGGREGATE_OAUTH_APP_ID` / 加密的 `AGGREGATE_OAUTH_APP_KEY`，默认接口为
+  `https://a.idcfx.net/connect.php`；不再使用 QQ 互联或微信开放平台的直连密钥。
 - 后台地址 `/admin`（仅 `role=admin` 可见），所有 POST 表单强制 CSRF。
 - 站点通知回调地址（后台「系统设置」页会显示，可直接复制）：
   - SG65 异步通知：`GET {APP_URL}/payments/sg65/notify`

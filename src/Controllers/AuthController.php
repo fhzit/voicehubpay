@@ -77,8 +77,13 @@ final class AuthController extends Controller
         if (!$this->app->config->bool($enabledKey, false)) {
             return $this->redirect('/login')->withFlash('该登录方式未开启。', 'error');
         }
-        $social = new SocialAuth($this->app);
-        return $this->redirect($social->authorizeUrl($provider, $request->string('redirect', '/account')));
+        try {
+            $social = new SocialAuth($this->app);
+            return $this->redirect($social->authorizeUrl($provider, $request->string('redirect', '/account')));
+        } catch (\Throwable $e) {
+            error_log('[aggregate auth authorize] ' . $e->getMessage());
+            return $this->redirect('/login')->withFlash('聚合登录服务暂时不可用，请稍后重试或使用账号密码登录。', 'error');
+        }
     }
 
     public function socialCallback(Request $request): Response

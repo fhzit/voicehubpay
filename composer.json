@@ -1,6 +1,6 @@
 {
   "name": "voicehub/voicehubpay",
-  "description": "VoiceHubPay - 原生 PHP 数字商品发卡商城 + 爱发电(Afdian)到 VoiceHub 的发券桥接。支持商城/库存/多数量购买、SG65 V2 支付、QQ/微信登录、SQLite/PostgreSQL、从旧版 voicehubpay 无损升级。",
+  "description": "VoiceHubPay - 原生 PHP 数字商品发卡商城 + 爱发电(Afdian)到 VoiceHub 的发券桥接。支持商城/库存/多数量购买、SG65 V2 支付、任性聚合 QQ/微信登录、SQLite/PostgreSQL、从旧版 voicehubpay 无损升级。",
   "type": "project",
   "license": "proprietary",
   "require": {
