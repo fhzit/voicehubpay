@@ -1,4 +1,7 @@
-<?php /** @var array $state @var array $env @var \VoiceHubPay\App $__app @var ?array $__flash */ ?>
+<?php
+/** @var array $state @var array $env @var \VoiceHubPay\App $__app @var ?array $__flash */
+$canContinue = !array_filter($env, static fn (array $check): bool => $check['required'] && !$check['ok']);
+?>
 <div class="steps" aria-label="安装进度">
   <?php for ($i = 1; $i <= 7; $i++): ?><div class="step <?= $i === 1 ? 'active' : '' ?>"><?= $i ?></div><?php endfor; ?>
 </div>
@@ -30,6 +33,6 @@
   <form method="post" action="/install?step=1" class="install-actions" style="justify-content:flex-end;">
     <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
     <input type="hidden" name="step" value="1">
-    <button class="btn btn-primary btn-lg" <?= !empty($state['env_ok']) ? '' : 'disabled' ?>>下一步 · 数据库配置</button>
+    <button class="btn btn-primary btn-lg" <?= $canContinue ? '' : 'disabled' ?>>下一步 · 数据库配置</button>
   </form>
 </div>

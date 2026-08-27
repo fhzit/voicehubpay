@@ -47,5 +47,10 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
         }
     }
 
+    $installEnv = file_get_contents($base . '/views/install/step-env.php') ?: '';
+    $t->assertContains('$canContinue', $installEnv, 'install env step computes availability from current checks');
+    $t->assertContains('$canContinue ?', $installEnv, 'install env button uses current checks instead of session state');
+    $t->assertFalse(str_contains($installEnv, "!empty(\$state['env_ok']) ? '' : 'disabled'"), 'install env button has no pre-submit session deadlock');
+
     return ['assertions' => $t->assertions()];
 };
