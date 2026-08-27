@@ -7,6 +7,9 @@ namespace VoiceHubPay\Database;
 use PDO;
 use VoiceHubPay\Config\Config;
 
+/**
+ * PDO factory for the business database (SQLite or PostgreSQL).
+ */
 final class Database
 {
     private ?PDO $pdo = null;
@@ -49,6 +52,11 @@ final class Database
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
+        if ($connection === 'sqlite') {
+            $this->pdo->exec('PRAGMA journal_mode = WAL');
+            $this->pdo->exec('PRAGMA foreign_keys = ON');
+            $this->pdo->exec('PRAGMA busy_timeout = 10000');
+        }
 
         return $this->pdo;
     }
@@ -56,6 +64,31 @@ final class Database
     public function driver(): string
     {
         return $this->pdo()->getAttribute(PDO::ATTR_DRIVER_NAME);
+    }
+
+    public function driverIsPgsql(): bool
+    {
+        return $this->driver() === 'pgsql';
+    }
+
+    /**
+     * Connection descriptor used by the maintenance screen.
+     */
+    public function describe(): array
+    {
+        $driver = $this->driver();
+        if ($driver === 'pgsql') {
+            return [
+                'type' => 'PostgreSQL',
+                'dsn' => sprintf(
+                    'pgsql:host=%s;port=%s;dbname=%s',
+                    $this->config->get('DATA_DB_HOST', '127.0.0.1'),
+                    $this->config->get('DATA_DB_PORT', '5432'),
+                    $this->config->get('DATA_DB_DATABASE', 'voicehubpay')
+                ),
+            ];
+        }
+        return ['type' => 'SQLite', 'dsn' => 'sqlite:' . $this->config->path($this->config->get('DATA_DB_DATABASE', 'storage/voicehubpay.sqlite'))];
     }
 
     private function ensureDriver(string $driver, string $extensionHint): void

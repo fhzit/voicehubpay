@@ -1,0 +1,64 @@
+<?php /** @var array $settings @var \VoiceHubPay\App $__app */
+$__pageTitle = '基础设置';
+$get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
+?>
+<div class="settings-layout">
+<div class="settings-nav">
+  <span class="nav-group" style="padding:4px 12px 8px;">设置</span>
+  <a href="/admin/settings/general" class="active">基础设置</a>
+  <a href="/admin/settings/payment">支付设置</a>
+  <a href="/admin/settings/auth">登录设置</a>
+  <a href="/admin/settings/voicehub">VoiceHub 设置</a>
+  <a href="/admin/settings/afdian">爱发电设置</a>
+  <a href="/admin/settings/security">安全设置</a>
+</div>
+<div class="settings-column" style="min-width:0;">
+<div class="settings-section" style="max-width:840px;">
+  <h3 class="card-title mb-4">基础设置</h3>
+  <form method="post" action="/admin/settings/general">
+    <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
+    <div class="field">
+      <label class="label">站点名称</label>
+      <input class="input" type="text" name="site_name" required value="<?= \VoiceHubPay\Http\View::e($get('SITE_NAME', 'VoiceHubPay')) ?>">
+    </div>
+    <div class="field">
+      <label class="label">站点 URL</label>
+      <input class="input" type="text" name="site_url" required value="<?= \VoiceHubPay\Http\View::e($get('SITE_URL', $get('APP_URL', ''))) ?>">
+      <div class="hint">支付回调与登录回调会基于此地址生成</div>
+    </div>
+    <div class="field">
+      <label class="label">Logo URL（可选）</label>
+      <input class="input" type="text" name="site_logo" value="<?= \VoiceHubPay\Http\View::e($get('SITE_LOGO')) ?>">
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">时区</label>
+        <select name="timezone" class="select">
+          <?php foreach (['Asia/Shanghai', 'Asia/Hong_Kong', 'Asia/Taipei', 'Asia/Tokyo', 'Asia/Singapore', 'UTC', 'America/Los_Angeles', 'Europe/London'] as $tz): ?>
+            <option value="<?= $tz ?>" <?= $get('APP_TIMEZONE', 'Asia/Shanghai') === $tz ? 'selected' : '' ?>><?= $tz ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">未支付订单保留（分钟）</label>
+        <input class="input" type="number" name="order_ttl" min="5" value="<?= (int) $get('ORDER_TTL_MINUTES', '30') ?>">
+        <div class="hint">超时由 release-reservations.php 定时释放</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">分页大小</label>
+        <input class="input" type="number" name="page_size" min="5" value="<?= (int) $get('PAGE_SIZE', '20') ?>">
+      </div>
+      <div class="field">
+        <label class="label">开放注册</label>
+        <div class="checkbox-row" style="margin-top:8px;">
+          <input type="checkbox" name="registration" id="registration" value="1" <?= $get('REGISTRATION_ENABLED', '1') === '1' ? 'checked' : '' ?>>
+          <label for="registration" class="small muted">允许访客注册账号</label>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary">保存设置</button>
+  </form>
+</div>
+</div></div>

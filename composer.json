@@ -1,13 +1,21 @@
 {
   "name": "voicehub/voicehubpay",
-  "description": "Afdian order bridge for VoiceHub song-ticket creation.",
+  "description": "VoiceHubPay - 原生 PHP 数字商品发卡商城 + 爱发电(Afdian)到 VoiceHub 的发券桥接。支持商城/库存/多数量购买、SG65 V2 支付、QQ/微信登录、SQLite/PostgreSQL、从旧版 voicehubpay 无损升级。",
   "type": "project",
   "license": "proprietary",
   "require": {
     "php": ">=8.2",
     "ext-pdo": "*",
+    "ext-pdo_sqlite": "*",
+    "ext-curl": "*",
+    "ext-openssl": "*",
+    "ext-sodium": "*",
+    "ext-mbstring": "*",
     "ext-json": "*",
-    "ext-curl": "*"
+    "ext-session": "*"
+  },
+  "suggest": {
+    "ext-pdo_pgsql": "使用 PostgreSQL 作为业务数据库时必需"
   },
   "autoload": {
     "psr-4": {
@@ -16,7 +24,10 @@
   },
   "scripts": {
     "serve": "php -S 127.0.0.1:8080 -t public",
+    "test": "php tests/run.php",
     "migrate": "php scripts/migrate.php",
-    "poll": "php scripts/poll-afdian.php"
+    "poll": "php scripts/poll-afdian.php",
+    "fulfill": "php scripts/process-fulfillments.php",
+    "release": "php scripts/release-reservations.php"
   }
 }

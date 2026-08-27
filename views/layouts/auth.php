@@ -1,0 +1,43 @@
+<?php /** @var string $content @var array $__site */ ?>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><?= isset($__pageTitle) ? \VoiceHubPay\Http\View::e($__pageTitle) . ' · ' : '' ?><?= \VoiceHubPay\Http\View::e($__site['name']) ?></title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234F46E5'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>V</text></svg>">
+<script>(function(){try{var t=localStorage.getItem('vhpay_theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();</script>
+<link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body class="auth-page">
+  <div class="auth-split">
+    <div class="auth-brand-panel" aria-hidden="true">
+      <div class="auth-brand-inner">
+        <span class="brand-logo" style="width:46px;height:46px;font-size:21px;border-radius:13px;margin-bottom:26px;">V</span>
+        <h1 class="auth-brand-title">购买、管理并随时找回<br>你的数字卡券。</h1>
+        <p class="auth-brand-tagline">VoiceHubPay 数字商品商城 —— 支付后自动发货，卡密加密保存，随时可查。</p>
+        <div class="auth-brand-points">
+          <div class="auth-brand-point">
+            <span class="pico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+            <div><b>支付后即时发货</b><span>对接 SG65 聚合支付，订单确认后自动调用 VoiceHub 发卡</span></div>
+          </div>
+          <div class="auth-brand-point">
+            <span class="pico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <div><b>卡密加密保存</b><span>主密钥加密入库，仅展示掩码，绝不明文留存</span></div>
+          </div>
+          <div class="auth-brand-point">
+            <span class="pico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+            <div><b>随时找回</b><span>我的卡券永久保存在账户中，换设备也能查到</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="auth-form-panel">
+      <div class="auth-form-inner">
+        <?= $content ?>
+      </div>
+    </div>
+  </div>
+  <script src="/assets/js/app.js" defer></script>
+</body>
+</html>

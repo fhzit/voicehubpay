@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+use VoiceHubPay\Integrations\AfdianOrderProcessor;
+
+return static function (\VoiceHubPay\Tests\TestCase $t): array {
+    [$app, $pdo] = $t->freshApp('afdian');
+    $crypto = $app->crypto;
+    $proc = new AfdianOrderProcessor($app);
+    $orders = $app->make('afdianOrders');
+    $deliveries = $app->make('deliveries');
+
+    $normalized = [
+        'out_trade_no' => 'AFD20260826ORDER0001',
+        'trade_no' => 'TRADE-88',
+        'user_id' => 'ifdian-user-9',
+        'plan_id' => 'plan-x',
+        'sku_detail' => '赞助档位',
+        'amount_cents' => 6600,
+        'status' => 'paid',
+        'raw' => ['order_no' => 'AFD20260826ORDER0001'],
+    ];
+
+    // first pass: stores order + delivery row; VoiceHub offline so it fails but records
+    $r = $proc->processNormalizedOrder($normalized);
+    $t->assertSame('AFD20260826ORDER0001', $r['out_trade_no']);
+    $t->assertTrue(in_array($r['status'], ['failed', 'success'], true), 'processed');
+
+    $row = $orders->findByOutTradeNo('AFD20260826ORDER0001');
+    $t->assertTrue($row !== null);
+    $t->assertSame(6600, (int) $row['amount_cents']);
+    $t->assertSame('paid', $row['status']);
+
+    // code == out_trade_no verbatim, single delivery row
+    $d = $pdo->query("SELECT * FROM voicehub_deliveries WHERE source_order_no='AFD20260826ORDER0001'")->fetchAll();
+    $t->assertSame(1, count($d), 'exactly one delivery');
+    $t->assertSame('afdian:' . 'AFD20260826ORDER0001', $d[0]['idempotency_key']);
+    $t->assertSame('AFD20260826ORDER0001', $crypto->decrypt($d[0]['code_ciphertext']), 'code == out_trade_no');
+    $t->assertSame('afdian_order_no', $d[0]['code_source']);
+
+    // duplicate webhook/poll: no second row, retry not new delivery
+    $proc->processNormalizedOrder($normalized);
+    $d2 = $pdo->query("SELECT COUNT(*) FROM voicehub_deliveries WHERE source_order_no='AFD20260826ORDER0001'")->fetchColumn();
+    $t->assertSame(1, (int) $d2, 'idempotent, no duplicate delivery');
+
+    // simulate a success, then verify never re-pushed
+    $pdo->exec("UPDATE afdian_orders SET voicehub_status='success' WHERE out_trade_no='AFD20260826ORDER0001'");
+    $r3 = $proc->processNormalizedOrder($normalized);
+    $t->assertSame('already_success', $r3['status'], 'success never re-pushed');
+
+    // unpaid orders are never delivered
+    $unpaid = $proc->processNormalizedOrder([
+        'out_trade_no' => 'AFD20260826UNPAID',
+        'amount_cents' => 100,
+        'status' => 'unpaid',
+    ]);
+    $t->assertSame('unpaid', $unpaid['status']);
+    $n = (int) $pdo->query("SELECT COUNT(*) FROM voicehub_deliveries WHERE source_order_no='AFD20260826UNPAID'")->fetchColumn();
+    $t->assertSame(0, $n, 'unpaid not delivered');
+
+    return ['assertions' => $t->assertions()];
+};

@@ -2,22 +2,35 @@
 
 declare(strict_types=1);
 
-use VoiceHubPay\Config\Config;
-use VoiceHubPay\Database\Database;
-use VoiceHubPay\Services\AfdianService;
-use VoiceHubPay\Services\OrderService;
-use VoiceHubPay\Services\VoiceHubService;
+/**
+ * CLI: poll Afdian for new orders and process them through the single
+ * AfdianOrderProcessor (webhook / poll / manual all share the same path).
+ *
+ *   php scripts/poll-afdian.php [--limit=20]
+ */
+
+use VoiceHubPay\App;
+use VoiceHubPay\Integrations\AfdianOrderProcessor;
 
 require __DIR__ . '/../src/bootstrap.php';
 
-$config = Config::fromEnv(dirname(__DIR__));
-$orders = new OrderService(new Database($config), new VoiceHubService($config));
-$afdian = new AfdianService($config);
-$count = 0;
-
-foreach ($afdian->pollOrders() as $order) {
-    $orders->upsertAndDispatch($order);
-    $count++;
+$app = new App(dirname(__DIR__));
+$afdian = $app->make('afdian');
+if (!$afdian->isEnabled()) {
+    echo 'Afdian integration is disabled.' . PHP_EOL;
+    exit(0);
 }
 
-echo 'Synced ' . $count . ' Afdian orders' . PHP_EOL;
+$processor = new AfdianOrderProcessor($app);
+$results = $processor->processPoll($afdian);
+
+$success = count(array_filter($results, static fn ($r) => $r['status'] === 'success'));
+$failed = count(array_filter($results, static fn ($r) => $r['status'] === 'failed'));
+$skipped = count($results) - $success - $failed;
+
+echo sprintf('Polled Afdian: total=%d success=%d failed=%d skipped=%d', count($results), $success, $failed, $skipped) . PHP_EOL;
+foreach ($results as $r) {
+    if ($r['status'] === 'failed') {
+        echo '  FAIL ' . $r['out_trade_no'] . ': ' . $r['message'] . PHP_EOL;
+    }
+}

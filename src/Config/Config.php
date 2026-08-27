@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace VoiceHubPay\Config;
 
+use VoiceHubPay\Security\SecretStore;
+
+/**
+ * Application configuration facade.
+ *
+ * Reads in order: settings.sqlite (persistent UI settings) -> .env -> $_ENV -> $_SERVER.
+ * Sensitive values (merchant keys, tokens, AppKeys) are stored encrypted and are
+ * only decrypted through SecretStore; this class returns the raw stored value.
+ */
 final class Config
 {
     private ?SettingsRepository $settingsRepository = null;
@@ -43,7 +52,20 @@ final class Config
 
     public function int(string $key, int $default): int
     {
-        return (int) ($this->get($key) ?? $default);
+        $value = $this->get($key);
+        if ($value === null || $value === '') {
+            return $default;
+        }
+        return (int) $value;
+    }
+
+    public function bool(string $key, bool $default = false): bool
+    {
+        $value = $this->get($key);
+        if ($value === null) {
+            return $default;
+        }
+        return in_array(strtolower((string) $value), ['1', 'true', 'yes', 'on'], true);
     }
 
     public function path(string $path): string
@@ -62,6 +84,19 @@ final class Config
         return $this->settingsRepository;
     }
 
+    public function secretStore(): SecretStore
+    {
+        return new SecretStore($this->basePath, $this->settings());
+    }
+
+    /**
+     * Get a decrypted secret value (master-key encrypted at rest).
+     */
+    public function secret(string $key, ?string $default = null): ?string
+    {
+        return $this->secretStore()->get($key, $default);
+    }
+
     public function reloadSettings(): void
     {
         $this->settings = $this->settings()->all();
@@ -69,7 +104,23 @@ final class Config
 
     public function isConfigured(): bool
     {
-        return $this->settings()->isConfigured();
+        return $this->settings()->get('APP_CONFIGURED', '0') === '1';
+    }
+
+    public function isInstalled(): bool
+    {
+        $lock = $this->basePath . '/storage/install.lock';
+        return is_file($lock) && $this->settings()->get('APP_CONFIGURED', '0') === '1';
+    }
+
+    public function appUrl(): string
+    {
+        return rtrim((string) $this->get('SITE_URL', $this->get('APP_URL', '')), '/');
+    }
+
+    public function timezone(): string
+    {
+        return (string) $this->get('APP_TIMEZONE', 'Asia/Shanghai');
     }
 
     private function loadSettings(): void

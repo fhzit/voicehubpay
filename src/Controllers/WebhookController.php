@@ -4,28 +4,40 @@ declare(strict_types=1);
 
 namespace VoiceHubPay\Controllers;
 
-use VoiceHubPay\Config\Config;
+use VoiceHubPay\App;
 use VoiceHubPay\Http\Request;
 use VoiceHubPay\Http\Response;
-use VoiceHubPay\Services\AfdianService;
-use VoiceHubPay\Services\OrderService;
+use VoiceHubPay\Integrations\AfdianOrderProcessor;
 
-final class WebhookController
+/**
+ * Afdian webhook — routes straight into the single AfdianOrderProcessor.
+ */
+final class WebhookController extends Controller
 {
-    public function __construct(private readonly Config $config, private readonly AfdianService $afdian, private readonly OrderService $orders)
+    public function __construct(App $app)
     {
+        parent::__construct($app);
     }
 
     public function afdian(Request $request): Response
     {
-        if (!$this->afdian->verifyWebhook($request)) {
-            return Response::json(['ec' => 401, 'em' => 'invalid signature'], 401);
+        $afdian = $this->app->make('afdian');
+        if (!$afdian->isEnabled()) {
+            return Response::json(['ec' => 503, 'em' => 'disabled'], 503);
         }
-        $order = $this->afdian->normalizeWebhookOrder($request->json());
-        if (!$order) {
-            return Response::json(['ec' => 422, 'em' => 'order not found in payload'], 422);
+        $processor = $this->app->make('afdianProcessor');
+        try {
+            $result = $processor->processWebhook($afdian, $request);
+            return Response::json(['ec' => 200, 'em' => '', 'status' => $result['status']]);
+        } catch (\InvalidArgumentException $e) {
+            $message = $e->getMessage();
+            if ($message === 'invalid signature') {
+                return Response::json(['ec' => 401, 'em' => 'invalid signature'], 401);
+            }
+            return Response::json(['ec' => 422, 'em' => $message], 422);
+        } catch (\Throwable $e) {
+            error_log('[afdian webhook] ' . $e->getMessage());
+            return Response::json(['ec' => 500, 'em' => 'internal error'], 500);
         }
-        $this->orders->upsertAndDispatch($order);
-        return Response::json(['ec' => 200, 'em' => '']);
     }
 }

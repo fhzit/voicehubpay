@@ -1,7 +1,10 @@
 .env
 /storage/*.sqlite
 /storage/*.sqlite-*
+/storage/.masterkey
+/storage/install.lock
 /storage/logs/*.log
+/storage/backups/
 /vendor/
 .DS_Store
 
