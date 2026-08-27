@@ -60,7 +60,7 @@ if ($app->config->bool('MAINTENANCE_MODE', false)) {
     $path = $request->path();
     $isExternal = $path === '/webhook/afdian' || $path === '/payments/sg65/notify' || str_starts_with($path, '/payments/sg65/notify');
     $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
-        || str_starts_with($path, '/auth/social');
+        || str_starts_with($path, '/auth/password') || str_starts_with($path, '/auth/social');
     if (!$isInstalled && str_starts_with($path, '/install')) {
         $isAuthFlow = true;
     }
@@ -82,7 +82,7 @@ if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
     // into an account. /install is only reachable while the system is NOT yet
     // installed; once installed it redirects like any other path.
     $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
-        || str_starts_with($path, '/auth/social');
+        || str_starts_with($path, '/auth/password') || str_starts_with($path, '/auth/social');
     if (!$isInstalled && str_starts_with($path, '/install')) {
         $isAuthFlow = true;
     }
