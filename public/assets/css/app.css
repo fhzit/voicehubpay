@@ -1412,6 +1412,127 @@ body.has-mobile-buybar { padding-bottom: 72px; }
 }
 
 /* ----------------------------------------------------------------------------
+   35b. Mobile UX Enhancements —— 手机端触控友好 & 信息布局（追加，不改既有规则）
+   -------------------------------------------------------------------------- */
+/* 移动导航菜单：全屏感 + 安全区 + 顶部定位 */
+@media (max-width: 768px) {
+  .shop-nav-links {
+    top: calc(var(--nav-h) + var(--safe-top, 0px));
+    max-height: calc(100vh - var(--nav-h));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  .shop-nav-links a {
+    font-size: 15px;
+    padding: 13px 14px;
+    border-radius: var(--radius-md);
+  }
+  /* 更大触控区域：导航栏按钮 */
+  .shop-nav-actions .btn-icon { width: 42px; height: 42px; }
+  .nav-burger { width: 42px; height: 42px; }
+}
+
+/* 数据表格：手机端紧凑 + 更易横向滑动（不破坏语义） */
+@media (max-width: 640px) {
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+  }
+  .table { font-size: 12px; }
+  .table th, .table td { padding: 10px 8px; }
+  .table td.num { white-space: nowrap; }
+  /* 超窄屏：账号/订单等表格首位加亮，方便阅读 */
+  .table tbody td:first-child { font-weight: 600; }
+}
+
+/* 表单过滤条：手机端整行铺满、控件足够高可点 */
+@media (max-width: 640px) {
+  .filters form, .filters { width: 100%; }
+  .filters .input, .filters .select,
+  .filters form .input, .filters form .select { min-height: 42px; font-size: 15px; }
+  .filters form .btn, .filters .btn { min-height: 42px; }
+  .seg { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; display: flex; flex-wrap: nowrap; flex-shrink: 0; }
+  .seg .seg-item { white-space: nowrap; }
+  .search, .input, .select { font-size: 16px; } /* 防止 iOS 聚焦缩放 */
+}
+
+/* 页面头：手机端字级与边距收敛 */
+@media (max-width: 480px) {
+  .page-title { font-size: 21px; }
+  .page-sub { font-size: 13px; }
+  .section-head h2 { font-size: 18px; }
+  .hero { padding: 34px 0 40px; }
+  .hero h1 { font-size: 27px; line-height: 1.25; }
+  .hero .hero-lead { font-size: 15px; margin-bottom: 22px; }
+  .hero-cta .btn { flex: 1 1 auto; min-height: 44px; }
+  .feature-grid { gap: 14px; }
+  .card { border-radius: var(--radius-lg); }
+  .code-item { padding: 12px; gap: 10px; }
+  .code-item .ci-code { font-size: 14px; }
+  .code-group-body { padding: 12px 14px; }
+  .code-group-head { padding: 12px 14px; }
+  .site-footer { margin-top: 40px; padding: 20px 0; }
+}
+
+/* 商品卡：手机端略紧凑 */
+@media (max-width: 560px) {
+  .product-grid { gap: 16px; }
+  .product-info { padding: 13px 13px 15px; }
+  .product-price { font-size: 19px; }
+  .product-cover { font-size: 36px; }
+}
+
+/* 商品详情 / 结账：手机端面板内边距与按钮 */
+@media (max-width: 640px) {
+  .buy-panel { padding: 20px 18px; }
+  .pdp-title { font-size: 22px; }
+  .checkout-card { padding: 18px; }
+  .pay-summary .ps-total .pt-value { font-size: 26px; }
+  .mobile-buybar { padding: 10px 14px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); gap: 10px; }
+  h3.card-title { font-size: 16px; }
+}
+
+/* 账户布局：手机端侧栏横向标签更贴手 + 内容边距 */
+@media (max-width: 640px) {
+  .account-layout { padding-top: 16px; gap: 18px; }
+  .account-sidebar a { height: 36px; font-size: 13.5px; padding: 0 11px; }
+  .account-content { width: 100%; }
+  .stat-card { padding: 14px 15px; }
+  .stat-value { font-size: 26px; }
+}
+
+/* 状态徽章：小屏内联换行不溢出 */
+@media (max-width: 560px) {
+  .page-head .status-dot { display: inline-flex; }
+  .flex-between.flex-wrap { gap: 10px; }
+  .summary-row { font-size: 13px; }
+}
+
+/* 支付方式：手机端更易点选 */
+@media (max-width: 640px) {
+  .pay-method { padding: 15px 14px; }
+  .pay-method .pm-label { font-size: 15px; }
+}
+
+/* 模态框（确认弹窗）手机端全宽 */
+@media (max-width: 640px) {
+  .modal, .modal-sm { width: calc(100% - 24px); margin: 12px auto; max-height: calc(100vh - 24px); }
+  .modal-body { padding: 18px 16px; }
+}
+
+/* 空态图标 & 弹层容器在手机端的稳妥边距 */
+@media (max-width: 480px) {
+  .empty { padding: 32px 20px; }
+  .empty-ico { width: 52px; height: 52px; font-size: 22px; }
+}
+
+/* 主题下拉菜单在手机端避免超出右缘 */
+@media (max-width: 480px) {
+  .theme-menu { right: -8px; min-width: 132px; }
+}
+
+/* ----------------------------------------------------------------------------
    36. Reduced Motion —— 必须支持
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {

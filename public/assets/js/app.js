@@ -228,11 +228,37 @@
 
   /* ------------------------------------------------------------ 移动导航 */
   var burger = document.querySelector('.nav-burger');
+  function closeMobileNav() {
+    var links = document.querySelector('.shop-nav-links');
+    if (links) { links.classList.remove('open'); }
+    document.body.style.overflow = '';
+  }
   if (burger) {
-    burger.addEventListener('click', function () {
+    burger.addEventListener('click', function (e) {
+      e.stopPropagation();
       var links = document.querySelector('.shop-nav-links');
-      if (links) { links.classList.toggle('open'); }
+      if (!links) { return; }
+      var open = links.classList.toggle('open');
+      // 锁定背景滚动，避免菜单打开时页面内容跟随滚动
+      document.body.style.overflow = open ? 'hidden' : '';
     });
+    // 点击导航链接后自动收起菜单
+    document.querySelectorAll('.shop-nav-links a').forEach(function (a) {
+      a.addEventListener('click', closeMobileNav);
+    });
+    // 点击页面其它区域、按下 ESC 均收起菜单
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.nav-burger') || e.target.closest('.shop-nav-links')) { return; }
+      var links = document.querySelector('.shop-nav-links');
+      if (links && links.classList.contains('open')) { closeMobileNav(); }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { closeMobileNav(); }
+    });
+  }
+  /* 商品详情页存在移动端固定购买栏时，给 body 预留底部空间，避免内容被遮挡 */
+  if (document.querySelector('.mobile-buybar') && window.matchMedia('(max-width: 960px)').matches) {
+    document.body.classList.add('has-mobile-buybar');
   }
   var sideToggle = document.querySelector('.admin-mobile-toggle');
   var backdrop = document.querySelector('.sidebar-backdrop');
