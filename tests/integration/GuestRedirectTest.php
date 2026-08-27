@@ -23,14 +23,16 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
 
     // Source contract: the front controller guards anonymous visitors before
     // dispatch, redirecting (302) to the configured URL, while leaving
-    // /login, /register, /install and external callbacks reachable.
+    // /login, /register, /install, the social-login flow and external callbacks
+    // reachable for anonymous visitors; anything else is redirected.
     $src = $t->basePath . '/public/index.php';
     $fc = (string) file_get_contents($src);
     $t->assertContains("'AUTH_REDIRECT_URL'", $fc, 'front controller reads AUTH_REDIRECT_URL');
     $t->assertContains('!$app->make(\'auth\')->isLoggedIn()', $fc, 'guard only applies to anonymous visitors');
-    $t->assertContains("\\VoiceHubPay\\Http\\Response::redirect(\$guestRedirect, 302)", $fc, 'anonymous requests get a 302 to the configured URL');
-    $t->assertContains("\$path !== '/login'", $fc, '/login stays reachable when logged out');
-    $t->assertContains("\$path !== '/register'", $fc, '/register stays reachable when logged out');
+    $t->assertContains("\VoiceHubPay\Http\Response::redirect(\$guestRedirect, 302)", $fc, 'anonymous requests get a 302 to the configured URL');
+    $t->assertContains("str_starts_with(\$path, '/login')", $fc, '/login stays reachable when logged out');
+    $t->assertContains("str_starts_with(\$path, '/register')", $fc, '/register stays reachable when logged out');
+    $t->assertContains("str_starts_with(\$path, '/auth/social')", $fc, 'QQ/WeChat social login flow stays reachable (regression fix)');
     $t->assertContains("str_starts_with(\$path, '/install')", $fc, 'install wizard stays reachable');
     $t->assertContains("'/webhook/afdian'", $fc, 'afdian webhook stays reachable');
     $t->assertContains("str_starts_with(\$path, '/payments/sg65')", $fc, 'SG65 payment callbacks stay reachable');

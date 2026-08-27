@@ -20,9 +20,9 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
     </button>
     <div class="shop-nav-links">
       <a href="/" <?= $nav === 'home' ? 'class="active"' : '' ?>>首页</a>
-      <a href="/products" <?= $nav === 'products' ? 'class="active"' : '' ?>>全部商品</a>
+      <a href="/products" <?= $nav === 'products' ? 'class="active"' : '' ?>>全部服务</a>
       <a href="/account/orders" <?= $nav === 'orders' ? 'class="active"' : '' ?>>我的订单</a>
-      <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>我的卡密</a>
+      <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>我的权益</a>
     </div>
     <div class="shop-nav-actions">
       <button class="btn-icon" data-theme-toggle="theme-menu" aria-label="切换主题" title="切换主题">
@@ -65,7 +65,7 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
         </a>
         <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          我的卡密
+          我的权益
         </a>
         <a href="/account/connections" <?= $nav === 'connections' ? 'class="active"' : '' ?>>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -77,7 +77,7 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
         </a>
         <a href="/products" style="margin-top:8px;color:var(--muted-foreground);font-size:13px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          返回商城
+          返回服务
         </a>
       </aside>
       <div class="account-content"><?= $content ?></div>
@@ -88,7 +88,6 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
 <footer class="site-footer">
   <div class="container flex-between flex-wrap">
     <span>© <?= gmdate('Y') ?> <?= \VoiceHubPay\Http\View::e($__site['name']) ?></span>
-    <span>数字商品即时发卡 · 卡密加密保存 · 请勿泄露</span>
   </div>
 </footer>
 <script src="/assets/js/app.js" defer></script>

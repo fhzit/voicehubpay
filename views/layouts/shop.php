@@ -6,7 +6,7 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= isset($__pageTitle) ? \VoiceHubPay\Http\View::e($__pageTitle) . ' · ' : '' ?><?= \VoiceHubPay\Http\View::e($__site['name']) ?></title>
-<meta name="description" content="数字商品发卡商城，安全在线购买卡密、虚拟商品，实时发货。">
+<meta name="description" content="安全便捷的账户服务，凭证加密保存，登录后随时管理您的服务记录。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234F46E5'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>V</text></svg>">
 <script>(function(){try{var t=localStorage.getItem('vhpay_theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();</script>
 <link rel="stylesheet" href="/assets/css/app.css">
@@ -20,10 +20,10 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
     </button>
     <div class="shop-nav-links">
       <a href="/" <?= $nav === 'home' ? 'class="active"' : '' ?>>首页</a>
-      <a href="/products" <?= $nav === 'products' ? 'class="active"' : '' ?>>全部商品</a>
+      <a href="/products" <?= $nav === 'products' ? 'class="active"' : '' ?>>全部服务</a>
       <?php if ($__user !== null): ?>
       <a href="/account/orders" <?= $nav === 'orders' ? 'class="active"' : '' ?>>我的订单</a>
-      <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>我的卡密</a>
+      <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>我的权益</a>
       <?php endif; ?>
     </div>
     <div class="shop-nav-actions">
@@ -63,7 +63,6 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
 <footer class="site-footer">
   <div class="container flex-between flex-wrap">
     <span>© <?= gmdate('Y') ?> <?= \VoiceHubPay\Http\View::e($__site['name']) ?></span>
-    <span>数字商品即时发卡 · 卡密加密保存 · 请勿泄露</span>
   </div>
 </footer>
 <script src="/assets/js/app.js" defer></script>

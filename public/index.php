@@ -57,7 +57,9 @@ if ($app->config->bool('SECURITY_FORCE_HTTPS', false)) {
 if ($app->config->bool('MAINTENANCE_MODE', false)) {
     $path = $request->path();
     $isExternal = $path === '/webhook/afdian' || $path === '/payments/sg65/notify' || str_starts_with($path, '/payments/sg65/notify');
-    if (!str_starts_with($path, '/install') && !$isExternal && !$app->make('auth')->isLoggedIn()) {
+    $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
+        || str_starts_with($path, '/auth/social') || str_starts_with($path, '/install');
+    if (!$isAuthFlow && !$isExternal && !$app->make('auth')->isLoggedIn()) {
         \VoiceHubPay\Http\Response::html($app->view->render('errors/maintenance', [], 'shop'))->send();
         exit;
     }
@@ -71,7 +73,9 @@ $guestRedirect = trim((string) $app->config->get('AUTH_REDIRECT_URL', ''));
 if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
     $path = $request->path();
     $isExternal = $path === '/webhook/afdian' || str_starts_with($path, '/payments/sg65');
-    if ($path !== '/login' && $path !== '/register' && !str_starts_with($path, '/install') && !$isExternal) {
+    $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
+        || str_starts_with($path, '/auth/social') || str_starts_with($path, '/install');
+    if (!$isAuthFlow && !$isExternal) {
         \VoiceHubPay\Http\Response::redirect($guestRedirect, 302)->send();
         exit;
     }
