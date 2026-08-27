@@ -37,13 +37,14 @@ $statusLabels = ['unpaid' => '未支付', 'pending' => '待支付', 'paid' => '�
     <?php endif; ?>
     <?php foreach ($orders as $o): ?>
       <?php $abnormal = $o['payment_status'] === 'paid' && in_array($o['fulfillment_status'], ['failed', 'manual_review'], true); ?>
+    <?php $cancelled = ($o['order_status'] ?? '') === 'cancelled' || ($o['payment_status'] !== 'paid' && !empty($o['expires_at']) && $o['expires_at'] < gmdate('c')); ?>
       <tr<?= $abnormal ? ' class="row-abnormal"' : '' ?>>
         <td class="mono"><?= \VoiceHubPay\Http\View::e($o['order_no']) ?></td>
         <td class="small"><?= \VoiceHubPay\Http\View::e($o['username'] ?? '—') ?></td>
         <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= \VoiceHubPay\Http\View::e($o['first_item_name'] ?? '') ?></td>
         <td class="num">¥<?= \VoiceHubPay\Http\View::money((int) $o['amount_due_cents']) ?></td>
-        <td><?= $__app->view->partial('partials/status-badge', ['kind' => 'payment', 'status' => $o['payment_status']]) ?></td>
-        <td><?= $__app->view->partial('partials/status-badge', ['kind' => 'fulfillment', 'status' => $o['fulfillment_status']]) ?></td>
+        <td><?= $cancelled ? '<span class="badge badge-gray">已取消</span>' : $__app->view->partial('partials/status-badge', ['kind' => 'payment', 'status' => $o['payment_status']]) ?></td>
+        <td><?= $cancelled ? '<span class="badge badge-gray">已取消</span>' : $__app->view->partial('partials/status-badge', ['kind' => 'fulfillment', 'status' => $o['fulfillment_status']]) ?></td>
         <td><span class="badge badge-<?= $o['source'] === 'afdian' ? 'purple' : 'blue' ?>"><?= $o['source'] === 'afdian' ? '爱发电' : '商城' ?></span></td>
         <td class="small muted"><?= \VoiceHubPay\Http\View::datetime($o['created_at']) ?></td>
         <td><a href="/admin/orders/<?= \VoiceHubPay\Http\View::e($o['order_no']) ?>" class="btn-link">处理</a></td>

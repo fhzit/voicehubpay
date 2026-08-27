@@ -8,8 +8,14 @@ $csrff = \VoiceHubPay\Security\Csrf::field();
 <div class="filters">
   <a href="/admin/orders" class="btn btn-ghost btn-sm">← 返回列表</a>
   <span class="muted mono"><?= \VoiceHubPay\Http\View::e($order['order_no']) ?></span>
-  <?= $__app->view->partial('partials/status-badge', ['kind' => 'payment', 'status' => $order['payment_status']]) ?>
-  <?= $__app->view->partial('partials/status-badge', ['kind' => 'fulfillment', 'status' => $order['fulfillment_status']]) ?>
+  <?php $orderCancelled = ($order['order_status'] ?? '') === 'cancelled' || ($order['payment_status'] !== 'paid' && !empty($order['expires_at']) && $order['expires_at'] < gmdate('c')); ?>
+  <?php if ($orderCancelled): ?>
+    <span class="badge badge-gray">已取消</span>
+    <span class="badge badge-gray">已取消</span>
+  <?php else: ?>
+    <?= $__app->view->partial('partials/status-badge', ['kind' => 'payment', 'status' => $order['payment_status']]) ?>
+    <?= $__app->view->partial('partials/status-badge', ['kind' => 'fulfillment', 'status' => $order['fulfillment_status']]) ?>
+  <?php endif; ?>
   <span class="badge badge-<?= $order['source'] === 'afdian' ? 'purple' : 'blue' ?>"><?= $order['source'] === 'afdian' ? '爱发电' : '商城' ?></span>
   <div class="flex-1"></div>
   <?php if ($order['payment_status'] !== 'paid'): ?>
@@ -200,7 +206,7 @@ echo $modalForm('modal-assign-inv', '分配库存', '/admin/orders/assign-invent
 echo $modalForm('modal-delete-unpaid', '取消未付款订单', '/admin/orders/delete-unpaid', [
     ['name' => 'order_no', 'type' => 'hidden', 'value' => \VoiceHubPay\Http\View::e($order['order_no'])],
     ['name' => 'reason', 'type' => 'textarea', 'label' => '处理原因', 'required' => true, 'placeholder' => '例如：超时未支付'],
-], '取消', '', 'danger');
+], '确认', '', 'danger');
 echo $modalForm('modal-retry-unit', '重试该单元', '/admin/orders/retry-unit', [
     ['name' => 'unit_id', 'type' => 'hidden', 'id' => 'unit_id'],
     ['name' => 'order_no', 'type' => 'hidden', 'value' => \VoiceHubPay\Http\View::e($order['order_no'])],
