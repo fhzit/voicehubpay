@@ -63,6 +63,20 @@ if ($app->config->bool('MAINTENANCE_MODE', false)) {
     }
 }
 
+// Guest redirect: when a redirect URL is configured, anonymous visitors are
+// sent there instead of seeing the shopfront, so the site does not look like a
+// commercial shop before login. /login and /register stay reachable so guests
+// can still get into an account (after login everything renders normally).
+$guestRedirect = trim((string) $app->config->get('AUTH_REDIRECT_URL', ''));
+if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
+    $path = $request->path();
+    $isExternal = $path === '/webhook/afdian' || str_starts_with($path, '/payments/sg65');
+    if ($path !== '/login' && $path !== '/register' && !str_starts_with($path, '/install') && !$isExternal) {
+        \VoiceHubPay\Http\Response::redirect($guestRedirect, 302)->send();
+        exit;
+    }
+}
+
 $router = new Router();
 
 $authC = static fn (App $app) => new AuthController($app);

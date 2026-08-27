@@ -27,6 +27,11 @@ $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
       <div class="hint">支付回调与登录回调会基于此地址生成</div>
     </div>
     <div class="field">
+      <label class="label">访客重定向地址（可选）</label>
+      <input class="input" type="text" name="auth_redirect_url" value="<?= \VoiceHubPay\Http\View::e($get('AUTH_REDIRECT_URL')) ?>" placeholder="https://example.com">
+      <div class="hint">设置后，未登录访客访问本站任意页面（除 /login、/register 与回调外）将 302 跳转到该地址，用于淡化本站的商业属性；留空则关闭此功能</div>
+    </div>
+    <div class="field">
       <label class="label">Logo URL（可选）</label>
       <input class="input" type="text" name="site_logo" value="<?= \VoiceHubPay\Http\View::e($get('SITE_LOGO')) ?>">
     </div>

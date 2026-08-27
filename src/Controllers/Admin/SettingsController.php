@@ -52,6 +52,13 @@ final class SettingsController extends Controller
         } catch (\Throwable) {
             return $this->redirect('/admin/settings/general')->withFlash('无效的时区。', 'error');
         }
+        $authRedirectUrl = trim($request->string('auth_redirect_url'));
+        if ($authRedirectUrl !== '') {
+            $rp = parse_url($authRedirectUrl);
+            if (!is_array($rp) || !in_array(strtolower((string) ($rp['scheme'] ?? '')), ['http', 'https'], true) || ($rp['host'] ?? '') === '') {
+                return $this->redirect('/admin/settings/general')->withFlash('访客重定向地址必须是无账号、查询参数和片段的 HTTP(S) 根地址，或留空。', 'error');
+            }
+        }
         $this->app->config->settings()->setMany([
             'SITE_NAME' => $siteName,
             'SITE_URL' => rtrim($siteUrl, '/'),
@@ -61,6 +68,7 @@ final class SettingsController extends Controller
             'REGISTRATION_ENABLED' => $request->int('registration', 0) === 1 ? '1' : '0',
             'ORDER_TTL_MINUTES' => (string) max(5, $request->int('order_ttl', 30)),
             'PAGE_SIZE' => (string) max(5, $request->int('page_size', 20)),
+            'AUTH_REDIRECT_URL' => $authRedirectUrl,
         ]);
         $this->app->config->reloadSettings();
         $this->audit($this->adminUserId(), 'settings.general', 'settings', 'general', ['site' => $siteName], $request);
