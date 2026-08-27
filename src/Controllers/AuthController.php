@@ -125,6 +125,10 @@ final class AuthController extends Controller
 
         $bindMode = (bool) ($_SESSION['social_bind_mode'] ?? false);
         $redirectAfter = (string) ($_SESSION['social_redirect'] ?? ($bindMode ? '/account/connections' : '/account'));
+        // Consume the one-time state before any account switch so a replay or a
+        // concurrent duplicate callback cannot re-use the same code to bind or
+        // switch accounts. Regeneration keeps the session itself intact.
+        unset($_SESSION['social_state'], $_SESSION['social_provider'], $_SESSION['social_redirect']);
         try {
             $social = new SocialAuth($this->app);
             $profile = $social->exchangeCode($provider, $code);
@@ -134,18 +138,25 @@ final class AuthController extends Controller
                     return $this->redirect('/login')->withFlash('登录状态已失效，请重新登录后再绑定。', 'error');
                 }
                 $result = $this->auth->bindToCurrentUser($provider, $profile);
+                unset($_SESSION['social_bind_mode']);
                 if (!$result['ok']) {
                     return $this->redirect($redirectAfter)->withFlash($result['error'], 'error');
                 }
-                unset($_SESSION['social_state'], $_SESSION['social_provider'], $_SESSION['social_redirect'], $_SESSION['social_bind_mode']);
                 return $this->redirect($this->safeRedirect($redirectAfter))->withFlash($result['already_bound'] ? '该登录方式此前已绑定。' : '绑定成功！');
+            }
+            // Non-bind login: if the visitor is already authenticated we must NOT
+            // silently switch to whatever account the code resolves to — that is
+            // how one browser can end up "logged into someone else's account"
+            // (e.g. a stale/second callback racing an active session). Keep them
+            // on their current account instead.
+            if ($this->auth->isLoggedIn()) {
+                return $this->redirect('/account')->withFlash('您已登录，若需切换账号请先退出后再登录。');
             }
             $result = $this->auth->loginWithSocial($provider, $profile);
             if (!$result['ok']) {
                 return $this->redirect('/login')->withFlash($result['error'], 'error');
             }
             $this->auth->loginUser($result['user']);
-            unset($_SESSION['social_state'], $_SESSION['social_provider'], $_SESSION['social_redirect'], $_SESSION['social_bind_mode']);
             return $this->redirect($this->safeRedirect($redirectAfter))->withFlash('登录成功！');
         } catch (\Throwable $e) {
             error_log('[social auth] ' . $e->getMessage());

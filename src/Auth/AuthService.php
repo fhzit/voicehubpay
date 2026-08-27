@@ -89,7 +89,7 @@ final class AuthService
             return $redirect;
         }
         if (!$this->isAdmin()) {
-            return $this->app->make('controllers.error')->forbidden();
+            return $this->app->make('controllers.error')->forbidden($request);
         }
         return null;
     }

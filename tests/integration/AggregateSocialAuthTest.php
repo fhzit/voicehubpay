@@ -71,5 +71,14 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $mig = file_get_contents($t->basePath . '/src/Migration/Legacy/LegacyMigrationService.php') ?: '';
     $t->assertContains("tableExists(\$targetPdo, 'afdian_orders_legacy')", $mig, 'openSource fallback guards against missing table');
 
+    // Bug 5 (security): a logged-in visitor must NOT be silently switched to a
+    // different account by a (possibly stale/racing) social login callback.
+    $t->assertContains('if ($this->auth->isLoggedIn()) {', $controllerSource, 'non-bind callback guards an already-logged-in visitor');
+    $t->assertContains('您已登录，若需切换账号请先退出后再登录。', $controllerSource, 'already-logged-in guest is kept on their account');
+    $t->assertContains("unset(\$_SESSION['social_state'], \$_SESSION['social_provider'], \$_SESSION['social_redirect'])", $controllerSource, 'one-time OAuth state is consumed before account switch');
+    // Bug 6 (500): requireAdmin must pass the Request into the 403 handler.
+    $service = file_get_contents($t->basePath . '/src/Auth/AuthService.php') ?: '';
+    $t->assertContains('->forbidden($request)', $service, 'requireAdmin passes Request to the 403 handler (fixes the 500)');
+
     return ['assertions' => $t->assertions()];
 };
