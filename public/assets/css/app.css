@@ -1533,6 +1533,113 @@ body.has-mobile-buybar { padding-bottom: 72px; }
 }
 
 /* ----------------------------------------------------------------------------
+   35c. Admin Mobile —— 覆盖后台內联 grid/表格的移动端适配
+   （后台视图大量使用内联 style grid-template-columns，无法用类样式覆盖，
+    这里用属性选择器把这些内联网格在手机端强制坍缩为单列）
+   -------------------------------------------------------------------------- */
+/* 中等屏幕（平板）：后台统计卡 4→2 列，详情侧栏仍并排 */
+@media (max-width: 1024px) {
+  .admin-content .stat-grid[style*="grid-template-columns:repeat(4,"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+/* 手机端：所有固定列宽/等分后台网格坍缩为单列（除 auto-fit 自适应网格外） */
+@media (max-width: 720px) {
+  .admin-content .grid[style*="grid-template-columns"]:not([style*="auto-fit"]) {
+    grid-template-columns: 1fr !important;
+  }
+}
+/* 手机端：订单详情 / 用户详情 / 分类页 的 340px 侧栏与 1fr 1fr 信息区全部单列 */
+@media (max-width: 860px) {
+  .admin-content .grid[style*="grid-template-columns:1fr 340px"],
+  .admin-content .grid[style*="grid-template-columns:1fr 1fr"],
+  .admin-content .grid[style*="grid-template-columns:1fr 1.2fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 后台图表行 / 指标段在手机端 2 列保留、超窄屏 1 列 */
+@media (max-width: 640px) {
+  .admin-content .metric-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 420px) {
+  .admin-content .metric-4 { grid-template-columns: 1fr; }
+}
+
+/* 后台顶部栏面包屑 / 返回 + 动作按钮在手机端换行对齐 */
+@media (max-width: 720px) {
+  .admin-content .filters .flex-1 { display: none; }
+  .admin-content .filters > * { margin-bottom: 4px; }
+  .admin-content .filters .mono { overflow-wrap: anywhere; }
+}
+
+/* 订单详情内的信息网格：手机端 2 列字段更易读，超窄 1 列 */
+@media (max-width: 520px) {
+  .admin-content .grid[style*="grid-template-columns:1fr 1fr;gap:8px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 模态框里的表单控件在手机端全宽、足够高可点 */
+@media (max-width: 640px) {
+  .admin-content .modal .input,
+  .admin-content .modal .textarea {
+    width: 100%; min-height: 44px; box-sizing: border-box;
+  }
+  .admin-content .modal-actions { flex-direction: column-reverse; gap: 8px; }
+  .admin-content .modal-actions .btn { width: 100%; min-height: 42px; }
+}
+
+/* 后台表格：手机端字号与间距收敛，横向滑动更顺滑 */
+@media (max-width: 720px) {
+  .admin-content .table-wrap { -webkit-overflow-scrolling: touch; }
+  .admin-content .table { font-size: 12px; }
+  .admin-content .table th, .admin-content .table td { padding: 9px 7px; }
+}
+
+/* 后台卡片头（标题 + 操作按钮）手机端换行，按钮不溢出 */
+@media (max-width: 640px) {
+  .admin-content .card-header { flex-wrap: wrap; gap: 8px; }
+  .admin-content .card-header .flex { width: 100%; }
+  .admin-content .card-header .btn { min-height: 38px; }
+}
+
+/* ----------------------------------------------------------------------------
+   35d. Account / 前台 内联 grid 移动端覆盖
+   （账户概览、订单详情等视图也用内联 style grid-template-columns，
+    这里在 .account-content 作用域内将这些内联网格手机端坍缩为单列）
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .account-content .grid[style*="grid-template-columns"]:not([style*="auto-fit"]),
+  .account-content .checkout-grid[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* 账户概览的三张统计卡：手机端单列 */
+  .account-content .stat-grid[style*="grid-template-columns:repeat(3,"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 640px) and (min-width: 421px) {
+  /* 中屏：账户统计卡保持两列更高效 */
+  .account-content .stat-grid[style*="grid-template-columns:repeat(3,"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* 前台订单详情信息区：手机端 2 列 → 超窄 1 列 */
+@media (max-width: 520px) {
+  .account-content .grid[style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 前台订单/权益明细 code-item 手机端纵向排布，避免按钮挤压 */
+@media (max-width: 480px) {
+  .account-content .code-item { flex-direction: column; align-items: stretch; gap: 10px; }
+  .account-content .code-item .flex { justify-content: flex-end; }
+}
+
+/* ----------------------------------------------------------------------------
    36. Reduced Motion —— 必须支持
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
