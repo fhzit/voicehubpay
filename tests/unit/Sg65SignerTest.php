@@ -42,5 +42,20 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertThrows(\RuntimeException::class, static fn () => Sg65Signer::sign(['a' => '1'], 'not-a-key'));
     $t->assertFalse(Sg65Signer::verify(['a' => '1', 'sign' => 'x'], 'not-a-key'));
 
+    // regression: SG65 exposes keys as BARE base64 (no PEM armor). A bare key
+    // must be wrapped into PEM automatically, or openssl fails with
+    // "unsupported" and sign/verify break. Strip the armor from the generated
+    // keys to simulate the platform's format.
+    $barePriv = preg_replace('/-----BEGIN [^-]+-----/', '', $private);
+    $barePriv = preg_replace('/-----END [^-]+-----/', '', $barePriv);
+    $barePriv = preg_replace('/\s+/', '', $barePriv);
+    $barePub = preg_replace('/-----BEGIN [^-]+-----/', '', $pub);
+    $barePub = preg_replace('/-----END [^-]+-----/', '', $barePub);
+    $barePub = preg_replace('/\s+/', '', $barePub);
+
+    $signedBare = Sg65Signer::sign(['merchant_id' => 'M1', 'order_id' => 'O9'], $barePriv);
+    $t->assertSame($signed, $signedBare, 'bare-base64 private key signs identically to PEM');
+    $t->assertTrue(Sg65Signer::verify(['merchant_id' => 'M1', 'order_id' => 'O9', 'sign' => $signedBare], $barePub), 'bare-base64 public key verifies');
+
     return ['assertions' => $t->assertions()];
 };
