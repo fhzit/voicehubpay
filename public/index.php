@@ -82,8 +82,11 @@ $router->get('/register', fn ($r) => $authC($app)->showRegister($r));
 $router->post('/auth/password/login', fn ($r) => $authC($app)->login($r));
 $router->post('/auth/password/register', fn ($r) => $authC($app)->register($r));
 $router->post('/logout', fn ($r) => $authC($app)->logout($r));
-$router->get('/auth/social/{provider}', fn ($r, $p) => $authC($app)->socialRedirect($r, $p));
 $router->get('/auth/social/callback', fn ($r) => $authC($app)->socialCallback($r));
+// The {provider} route MUST come AFTER /auth/social/callback so a callback URL
+// is never captured as provider="callback" (which would reject it as an
+// unsupported login). Router dispatches in registration order.
+$router->get('/auth/social/{provider}', fn ($r, $p) => $authC($app)->socialRedirect($r, $p));
 
 // ------------------------------------------------------------ user routes
 $router->get('/account', fn ($r) => $accountC($app)->overview($r));
