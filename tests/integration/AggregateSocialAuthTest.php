@@ -37,6 +37,10 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $controllerSource = file_get_contents($t->basePath . '/src/Controllers/AuthController.php') ?: '';
     $t->assertContains('hash_equals($expectedState, $state)', $controllerSource, 'aggregate callback keeps one-time state validation');
     $t->assertContains("social_provider", $controllerSource, 'aggregate callback binds state to provider');
+    // Bug: 聚合登录回跳可能落在 /auth/social/{provider} 或 /auth/social，而不是
+    // /auth/social/callback；当带有 code 时必须作为回调转发，否则会误报“不支持的登录方式”。
+    $t->assertContains("query['code'] ?? '' !== ''", $controllerSource, 'socialRedirect forwards a returned code to the callback handler');
+    $t->assertContains('return $this->socialCallback($request, (string) ($params[\'provider\'] ?? \'\'));', $controllerSource, 'socialRedirect preserves the route provider when forwarding a return code');
     $t->assertContains('name="aggregate_app_id"', $settingsView);
     $t->assertContains('name="aggregate_app_key"', $settingsView);
     $t->assertContains('name="aggregate_endpoint"', $settingsView);

@@ -71,6 +71,17 @@ final class AuthController extends Controller
 
     public function socialRedirect(Request $request, array $params): Response
     {
+        // The聚合登录平台 can bounce the user back to a /auth/social/{provider}
+        // style URL (e.g. /auth/social or /auth/social/qq) carrying the
+        // authorization code, instead of the canonical /auth/social/callback.
+        // When a code is present that is a callback return, not a fresh
+        // authorize click — hand off to the callback handler so logins don't
+        // fail with "不支持的登录方式".
+        if ($request->query['code'] ?? '' !== '') {
+            // Pass through the route provider so /auth/social/wx?code=… keeps
+            // its WeChat identity even when the query omits `provider`.
+            return $this->socialCallback($request, (string) ($params['provider'] ?? ''));
+        }
         $provider = (string) ($params['provider'] ?? '');
         if (!in_array($provider, ['qq', 'wx'], true)) {
             return $this->redirect('/login')->withFlash('不支持的登录方式。', 'error');
@@ -95,9 +106,9 @@ final class AuthController extends Controller
         }
     }
 
-    public function socialCallback(Request $request): Response
+    public function socialCallback(Request $request, string $fallbackProvider = ''): Response
     {
-        $provider = (string) ($request->query['provider'] ?? 'qq');
+        $provider = (string) ($request->query['provider'] ?? ($fallbackProvider !== '' ? $fallbackProvider : 'qq'));
         $provider = in_array($provider, ['qq', 'wx'], true) ? $provider : 'qq';
         $state = (string) ($request->query['state'] ?? '');
         $expectedState = (string) ($_SESSION['social_state'] ?? '');
