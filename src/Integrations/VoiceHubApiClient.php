@@ -81,9 +81,28 @@ final class VoiceHubApiClient
         $parsed = is_array($decoded) ? $decoded : ['raw' => (string) $body];
 
         if ($status >= 400 || (($parsed['success'] ?? true) !== true && ($parsed['code'] ?? 0) !== 0)) {
+            // The ticket already exists in VoiceHub: the code was delivered
+            // before, so treat it as a completed delivery instead of an error.
+            if ($this->isAlreadyExists($parsed)) {
+                return $parsed;
+            }
             throw new \RuntimeException('VoiceHub 拒绝发券（HTTP ' . $status . '）：' . json_encode($parsed, JSON_UNESCAPED_UNICODE));
         }
         return $parsed;
+    }
+
+    /**
+     * Detect a VoiceHub "ticket already exists" rejection. VoiceHub returns a
+     * 400 with a message like "这些点歌券已经存在，无需重复创建" when the code
+     * was already created there earlier; that is a completed delivery, not a
+     * failure, so we report success instead of surfacing an error.
+     */
+    private function isAlreadyExists(array $parsed): bool
+    {
+        $message = is_string($parsed['message'] ?? null)
+            ? $parsed['message']
+            : (is_string($parsed['error'] ?? null) ? $parsed['error'] : '');
+        return preg_match('/点歌券已经存在|无需重复创建|已存在|already exists|already created/i', $message) === 1;
     }
 
     private function endpointPath(): string
