@@ -5,7 +5,7 @@
 </div>
 
 <h1 class="auth-title">创建账户</h1>
-<p class="auth-sub">注册后即可购买数字商品，卡券永久保存</p>
+<p class="auth-sub">创建账户，您的服务记录与凭证将永久保存在账号中</p>
 
 <?php if ($__flash !== null): ?>
   <div class="alert alert-<?= \VoiceHubPay\Http\View::e($__flash['type'] ?? 'success') ?>" style="margin-bottom:16px;"><?= \VoiceHubPay\Http\View::e($__flash['message'] ?? '') ?></div>
@@ -57,7 +57,7 @@
     </div>
     <div class="field checkbox-row">
       <input type="checkbox" name="agreed" id="agreed" value="1" required>
-      <label for="agreed" class="small muted">我已阅读并同意《服务条款》，卡密为虚拟商品，购买后不退款</label>
+      <label for="agreed" class="small muted">我已阅读并同意《服务条款》</label>
     </div>
     <button class="btn btn-primary btn-lg btn-block">注 册</button>
   </form>

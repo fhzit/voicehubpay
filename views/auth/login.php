@@ -5,7 +5,7 @@
 </div>
 
 <h1 class="auth-title">欢迎回来</h1>
-<p class="auth-sub">登录后查看订单、卡密与绑定方式</p>
+<p class="auth-sub">登录后查看您的账户记录与服务凭证</p>
 
 <?php if ($__flash !== null): ?>
   <div class="alert alert-<?= \VoiceHubPay\Http\View::e($__flash['type'] ?? 'success') ?>" style="margin-bottom:16px;"><?= \VoiceHubPay\Http\View::e($__flash['message'] ?? '') ?></div>
