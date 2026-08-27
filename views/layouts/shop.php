@@ -22,7 +22,7 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
       <a href="/" <?= $nav === 'home' ? 'class="active"' : '' ?>>首页</a>
       <a href="/products" <?= $nav === 'products' ? 'class="active"' : '' ?>>全部服务</a>
       <?php if ($__user !== null): ?>
-      <a href="/account/orders" <?= $nav === 'orders' ? 'class="active"' : '' ?>>我的订单</a>
+      <a href="/account/orders" <?= $nav === 'orders' ? 'class="active"' : '' ?>>我的服务</a>
       <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>我的权益</a>
       <?php endif; ?>
     </div>

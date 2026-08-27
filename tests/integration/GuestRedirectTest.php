@@ -33,7 +33,8 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertContains("str_starts_with(\$path, '/login')", $fc, '/login stays reachable when logged out');
     $t->assertContains("str_starts_with(\$path, '/register')", $fc, '/register stays reachable when logged out');
     $t->assertContains("str_starts_with(\$path, '/auth/social')", $fc, 'QQ/WeChat social login flow stays reachable (regression fix)');
-    $t->assertContains("str_starts_with(\$path, '/install')", $fc, 'install wizard stays reachable');
+    $t->assertContains("str_starts_with(\$path, '/install')", $fc, 'install wizard is gated on install state (regression: only reachable while not installed)');
+    $t->assertContains('isInstalled', $fc, 'front controller gates /install on installed state');
     $t->assertContains("'/webhook/afdian'", $fc, 'afdian webhook stays reachable');
     $t->assertContains("str_starts_with(\$path, '/payments/sg65')", $fc, 'SG65 payment callbacks stay reachable');
 

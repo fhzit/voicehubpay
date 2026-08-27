@@ -53,12 +53,17 @@ if ($app->config->bool('SECURITY_FORCE_HTTPS', false)) {
     }
 }
 
+$isInstalled = $app->config->isInstalled();
+
 // Maintenance mode (except install + external callbacks).
 if ($app->config->bool('MAINTENANCE_MODE', false)) {
     $path = $request->path();
     $isExternal = $path === '/webhook/afdian' || $path === '/payments/sg65/notify' || str_starts_with($path, '/payments/sg65/notify');
     $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
-        || str_starts_with($path, '/auth/social') || str_starts_with($path, '/install');
+        || str_starts_with($path, '/auth/social');
+    if (!$isInstalled && str_starts_with($path, '/install')) {
+        $isAuthFlow = true;
+    }
     if (!$isAuthFlow && !$isExternal && !$app->make('auth')->isLoggedIn()) {
         \VoiceHubPay\Http\Response::html($app->view->render('errors/maintenance', [], 'shop'))->send();
         exit;
@@ -73,8 +78,14 @@ $guestRedirect = trim((string) $app->config->get('AUTH_REDIRECT_URL', ''));
 if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
     $path = $request->path();
     $isExternal = $path === '/webhook/afdian' || str_starts_with($path, '/payments/sg65');
+    // /login, /register and the social flow stay reachable so guests can get
+    // into an account. /install is only reachable while the system is NOT yet
+    // installed; once installed it redirects like any other path.
     $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
-        || str_starts_with($path, '/auth/social') || str_starts_with($path, '/install');
+        || str_starts_with($path, '/auth/social');
+    if (!$isInstalled && str_starts_with($path, '/install')) {
+        $isAuthFlow = true;
+    }
     if (!$isAuthFlow && !$isExternal) {
         \VoiceHubPay\Http\Response::redirect($guestRedirect, 302)->send();
         exit;

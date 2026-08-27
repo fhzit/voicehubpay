@@ -8,7 +8,7 @@
     <p class="pc-sub">页面不存在 —— 你访问的页面可能已被移动或删除。</p>
     <div class="flex" style="justify-content:center;gap:12px;">
       <a href="/" class="btn btn-primary">返回首页</a>
-      <a href="/products" class="btn btn-outline">浏览商品</a>
+      <a href="/products" class="btn btn-outline">浏览服务</a>
     </div>
   </div>
 </div>

@@ -6,7 +6,7 @@ $isProcessing = $order['payment_status'] === 'paid' && !in_array($order['fulfill
 $modeLabels = ['card' => '库存卡密', 'voicehub' => 'VoiceHub 发券', 'card_and_voicehub' => '卡密+发券', 'manual' => '人工发货'];
 ?>
 <div class="container" style="padding-top:24px;">
-  <nav class="small muted mb-3"><a href="/account/orders">我的订单</a> › <?= \VoiceHubPay\Http\View::e($order['order_no']) ?></nav>
+  <nav class="small muted mb-3"><a href="/account/orders">我的服务</a> › <?= \VoiceHubPay\Http\View::e($order['order_no']) ?></nav>
 
   <div class="page-head flex-between flex-wrap">
     <div>

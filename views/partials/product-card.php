@@ -23,7 +23,7 @@
     <?php if ((int) $p['stock_enabled'] === 1 && (int) $p['stock_available'] === 0): ?>
       <a href="/product/<?= \VoiceHubPay\Http\View::e($p['slug']) ?>" class="btn btn-secondary btn-block" style="height:36px;pointer-events:none;opacity:.6;">暂时缺货</a>
     <?php else: ?>
-      <a href="/product/<?= \VoiceHubPay\Http\View::e($p['slug']) ?>" class="btn btn-primary btn-block" style="height:36px;">立即购买</a>
+      <a href="/product/<?= \VoiceHubPay\Http\View::e($p['slug']) ?>" class="btn btn-primary btn-block" style="height:36px;">立即获取</a>
     <?php endif; ?>
   </div>
 </div>

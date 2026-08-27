@@ -5,8 +5,8 @@ $tabLabels = ['全部', '待支付', '待发货', '已完成', '异常'];
 ?>
 <div class="container" style="padding-top:24px;">
   <div class="page-head flex-between flex-wrap">
-    <div><h1 class="page-title">我的订单</h1><p class="page-sub">共 <?= $total ?> 笔订单</p></div>
-    <a href="/products" class="btn btn-primary btn-sm">继续购物</a>
+    <div><h1 class="page-title">我的服务</h1><p class="page-sub">共 <?= $total ?> 项服务</p></div>
+    <a href="/products" class="btn btn-primary btn-sm">更多服务</a>
   </div>
 
   <div class="tab-bar">
@@ -17,7 +17,7 @@ $tabLabels = ['全部', '待支付', '待发货', '已完成', '异常'];
 
   <form method="get" action="/account/orders" class="filters">
     <input type="hidden" name="status" value="<?= \VoiceHubPay\Http\View::e($status) ?>">
-    <input type="text" name="q" class="input search" placeholder="搜索订单号…" value="<?= \VoiceHubPay\Http\View::e($q) ?>">
+    <input type="text" name="q" class="input search" placeholder="搜索服务号…" value="<?= \VoiceHubPay\Http\View::e($q) ?>">
     <button class="btn btn-primary">搜索</button>
   </form>
 
@@ -26,13 +26,13 @@ $tabLabels = ['全部', '待支付', '待发货', '已完成', '异常'];
       <div class="empty-ico">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
       </div>
-      <div class="empty-title">暂无订单</div>
-      <div>还没有符合条件的订单</div>
+      <div class="empty-title">暂无服务记录</div>
+      <div>还没有符合条件的服务记录</div>
     </div>
   <?php else: ?>
     <div class="card card-pad-0">
       <div class="table-wrap"><table class="table">
-        <thead><tr><th>订单号</th><th>商品</th><th>金额</th><th>支付</th><th>发货</th><th>时间</th><th></th></tr></thead>
+        <thead><tr><th>服务号</th><th>服务</th><th>金额</th><th>支付</th><th>发货</th><th>时间</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($orders as $o): ?>
           <tr>

@@ -12,10 +12,10 @@ foreach ($cards as $c) {
 ?>
 <div class="page-head flex-between flex-wrap">
   <div>
-    <h1 class="page-title" style="font-size:26px;">我的卡密</h1>
-    <p class="page-sub">共 <?= $total ?> 个已发货卡密，卡密加密保存，点击“显示”后展示完整卡密</p>
+    <h1 class="page-title" style="font-size:26px;">我的权益</h1>
+    <p class="page-sub">共 <?= $total ?> 条权益记录，加密保存，点击“显示”后查看完整内容</p>
   </div>
-  <a href="/products" class="btn btn-primary btn-sm">继续购物</a>
+  <a href="/products" class="btn btn-primary btn-sm">更多服务</a>
 </div>
 
 <form method="get" action="/account/cards" class="filters">
@@ -24,7 +24,7 @@ foreach ($cards as $c) {
     <option value="completed" <?= $status === 'completed' ? 'selected' : '' ?>>已发放</option>
     <option value="processing" <?= $status === 'processing' ? 'selected' : '' ?>>发放中</option>
   </select>
-  <input type="text" name="q" class="input search" placeholder="搜索卡密/订单号…" value="<?= \VoiceHubPay\Http\View::e($q) ?>" style="min-width:220px;">
+  <input type="text" name="q" class="input search" placeholder="搜索权益/服务号…" value="<?= \VoiceHubPay\Http\View::e($q) ?>" style="min-width:220px;">
   <button class="btn btn-primary">筛选</button>
 </form>
 
@@ -33,9 +33,9 @@ foreach ($cards as $c) {
     <div class="empty-ico">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
     </div>
-    <div class="empty-title">还没有卡密</div>
-    <div>购买商品后，卡密将自动出现在这里</div>
-    <div style="margin-top:14px;"><a href="/products" class="btn btn-primary btn-sm">去逛商城</a></div>
+    <div class="empty-title">暂无权益记录</div>
+    <div>开通服务后，权益将自动出现在这里</div>
+    <div style="margin-top:14px;"><a href="/products" class="btn btn-primary btn-sm">前往服务</a></div>
   </div>
 <?php else: ?>
   <div class="code-groups">
@@ -44,8 +44,8 @@ foreach ($cards as $c) {
         <div class="code-group-head">
           <div class="flex-between flex-wrap" style="gap:8px;">
             <div style="min-width:0;">
-              <div class="g-name"><?= \VoiceHubPay\Http\View::e($g['product_name'] ?: '数字商品') ?></div>
-              <div class="small muted" style="margin-top:2px;"><span class="mono"><?= \VoiceHubPay\Http\View::e($g['order_no']) ?></span> · 购买于 <?= \VoiceHubPay\Http\View::datetime($g['created_at']) ?> · <?= count($g['items']) ?> 张</div>
+              <div class="g-name"><?= \VoiceHubPay\Http\View::e($g['product_name'] ?: '数字服务') ?></div>
+              <div class="small muted" style="margin-top:2px;"><span class="mono"><?= \VoiceHubPay\Http\View::e($g['order_no']) ?></span> · 获取于 <?= \VoiceHubPay\Http\View::datetime($g['created_at']) ?> · <?= count($g['items']) ?> 份</div>
             </div>
             <?php if (count($g['items']) > 1): ?>
               <button class="btn btn-secondary btn-sm" data-reveal-order="<?= \VoiceHubPay\Http\View::e($g['order_no']) ?>">复制全部</button>

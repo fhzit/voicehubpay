@@ -21,8 +21,8 @@ $paid = $order !== null && $order['payment_status'] === 'paid';
         <div class="vert-step done"><span class="vs-dot">✓</span><div><div class="vs-title">VoiceHub 同步</div><div class="vs-sub">发券同步正在进行</div></div></div>
       </div>
       <div class="flex" style="justify-content:center;gap:12px;margin-top:26px;">
-        <a href="/orders/<?= \VoiceHubPay\Http\View::e($order['order_no']) ?>" class="btn btn-primary">查看卡密</a>
-        <a href="/account/orders" class="btn btn-outline">我的订单</a>
+        <a href="/orders/<?= \VoiceHubPay\Http\View::e($order['order_no']) ?>" class="btn btn-primary">查看详情</a>
+        <a href="/account/orders" class="btn btn-outline">我的服务</a>
       </div>
     <?php else: ?>
       <div class="status-ico info">
@@ -40,7 +40,7 @@ $paid = $order !== null && $order['payment_status'] === 'paid';
         <div class="vert-step"><span class="vs-dot">3</span><div><div class="vs-title">VoiceHub 同步</div><div class="vs-sub">逐码调用发券接口</div></div></div>
       </div>
       <div id="poll-timeout" style="display:none;" class="notice notice-blue" style="margin-top:18px;">
-        确认时间较长，支付成功后可随时到 <a href="/account/orders">我的订单</a> 查看卡密，无需重复支付。
+        确认时间较长，支付成功后可随时到 <a href="/account/orders">我的服务</a> 查看权益，无需重复支付。
       </div>
       <a href="/orders/<?= \VoiceHubPay\Http\View::e($order_no) ?>" class="btn btn-outline" style="margin-top:22px;">前往订单详情</a>
     <?php endif; ?>

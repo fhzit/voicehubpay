@@ -52,14 +52,14 @@ $step = max(1, (int) $product['quantity_step']);
             <input type="hidden" name="product_id" value="<?= (int) $product['id'] ?>">
             <input type="hidden" name="slug" value="<?= \VoiceHubPay\Http\View::e($product['slug']) ?>">
             <div class="field">
-              <label class="label">购买数量</label>
+              <label class="label">获取数量</label>
               <div class="flex" style="gap:14px;flex-wrap:wrap;">
                 <div class="stepper" data-stepper data-price-cents="<?= $priceCents ?>">
                   <button type="button" data-step="-1" aria-label="减少数量">−</button>
                   <input type="number" name="quantity" id="qty" value="<?= $minQ ?>" min="<?= $minQ ?>" max="<?= $maxQ ?>" step="<?= $step ?>" inputmode="numeric">
                   <button type="button" data-step="1" aria-label="增加数量">＋</button>
                 </div>
-                <div class="hint" style="margin:0;align-self:center;">单次购买 <?= $minQ ?> – <?= $maxQ ?> 件<?= $step > 1 ? '，单步 ' . $step . ' 件' : '' ?></div>
+                <div class="hint" style="margin:0;align-self:center;">单次获取 <?= $minQ ?> – <?= $maxQ ?> 份<?= $step > 1 ? '，单步 ' . $step . ' 份' : '' ?></div>
               </div>
             </div>
             <div class="total-row">
@@ -67,21 +67,21 @@ $step = max(1, (int) $product['quantity_step']);
               <span class="tv" data-total-cents>¥<?= \VoiceHubPay\Http\View::money($priceCents * $minQ) ?></span>
             </div>
             <button class="btn btn-primary btn-lg btn-block buy-cta-desktop" type="submit">
-              <?= $__user !== null ? '立即购买' : '登录后购买' ?>
+              <?= $__user !== null ? '立即获取' : '登录后获取' ?>
             </button>
             <?php if ($__user === null): ?>
-              <div class="info-box">登录后可永久查看历史购买卡券，卡密加密保存，随时找回。</div>
+              <div class="info-box">登录后可永久查看历史获取记录与权益，重要信息加密保存，随时找回。</div>
             <?php endif; ?>
           </form>
         <?php endif; ?>
       </div>
 
       <div class="card" style="margin-top:24px;">
-        <h3 class="card-title mb-2">商品说明</h3>
+        <h3 class="card-title mb-2">服务说明</h3>
         <?php if (!empty($product['description'])): ?>
           <div style="white-space:pre-wrap;color:var(--foreground-secondary);font-size:14px;line-height:1.8;"><?= \VoiceHubPay\Http\View::e($product['description']) ?></div>
         <?php else: ?>
-          <p class="muted" style="margin:0;">暂无详细说明，购买后将自动发货。</p>
+          <p class="muted" style="margin:0;">暂无详细说明，获取后即时生效。</p>
         <?php endif; ?>
       </div>
     </div>
@@ -91,6 +91,6 @@ $step = max(1, (int) $product['quantity_step']);
 <?php if (!$outOfStock): ?>
 <div class="mobile-buybar">
   <span class="mb-price"><span data-total-cents style="font-size:20px;">¥<?= \VoiceHubPay\Http\View::money($priceCents * $minQ) ?></span></span>
-  <button class="btn btn-primary mb-cta" style="height:44px;" type="submit" form="buy-form"><?= $__user !== null ? '立即购买' : '登录后购买' ?></button>
+  <button class="btn btn-primary mb-cta" style="height:44px;" type="submit" form="buy-form"><?= $__user !== null ? '立即获取' : '登录后获取' ?></button>
 </div>
 <?php endif; ?>

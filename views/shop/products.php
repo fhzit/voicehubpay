@@ -6,10 +6,10 @@ $base = '/products?' . $query;
 <div class="container" style="padding-top:32px;">
   <div class="page-head flex-between flex-wrap">
     <div>
-      <h1 class="page-title">商城</h1>
-      <p class="page-sub">选择你需要的数字商品，支付后自动发货</p>
+      <h1 class="page-title">服务</h1>
+      <p class="page-sub">选择你需要的数字服务，开通后即时生效</p>
     </div>
-    <span class="small muted">共 <?= $total ?> 件商品</span>
+    <span class="small muted">共 <?= $total ?> 项服务</span>
   </div>
 
   <!-- Filter Toolbar -->
@@ -22,7 +22,7 @@ $base = '/products?' . $query;
           <option value="<?= (int) $c['id'] ?>" <?= (int) $filters['category_id'] === (int) $c['id'] ? 'selected' : '' ?>><?= \VoiceHubPay\Http\View::e($c['name']) ?></option>
         <?php endforeach; ?>
       </select>
-      <input type="text" name="q" class="input search" placeholder="搜索商品名称…" value="<?= \VoiceHubPay\Http\View::e($filters['q']) ?>" style="min-width:220px;">
+      <input type="text" name="q" class="input search" placeholder="搜索服务名称…" value="<?= \VoiceHubPay\Http\View::e($filters['q']) ?>" style="min-width:220px;">
       <button class="btn btn-primary">搜索</button>
     </form>
     <div class="seg" aria-label="排序">
@@ -37,7 +37,7 @@ $base = '/products?' . $query;
       <div class="empty-ico">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       </div>
-      <div class="empty-title">没有找到相关商品</div>
+      <div class="empty-title">没有找到相关服务</div>
       <div>换个关键词或分类试试</div>
     </div>
   <?php else: ?>

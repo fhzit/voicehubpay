@@ -21,7 +21,7 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
     <div class="shop-nav-links">
       <a href="/" <?= $nav === 'home' ? 'class="active"' : '' ?>>首页</a>
       <a href="/products" <?= $nav === 'products' ? 'class="active"' : '' ?>>全部服务</a>
-      <a href="/account/orders" <?= $nav === 'orders' ? 'class="active"' : '' ?>>我的订单</a>
+      <a href="/account/orders" <?= $nav === 'orders' ? 'class="active"' : '' ?>>我的服务</a>
       <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>我的权益</a>
     </div>
     <div class="shop-nav-actions">
@@ -61,7 +61,7 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
         </a>
         <a href="/account/orders" <?= $nav === 'orders' ? 'class="active"' : '' ?>>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-          我的订单
+          我的服务
         </a>
         <a href="/account/cards" <?= $nav === 'cards' ? 'class="active"' : '' ?>>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
