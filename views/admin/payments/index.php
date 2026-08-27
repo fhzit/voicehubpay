@@ -6,7 +6,7 @@ $__pageTitle = '支付流水';
     <input type="text" name="q" class="input" placeholder="商户单号/平台单号" value="<?= \VoiceHubPay\Http\View::e($q) ?>">
     <select name="pay_type" class="select">
       <option value="">全部支付方式</option>
-      <?php foreach (['alipay' => '支付宝', 'wechat' => '微信支付', 'qq' => 'QQ 钱包', 'unionpay' => '银联', 'balance' => '余额'] as $tk => $tl): ?>
+      <?php foreach (['alipay' => '支付宝', 'wxpay' => '微信支付', 'qqpay' => 'QQ 钱包'] as $tk => $tl): ?>
         <option value="<?= $tk ?>" <?= $pay_type === $tk ? 'selected' : '' ?>><?= $tl ?></option>
       <?php endforeach; ?>
     </select>

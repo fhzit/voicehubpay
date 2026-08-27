@@ -1,7 +1,7 @@
 <?php /** @var array $settings @var string $private_key_placeholder @var string $public_key_placeholder @var string $notify_url @var string $return_url @var \VoiceHubPay\App $__app */
 $__pageTitle = '支付设置';
 $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
-$types = array_filter(explode(',', $get('SG65_ENABLED_TYPES', 'alipay,wechat,qq')));
+$types = array_filter(explode(',', $get('SG65_ENABLED_TYPES', 'alipay,wxpay,qqpay')));
 ?>
 <div class="settings-layout">
 <div class="settings-nav">
@@ -32,7 +32,7 @@ $types = array_filter(explode(',', $get('SG65_ENABLED_TYPES', 'alipay,wechat,qq'
       <div class="field">
         <label class="label">默认支付方式</label>
         <select name="sg65_default_type" class="select">
-          <?php foreach (['alipay' => '支付宝', 'wechat' => '微信支付', 'qq' => 'QQ 钱包', 'unionpay' => '银联', 'balance' => '余额'] as $tk => $tl): ?>
+          <?php foreach (['alipay' => '支付宝', 'wxpay' => '微信支付', 'qqpay' => 'QQ 钱包'] as $tk => $tl): ?>
             <option value="<?= $tk ?>" <?= $get('SG65_DEFAULT_PAYMENT_TYPE', 'alipay') === $tk ? 'selected' : '' ?>><?= $tl ?></option>
           <?php endforeach; ?>
         </select>
@@ -41,7 +41,7 @@ $types = array_filter(explode(',', $get('SG65_ENABLED_TYPES', 'alipay,wechat,qq'
     <div class="field">
       <label class="label">启用支付方式</label>
       <div class="flex-wrap flex" style="gap:12px;">
-        <?php foreach (['alipay' => '支付宝', 'wechat' => '微信支付', 'qq' => 'QQ 钱包', 'unionpay' => '银联', 'balance' => '余额'] as $tk => $tl): ?>
+        <?php foreach (['alipay' => '支付宝', 'wxpay' => '微信支付', 'qqpay' => 'QQ 钱包'] as $tk => $tl): ?>
           <div class="checkbox-row">
             <input type="checkbox" name="sg65_types[]" id="type_<?= $tk ?>" value="<?= $tk ?>" <?= in_array($tk, $types, true) ? 'checked' : '' ?>>
             <label for="type_<?= $tk ?>" class="small"><?= $tl ?></label>
