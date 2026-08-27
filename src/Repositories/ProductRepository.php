@@ -205,7 +205,10 @@ final class ProductRepository extends Repository
 
     private function slugExists(string $slug, ?int $ignoreId): bool
     {
-        $stmt = $this->pdo()->prepare('SELECT id FROM products WHERE slug = ? AND (? IS NULL OR id != ?) LIMIT 1');
+        // CAST keeps the nullable parameter typed on PostgreSQL (where a bare
+        // `? IS NULL` with a NULL bind triggers "indeterminate datatype"),
+        // while remaining valid on SQLite.
+        $stmt = $this->pdo()->prepare('SELECT id FROM products WHERE slug = ? AND (CAST(? AS BIGINT) IS NULL OR id != CAST(? AS BIGINT)) LIMIT 1');
         $stmt->execute([$slug, $ignoreId, $ignoreId]);
         return $stmt->fetchColumn() !== false;
     }

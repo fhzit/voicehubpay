@@ -97,7 +97,10 @@ final class CategoryRepository extends Repository
 
     private function slugExists(string $slug, ?int $ignoreId): bool
     {
-        $stmt = $this->pdo()->prepare('SELECT id FROM categories WHERE slug = ? AND (? IS NULL OR id != ?) LIMIT 1');
+        // CAST keeps the nullable parameter typed on PostgreSQL (a bare
+        // `? IS NULL` with a NULL bind triggers "indeterminate datatype");
+        // SQLite-accepting too.
+        $stmt = $this->pdo()->prepare('SELECT id FROM categories WHERE slug = ? AND (CAST(? AS BIGINT) IS NULL OR id != CAST(? AS BIGINT)) LIMIT 1');
         $stmt->execute([$slug, $ignoreId, $ignoreId]);
         return $stmt->fetchColumn() !== false;
     }
