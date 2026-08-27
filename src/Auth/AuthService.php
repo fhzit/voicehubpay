@@ -200,4 +200,36 @@ final class AuthService
         $this->social->bind((int) $user['id'], $provider, $socialUid, $nickname, $avatar);
         return ['ok' => true, 'error' => '', 'user' => $user];
     }
+
+    /**
+     * Bind a social identity to the currently logged-in user.
+     *
+     * This never signs the user out, switches accounts, or creates a new
+     * account. It only adds (provider, social_uid) to the active user's
+     * login methods. Returns an error if that social identity is already
+     * bound to a different account.
+     */
+    public function bindToCurrentUser(string $provider, array $profile): array
+    {
+        $provider = in_array($provider, ['qq', 'wx'], true) ? $provider : 'qq';
+        $user = $this->user();
+        if ($user === null) {
+            return ['ok' => false, 'error' => '请先登录再绑定。', 'user' => null];
+        }
+        $socialUid = (string) ($profile['openid'] ?? $profile['social_uid'] ?? '');
+        if ($socialUid === '') {
+            return ['ok' => false, 'error' => '未获取到第三方身份标识。', 'user' => null];
+        }
+        $existing = $this->social->findByIdentity($provider, $socialUid);
+        if ($existing !== null) {
+            if ((int) $existing['user_id'] === (int) $user['id']) {
+                return ['ok' => true, 'error' => '', 'already_bound' => true, 'user' => $user];
+            }
+            return ['ok' => false, 'error' => '该' . ($provider === 'qq' ? 'QQ' : '微信') . '账号已绑定到其他账号，无法重复绑定。', 'user' => null];
+        }
+        $nickname = (string) ($profile['nickname'] ?? '');
+        $avatar = (string) ($profile['avatar_url'] ?? '');
+        $this->social->bind((int) $user['id'], $provider, $socialUid, $nickname, $avatar);
+        return ['ok' => true, 'error' => '', 'already_bound' => false, 'user' => $user];
+    }
 }

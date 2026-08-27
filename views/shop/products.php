@@ -43,7 +43,7 @@ $base = '/products?' . $query;
   <?php else: ?>
     <div class="product-grid">
       <?php foreach ($products as $p): ?>
-        <?php $__app->view->partial('partials/product-card', ['p' => $p]); ?>
+        <?= $__app->view->partial('partials/product-card', ['p' => $p]) ?>
       <?php endforeach; ?>
     </div>
     <?php if ($pages > 1): ?>

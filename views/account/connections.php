@@ -44,7 +44,11 @@ $GLOBALS['__nav'] = 'connections';
             </form>
           <?php else: ?>
             <?php $enabled = $provider === 'qq' ? $qq_enabled : $wx_enabled; ?>
-            <span class="small muted"><?= $enabled ? '可前往登录页绑定' : ($provider === 'qq' ? 'QQ 登录未开启' : '微信登录未开启') ?></span>
+            <?php if ($enabled): ?>
+              <a href="/auth/social/<?= $provider ?>?redirect=<?= \VoiceHubPay\Http\View::e(urlencode('/account/connections')) ?>" class="btn btn-secondary btn-sm">绑定</a>
+            <?php else: ?>
+              <span class="small muted"><?= $provider === 'qq' ? 'QQ 登录未开启' : '微信登录未开启' ?></span>
+            <?php endif; ?>
           <?php endif; ?>
         </div>
       </div>

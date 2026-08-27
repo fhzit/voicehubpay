@@ -29,6 +29,8 @@ final class AuthController extends Controller
         }
         return $this->render('auth/register', [
             'registration_enabled' => $this->app->config->bool('REGISTRATION_ENABLED', true),
+            'qq_enabled' => $this->app->config->bool('QQ_LOGIN_ENABLED', false),
+            'wx_enabled' => $this->app->config->bool('WX_LOGIN_ENABLED', false),
         ], 'auth');
     }
 
@@ -79,6 +81,13 @@ final class AuthController extends Controller
         }
         try {
             $social = new SocialAuth($this->app);
+            // When the visitor is already authenticated this flow binds the
+            // social identity to their account instead of signing in/up a
+            // separate (or new) account.
+            if ($this->auth->isLoggedIn()) {
+                $_SESSION['social_bind_mode'] = true;
+                return $this->redirect($social->authorizeUrl($provider, '/account/connections'));
+            }
             return $this->redirect($social->authorizeUrl($provider, $request->string('redirect', '/account')));
         } catch (\Throwable $e) {
             error_log('[aggregate auth authorize] ' . $e->getMessage());
@@ -103,22 +112,35 @@ final class AuthController extends Controller
             return $this->redirect('/login')->withFlash('未收到授权码，请重试。', 'error');
         }
 
+        $bindMode = (bool) ($_SESSION['social_bind_mode'] ?? false);
+        $redirectAfter = (string) ($_SESSION['social_redirect'] ?? ($bindMode ? '/account/connections' : '/account'));
         try {
             $social = new SocialAuth($this->app);
             $profile = $social->exchangeCode($provider, $code);
+            if ($bindMode) {
+                if (!$this->auth->isLoggedIn()) {
+                    unset($_SESSION['social_bind_mode']);
+                    return $this->redirect('/login')->withFlash('登录状态已失效，请重新登录后再绑定。', 'error');
+                }
+                $result = $this->auth->bindToCurrentUser($provider, $profile);
+                if (!$result['ok']) {
+                    return $this->redirect($redirectAfter)->withFlash($result['error'], 'error');
+                }
+                unset($_SESSION['social_state'], $_SESSION['social_provider'], $_SESSION['social_redirect'], $_SESSION['social_bind_mode']);
+                return $this->redirect($this->safeRedirect($redirectAfter))->withFlash($result['already_bound'] ? '该登录方式此前已绑定。' : '绑定成功！');
+            }
             $result = $this->auth->loginWithSocial($provider, $profile);
             if (!$result['ok']) {
                 return $this->redirect('/login')->withFlash($result['error'], 'error');
             }
             $this->auth->loginUser($result['user']);
-            $redirectAfter = (string) ($_SESSION['social_redirect'] ?? '/account');
-            unset($_SESSION['social_state'], $_SESSION['social_provider'], $_SESSION['social_redirect']);
+            unset($_SESSION['social_state'], $_SESSION['social_provider'], $_SESSION['social_redirect'], $_SESSION['social_bind_mode']);
             return $this->redirect($this->safeRedirect($redirectAfter))->withFlash('登录成功！');
         } catch (\Throwable $e) {
             error_log('[social auth] ' . $e->getMessage());
             // Keep provider responses, access-token errors and transport details
             // out of the browser; they may contain sensitive diagnostics.
-            return $this->redirect('/login')->withFlash('第三方登录失败，请稍后重试或联系管理员。', 'error');
+            return $this->redirect($bindMode ? $redirectAfter : '/login')->withFlash('第三方登录失败，请稍后重试或联系管理员。', 'error');
         }
     }
 

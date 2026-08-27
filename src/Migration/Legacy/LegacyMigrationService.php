@@ -339,9 +339,13 @@ final class LegacyMigrationService
                 return null;
             }
         }
-        // Fall back to the columns reported by detection.
-        if ($detectedColumns !== []) {
-            return [$targetPdo, 'afdian_orders_legacy', $detectedColumns];
+        // Fall back to the columns reported by detection — but only if the
+        // table we would read actually exists in the target. Otherwise these
+        // columns came from an old/separate data DB that could not be opened,
+        // and reading the hard-coded afdian_orders_legacy name here would
+        // throw "no such table" and fail install/migrate.
+        if ($detectedColumns !== [] && $this->tableExists($targetPdo, 'afdian_orders_legacy')) {
+            return [$targetPdo, 'afdian_orders_legacy', $this->tableColumns($targetPdo, 'afdian_orders_legacy')];
         }
         return null;
     }

@@ -43,5 +43,29 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertFalse(str_contains($settingsView, 'name="qq_app_id"'));
     $t->assertFalse(str_contains($settingsView, 'name="wx_app_id"'));
 
+    // Bug 2: a logged-in user can bind a social identity to their account.
+    $service = file_get_contents($t->basePath . '/src/Auth/AuthService.php') ?: '';
+    $t->assertContains('bindToCurrentUser', $service, 'bind-to-current-user service method exists');
+    $t->assertContains("social_bind_mode", $controllerSource, 'bind mode flag is set when logged in');
+    $t->assertContains('bindToCurrentUser', $controllerSource, 'callback routes to bind in bind mode');
+    $connView = file_get_contents($t->basePath . '/views/account/connections.php') ?: '';
+    $t->assertContains('/auth/social/', $connView, 'connections page offers a bind button');
+
+    // Bug 3: unauthenticated users can register via QQ/WeChat.
+    $registerView = file_get_contents($t->basePath . '/views/auth/register.php') ?: '';
+    $t->assertContains('/auth/social/qq', $registerView, 'register page offers QQ auth');
+    $t->assertContains('/auth/social/wx', $registerView, 'register page offers WeChat auth');
+
+    // Bug 4: product cards are actually emitted (not discarded) on shop pages.
+    foreach (['/views/shop/products.php', '/views/shop/home.php'] as $v) {
+        $shopView = file_get_contents($t->basePath . $v) ?: '';
+        $t->assertFalse(str_contains($shopView, '<?php $__app->view->partial('), "$v no longer discards partial output");
+        $t->assertContains("view->partial('partials/product-card'", $shopView, "$v renders product cards");
+    }
+
+    // Bug 1: legacy openSource fallback validates the target table exists.
+    $mig = file_get_contents($t->basePath . '/src/Migration/Legacy/LegacyMigrationService.php') ?: '';
+    $t->assertContains("tableExists(\$targetPdo, 'afdian_orders_legacy')", $mig, 'openSource fallback guards against missing table');
+
     return ['assertions' => $t->assertions()];
 };
