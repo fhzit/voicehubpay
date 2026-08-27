@@ -318,9 +318,15 @@ input, select, textarea, button { font-family: inherit; }
 .flex-1 { flex: 1; }
 .grow { flex: 1; }
 .grid { display: grid; gap: 16px; }
-.dash-grid-2 { grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr); }
+.dash-grid-2 { grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr); }
+/* 防止网格子项内容溢出列宽（渠道收入等窄列的内容不再“顶出去”），
+   并保证 card 可收缩、长内容可换行/省略 */
+.grid > *, .dash-grid-2 > * { min-width: 0; }
+.dash-grid-2 > * { overflow: hidden; }
+.card, .card-pad-0 { min-width: 0; }
 .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 52px; }
-@media (max-width: 960px) {
+@media (max-width: 1280px) {
+  /* 较窄窗口时收入/渠道并排会挤在一起显得“小”，改为单列更舒展 */
   .dash-grid-2 { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {

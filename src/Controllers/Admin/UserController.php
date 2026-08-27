@@ -37,6 +37,8 @@ final class UserController extends Controller
             'pages' => (int) ceil($result['total'] / max(1, $result['perPage'])),
             'q' => $q,
             'status' => $status,
+            'super_id' => $this->app->make('users')->superAdminId(),
+            'is_super' => $this->auth->isSuperAdmin(),
         ], 'admin');
     }
 
@@ -63,6 +65,8 @@ final class UserController extends Controller
             'orders' => $recentOrders,
             'consumption' => $consumption,
             'card_count' => $unitRepo->countDeliveredForUser((int) $user['id']),
+            'super_id' => $this->app->make('users')->superAdminId(),
+            'is_super' => $this->auth->isSuperAdmin(),
         ], 'admin');
     }
 
@@ -83,5 +87,49 @@ final class UserController extends Controller
         $this->app->make('users')->setStatus($id, $newStatus);
         $this->audit($this->adminUserId(), 'user.status', 'user', (string) $id, ['to' => $newStatus, 'username' => $user['username']], $request);
         return $this->redirect('/admin/users')->withFlash('用户状态已更新。');
+    }
+
+    public function setRole(Request $request, array $params): Response
+    {
+        if ($redirect = $this->requireAdmin($request)) {
+            return $redirect;
+        }
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $users = $this->app->make('users');
+        $id = (int) ($params['id'] ?? 0);
+        $target = $users->findById($id);
+        if ($target === null) {
+            return $this->redirect('/admin/users')->withFlash('用户不存在。', 'error');
+        }
+        $actorId = $this->adminUserId();
+        $isSuper = $users->isSuperAdmin($actorId);
+        $newRole = $request->string('role') === 'admin' ? 'admin' : 'user';
+        $wasAdmin = in_array($target['role'] ?? 'user', ['admin', 'superadmin'], true);
+        $isTargetSuper = $users->isSuperAdmin($id);
+
+        // Guard rails:
+        // 1. Only the super admin may change another admin's role.
+        // 2. The super admin itself can never be demoted (even by itself).
+        if ($wasAdmin && !$isSuper) {
+            return $this->redirect('/admin/users')->withFlash('只有超级管理员可以调整管理员的角色。', 'error');
+        }
+        if ($isTargetSuper) {
+            return $this->redirect('/admin/users')->withFlash('超级管理员不可被降级。', 'error');
+        }
+        if ($wasAdmin && $newRole !== 'admin') {
+            // demote an admin to a normal user
+            $users->setRole($id, 'user');
+            $this->audit($actorId, 'user.demote', 'user', (string) $id, ['username' => $target['username']], $request);
+            return $this->redirect('/admin/users')->withFlash('已将「' . $target['username'] . '」降级为普通用户。');
+        }
+        if (!$wasAdmin && $newRole === 'admin') {
+            // promote a normal user to admin
+            $users->setRole($id, 'admin');
+            $this->audit($actorId, 'user.promote', 'user', (string) $id, ['username' => $target['username']], $request);
+            return $this->redirect('/admin/users')->withFlash('已将「' . $target['username'] . '」设为管理员。');
+        }
+        return $this->redirect('/admin/users')->withFlash('角色未变化。');
     }
 }

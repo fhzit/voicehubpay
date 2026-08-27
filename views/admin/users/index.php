@@ -1,4 +1,4 @@
-<?php /** @var array $users @var int $total @var int $page @var int $pages @var string $q @var string $status @var \VoiceHubPay\App $__app */
+<?php /** @var array $users @var int $total @var int $page @var int $pages @var string $q @var string $status @var ?int $super_id @var bool $is_super @var \VoiceHubPay\App $__app */
 $__pageTitle = '用户管理';
 ?>
 <div class="filters">
@@ -21,6 +21,9 @@ $__pageTitle = '用户管理';
       <tr><td colspan="7" class="text-center muted">暂无用户</td></tr>
     <?php endif; ?>
     <?php foreach ($users as $u): ?>
+      <?php $isAdminUser = ($u['role'] === 'admin' || (int) ($u['id']) === (int) ($super_id ?? 0)); ?>
+      <?php $isTargetSuper = (int) ($u['id']) === (int) ($super_id ?? 0); ?>
+      <?php $isSelf = (int) ($u['id']) === (int) ($__user['id'] ?? 0); ?>
       <tr>
         <td>
           <div class="flex" style="gap:8px;">
@@ -31,7 +34,7 @@ $__pageTitle = '用户管理';
             </div>
           </div>
         </td>
-        <td><?= $u['role'] === 'admin' ? '<span class="badge badge-purple">管理员</span>' : '<span class="badge badge-gray">用户</span>' ?></td>
+        <td><?php if ($isTargetSuper): ?><span class="badge badge-purple" title="初始创建的第一位管理员，不可被降级">超级管理员</span><?php elseif ($u['role'] === 'admin'): ?><span class="badge badge-purple">管理员</span><?php else: ?><span class="badge badge-gray">用户</span><?php endif; ?></td>
         <td><?= (int) $u['order_count'] ?></td>
         <td class="small"><?php foreach ($u['social'] as $s): ?><span class="badge badge-blue" style="margin-right:4px;"><?= $s['provider'] === 'qq' ? 'QQ' : '微信' ?></span><?php endforeach; ?><?= empty($u['password_hash']) ? '' : '<span class="badge badge-gray">密码</span>' ?></td>
         <td><?= $__app->view->partial('partials/status-badge', ['kind' => 'user', 'status' => $u['status']]) ?></td>
@@ -39,7 +42,22 @@ $__pageTitle = '用户管理';
         <td class="text-right">
           <div class="flex" style="justify-content:flex-end;gap:6px;">
             <a href="/admin/users/<?= (int) $u['id'] ?>" class="btn btn-secondary btn-sm">详情</a>
-            <?php if ((int) $u['id'] !== (int) ($__user['id'] ?? 0)): ?>
+            <?php if ($is_super && !$isTargetSuper): ?>
+              <?php if ($isAdminUser): ?>
+                <form method="post" action="/admin/users/<?= (int) $u['id'] ?>/role" data-confirm="确定将「<?= \VoiceHubPay\Http\View::e($u['username']) ?>」降级为普通用户？" style="display:inline;">
+                  <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
+                  <input type="hidden" name="role" value="user">
+                  <button class="btn btn-ghost btn-sm">降级为普通用户</button>
+                </form>
+              <?php else: ?>
+                <form method="post" action="/admin/users/<?= (int) $u['id'] ?>/role" data-confirm="确定将「<?= \VoiceHubPay\Http\View::e($u['username']) ?>」设为管理员？" style="display:inline;">
+                  <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
+                  <input type="hidden" name="role" value="admin">
+                  <button class="btn btn-primary btn-sm">设为管理员</button>
+                </form>
+              <?php endif; ?>
+            <?php endif; ?>
+            <?php if (!$isSelf): ?>
               <form method="post" action="/admin/users/<?= (int) $u['id'] ?>/status" data-confirm="确定<?= $u['status'] === 'active' ? '禁用' : '恢复' ?>用户「<?= \VoiceHubPay\Http\View::e($u['username']) ?>」？" style="display:inline;">
                 <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
                 <button class="btn btn-<?= $u['status'] === 'active' ? 'danger' : 'ghost' ?> btn-sm"><?= $u['status'] === 'active' ? '禁用' : '恢复' ?></button>

@@ -34,7 +34,7 @@ final class AuthService
             unset($_SESSION['user_id'], $_SESSION['admin_last_seen_at']);
             return null;
         }
-        if ($user['role'] === 'admin') {
+        if (($user['role'] === 'admin' || $user['role'] === 'superadmin')) {
             $timeout = max(10, $this->app->config->int('SECURITY_ADMIN_SESSION_MINUTES', 120)) * 60;
             $lastSeen = (int) ($_SESSION['admin_last_seen_at'] ?? time());
             if (time() - $lastSeen > $timeout) {
@@ -56,7 +56,19 @@ final class AuthService
     public function isAdmin(): bool
     {
         $user = $this->user();
-        return $user !== null && $user['role'] === 'admin';
+        return $user !== null && ($user['role'] === 'admin' || $user['role'] === 'superadmin');
+    }
+
+    /**
+     * True when the logged-in user is the super admin (the first-created admin).
+     */
+    public function isSuperAdmin(): bool
+    {
+        $user = $this->user();
+        if ($user === null || !$this->isAdmin()) {
+            return false;
+        }
+        return $this->users->isSuperAdmin((int) $user['id']);
     }
 
     /**

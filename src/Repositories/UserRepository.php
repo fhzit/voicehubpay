@@ -137,6 +137,42 @@ final class UserRepository extends Repository
         $this->update($id, ['status' => $status]);
     }
 
+    public function setRole(int $id, string $role): void
+    {
+        $this->update($id, ['role' => $role]);
+    }
+
+    /**
+     * The super admin is the admin with the lowest user id — i.e. the first
+     * admin account ever created. Only that account may promote/demote other
+     * admins, and it cannot itself be demoted.
+     */
+    public function superAdminId(): ?int
+    {
+        if (!$this->tableExists()) {
+            return null;
+        }
+        $stmt = $this->pdo()->query("SELECT MIN(id) FROM users WHERE role IN ('admin','superadmin')");
+        $id = $stmt->fetchColumn();
+        return $id !== false && $id !== null ? (int) $id : null;
+    }
+
+    public function isSuperAdmin(int $id): bool
+    {
+        $superId = $this->superAdminId();
+        return $superId !== null && $id === $superId;
+    }
+
+    private function tableExists(): bool
+    {
+        try {
+            $this->pdo()->query('SELECT 1 FROM users LIMIT 1');
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     /**
      * Generate a guaranteed-unique username (used for social logins).
      */
