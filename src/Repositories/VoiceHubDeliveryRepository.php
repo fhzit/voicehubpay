@@ -42,19 +42,31 @@ final class VoiceHubDeliveryRepository extends Repository
         }
         $now = $this->now();
         $stmt = $this->pdo()->prepare('INSERT INTO voicehub_deliveries (source_type, source_id, source_order_no, fulfillment_unit_id, code_ciphertext, code_hash, code_source, idempotency_key, status, attempts, last_error, request_payload, response_payload, created_at, updated_at, success_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, ?, ?, NULL)');
-        $stmt->execute([
-            $data['source_type'],
-            $data['source_id'] ?? null,
-            $data['source_order_no'],
-            $data['fulfillment_unit_id'] ?? null,
-            $data['code_ciphertext'],
-            $data['code_hash'],
-            $data['code_source'],
-            $data['idempotency_key'],
-            $data['status'] ?? 'pending',
-            $now,
-            $now,
-        ]);
+        try {
+            $stmt->execute([
+                $data['source_type'],
+                $data['source_id'] ?? null,
+                $data['source_order_no'],
+                $data['fulfillment_unit_id'] ?? null,
+                $data['code_ciphertext'],
+                $data['code_hash'],
+                $data['code_source'],
+                $data['idempotency_key'],
+                $data['status'] ?? 'pending',
+                $now,
+                $now,
+            ]);
+        } catch (\PDOException $e) {
+            // Concurrent create: the unique idempotency key is the arbiter.
+            if ((string) $e->getCode() !== '23000' && (string) $e->getCode() !== '23505') {
+                throw $e;
+            }
+            $existing = $this->findByIdempotencyKey((string) $data['idempotency_key']);
+            if ($existing !== null) {
+                return ['created' => false, 'delivery' => $existing];
+            }
+            throw $e;
+        }
         $delivery = $this->findById((int) $this->pdo()->lastInsertId());
         return ['created' => true, 'delivery' => $delivery];
     }
@@ -81,9 +93,25 @@ final class VoiceHubDeliveryRepository extends Repository
         $stmt->execute($params);
     }
 
-    public function markProcessing(int $id, string $requestPayload): void
+    /**
+     * Atomically claim a delivery before issuing the external HTTP request.
+     * A stale processing lease may be reclaimed after $leaseSeconds so a
+     * crashed worker cannot block the delivery forever.
+     */
+    public function claimForProcessing(int $id, string $requestPayload, int $maxAttempts, bool $force = false, int $leaseSeconds = 300): bool
     {
-        $this->update($id, ['status' => 'processing', 'request_payload' => $requestPayload]);
+        $now = $this->now();
+        $staleBefore = gmdate('c', time() - max(30, $leaseSeconds));
+        if ($force) {
+            $sql = "UPDATE voicehub_deliveries SET status = 'processing', attempts = attempts + 1, request_payload = ?, last_error = NULL, updated_at = ? WHERE id = ? AND (status != 'processing' OR updated_at < ?)";
+            $params = [$requestPayload, $now, $id, $staleBefore];
+        } else {
+            $sql = "UPDATE voicehub_deliveries SET status = 'processing', attempts = attempts + 1, request_payload = ?, last_error = NULL, updated_at = ? WHERE id = ? AND attempts < ? AND (status IN ('pending','failed') OR (status = 'processing' AND updated_at < ?))";
+            $params = [$requestPayload, $now, $id, max(1, $maxAttempts), $staleBefore];
+        }
+        $stmt = $this->pdo()->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount() === 1;
     }
 
     public function markSuccess(int $id, string $responsePayload): void
@@ -93,15 +121,7 @@ final class VoiceHubDeliveryRepository extends Repository
 
     public function markFailed(int $id, string $error, string $responsePayload = ''): void
     {
-        $delivery = $this->findById($id);
-        $attempts = $delivery ? ((int) $delivery['attempts'] + 1) : 1;
-        $this->update($id, ['status' => 'failed', 'attempts' => $attempts, 'last_error' => mb_substr($error, 0, 1000), 'response_payload' => $responsePayload !== '' ? $responsePayload : null]);
-    }
-
-    public function incrementAttempt(int $id): void
-    {
-        $stmt = $this->pdo()->prepare('UPDATE voicehub_deliveries SET attempts = attempts + 1, updated_at = ? WHERE id = ?');
-        $stmt->execute([$this->now(), $id]);
+        $this->update($id, ['status' => 'failed', 'last_error' => mb_substr($error, 0, 1000), 'response_payload' => $responsePayload !== '' ? $responsePayload : null]);
     }
 
     public function stats(): array

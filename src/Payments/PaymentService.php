@@ -213,18 +213,19 @@ final class PaymentService
             return false;
         }
         $orderNo = (string) ($response['out_trade_no'] ?? $response['data']['out_trade_no'] ?? $response['data']['order']['out_trade_no'] ?? '');
-        if ($orderNo !== '' && $orderNo !== (string) $order['order_no']) {
+        if ($orderNo === '' || $orderNo !== (string) $order['order_no']) {
             return false;
         }
         $money = (string) ($response['money'] ?? $response['data']['money'] ?? $response['data']['order']['money'] ?? '');
-        if ($money !== '') {
-            try {
-                if (Money::toCents($money) !== (int) $order['amount_due_cents']) {
-                    return false;
-                }
-            } catch (\InvalidArgumentException) {
+        if ($money === '') {
+            return false;
+        }
+        try {
+            if (Money::toCents($money) !== (int) $order['amount_due_cents']) {
                 return false;
             }
+        } catch (\InvalidArgumentException) {
+            return false;
         }
         return true;
     }
@@ -260,8 +261,14 @@ final class PaymentService
                 if ($order === null || $order['payment_status'] === 'paid') {
                     continue;
                 }
-                $this->confirmPaid($order, 'sg65', 'query');
-                $backfilled++;
+                // The merchant list is discovery-only. Confirm every candidate
+                // through the signed single-order query, including order number
+                // and amount verification, before changing local payment state.
+                $tradeNo = (string) ($row['trade_no'] ?? '');
+                $verified = $this->queryAndBackfill($order, $tradeNo !== '' ? $tradeNo : null);
+                if ($verified['paid']) {
+                    $backfilled++;
+                }
             }
         }
         return ['backfilled' => $backfilled, 'checked' => count($orders)];

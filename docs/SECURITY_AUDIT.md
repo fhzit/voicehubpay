@@ -1,6 +1,6 @@
 # VoiceHubPay 前后端系统性安全与质量审查报告
 
-审查日期：2026-06-18
+审查日期：2026-08-27
 范围：`public/index.php`、全部 Controller/Repository/Service、认证与会话、SG65、爱发电、VoiceHub、安装与迁移、全部 PHP 视图、`app.js`、`app.css`。
 
 ## 结论
@@ -25,6 +25,13 @@
 12. **SG65 通道设置未白名单化**：数组值可原样持久化，默认类型也可能未启用。已白名单过滤并保证默认类型属于启用集合。
 13. **暗色主题语义边框 token 缺失**：浅色硬编码边框在暗色模式中过亮。已补齐 light/dark token 并替换硬编码。
 14. **管理 Dashboard 双列布局无移动端降级**：内联 grid 模板导致窄屏挤压。已加入专用响应式类。
+15. **安装数据库表单字段冲突**：SQLite 与 PostgreSQL 隐藏区域共用 `db_database`，浏览器会同时提交并可能覆盖 SQLite 路径。已拆分字段名并按数据库类型读取。
+16. **VoiceHub/爱发电履约并发重复调用**：重叠 cron、Webhook 或后台重试可同时读取同一待处理记录并重复请求外部 API。已加入数据库条件更新的原子处理租约、陈旧租约回收和单次 attempts 计数。
+17. **SG65 对账过度信任列表结果**：商户订单列表的 `status=1` 可直接触发本地入账，未逐单校验签名、订单号和金额。现仅将列表用于发现候选，并通过签名单笔查询确认；缺失订单号或金额时拒绝回填。
+18. **爱发电未支付订单无法转为已支付**：重复订单只读回旧行，不刷新来源状态，导致首次抓到 unpaid 的订单永久不发券。已在重复事件中刷新来源字段并保留投递状态，覆盖 unpaid→paid。
+19. **登录后跳转反斜杠边界**：`/\\evil.example` 可被部分浏览器规范化为外站 URL。已拒绝反斜杠、控制字符和带 authority/scheme 的目标。
+20. **配置优先级与文档相反**：运行时数据库设置覆盖 `.env`，使环境级紧急覆盖不生效。已按文档改为环境层优先。
+21. **并发 create-if-absent 并非真正幂等**：并发 Webhook/worker 可在“先查后插”间触发唯一键异常。现捕获唯一约束冲突并读回已存在记录。
 
 ### 低风险/质量问题
 
@@ -47,4 +54,6 @@
 
 ## 回归覆盖
 
-新增 `tests/unit/SecurityRegressionTest.php`，覆盖代理头欺骗、SG65 前后端标识、订单布局、AJAX CSRF、金额格式与安装表单 CSRF。最终回归结果记录在交付回复中。
+新增并扩展 `tests/unit/SecurityRegressionTest.php`、`tests/integration/VoiceHubFulfillmentTest.php` 与 `tests/integration/AfdianProcessorTest.php`，覆盖代理头欺骗、SG65 前后端标识、订单布局、AJAX CSRF、金额格式、安装表单 CSRF、数据库字段隔离、跳转校验、环境配置优先级、履约原子抢占/尝试次数，以及爱发电 unpaid→paid 状态刷新。
+
+本轮使用用户目录中的 PHP 8.4 CLI 真实执行：147 个跟踪 PHP 文件语法检查全部通过；13 个测试套件共 1643 个断言、0 失败。另在空目录启动 PHP 内置服务，按真实 Cookie+CSRF 完成 `/install` 1–7 步，确认生成 `settings.sqlite`、业务 SQLite、`.masterkey`、`install.lock`、16 张表及有效管理员账号。

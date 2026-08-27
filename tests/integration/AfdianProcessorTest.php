@@ -59,5 +59,21 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $n = (int) $pdo->query("SELECT COUNT(*) FROM voicehub_deliveries WHERE source_order_no='AFD20260826UNPAID'")->fetchColumn();
     $t->assertSame(0, $n, 'unpaid not delivered');
 
+    // A later paid payload for the same order refreshes source fields and is
+    // eligible for delivery instead of remaining permanently unpaid.
+    $transition = $proc->processNormalizedOrder([
+        'out_trade_no' => 'AFD20260826UNPAID',
+        'trade_no' => 'LATE-PAID-TRADE',
+        'amount_cents' => 100,
+        'status' => 'paid',
+    ]);
+    $t->assertTrue(in_array($transition['status'], ['failed', 'success'], true), 'unpaid-to-paid transition is processed');
+    $transitionedOrder = $orders->findByOutTradeNo('AFD20260826UNPAID');
+    $t->assertSame('paid', $transitionedOrder['status']);
+    $t->assertSame('LATE-PAID-TRADE', $transitionedOrder['trade_no']);
+    $t->assertTrue($transitionedOrder['paid_at'] !== null && $transitionedOrder['paid_at'] !== '');
+    $transitionDeliveries = (int) $pdo->query("SELECT COUNT(*) FROM voicehub_deliveries WHERE source_order_no='AFD20260826UNPAID'")->fetchColumn();
+    $t->assertSame(1, $transitionDeliveries, 'paid transition creates one delivery');
+
     return ['assertions' => $t->assertions()];
 };

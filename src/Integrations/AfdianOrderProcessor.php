@@ -97,9 +97,15 @@ final class AfdianOrderProcessor
             return ['out_trade_no' => $outTradeNo, 'status' => 'failed', 'created' => $stored['created'], 'message' => 'max attempts reached'];
         }
 
+        $payload = json_encode(['codes' => [$code]], JSON_UNESCAPED_UNICODE) ?: '';
+        if (!$this->deliveries->claimForProcessing($deliveryId, $payload, $maxAttempts)) {
+            $current = $this->deliveries->findById($deliveryId) ?? $delivery;
+            return ['out_trade_no' => $outTradeNo, 'status' => (string) $current['status'], 'created' => $stored['created'], 'message' => 'already processing or retry limit reached'];
+        }
+        $delivery = $this->deliveries->findById($deliveryId) ?? $delivery;
+
         try {
             $this->afdian->markVoiceHub($orderId, 'processing', (int) $delivery['attempts'], null);
-            $this->deliveries->markProcessing($deliveryId, json_encode(['codes' => [$code]], JSON_UNESCAPED_UNICODE) ?: '');
             $response = $this->voicehub->createTicket($code, [
                 'source_type' => 'afdian',
                 'source_order_no' => $outTradeNo,

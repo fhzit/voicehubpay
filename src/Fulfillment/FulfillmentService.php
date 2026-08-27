@@ -166,11 +166,19 @@ final class FulfillmentService
             return $delivery;
         }
 
-        $this->orders->updateUnit((int) $unit['id'], ['status' => 'processing', 'voicehub_status' => 'processing']);
-
         $code = $this->app->crypto->decrypt($delivery['code_ciphertext']);
         $payload = json_encode(['codes' => [$code], 'note' => 'voicehubpay'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
-        $this->deliveries->markProcessing((int) $delivery['id'], $payload);
+        if (!$this->deliveries->claimForProcessing((int) $delivery['id'], $payload, $maxAttempts, $force)) {
+            // Another worker/admin request owns the active processing lease, or
+            // the retry cap was reached. Never issue a duplicate HTTP request.
+            return $this->deliveries->findById((int) $delivery['id']) ?? $delivery;
+        }
+        $delivery = $this->deliveries->findById((int) $delivery['id']) ?? $delivery;
+        $this->orders->updateUnit((int) $unit['id'], [
+            'status' => 'processing',
+            'voicehub_status' => 'processing',
+            'voicehub_attempts' => (int) $delivery['attempts'],
+        ]);
 
         try {
             $response = $this->voicehub->createTicket($code, [

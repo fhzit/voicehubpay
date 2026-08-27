@@ -121,9 +121,12 @@ final class InstallController extends Controller
         if (!in_array($connection, ['sqlite', 'pgsql'], true)) {
             throw new \InvalidArgumentException('不支持的数据库类型。');
         }
+        $database = $connection === 'sqlite'
+            ? $request->string('db_sqlite_database', 'storage/voicehubpay.sqlite')
+            : $request->string('db_pgsql_database', 'voicehubpay');
         $db = [
             'connection' => $connection,
-            'database' => $request->string('db_database', $connection === 'sqlite' ? 'storage/voicehubpay.sqlite' : 'voicehubpay'),
+            'database' => $database,
             'host' => $request->string('db_host', '127.0.0.1'),
             'port' => $request->string('db_port', '5432') ?: '5432',
             'username' => $request->string('db_username'),

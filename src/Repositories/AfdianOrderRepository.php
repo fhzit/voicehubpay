@@ -29,24 +29,50 @@ final class AfdianOrderRepository extends Repository
     {
         $existing = $this->findByOutTradeNo((string) $data['out_trade_no']);
         if ($existing) {
-            return ['created' => false, 'order' => $existing];
+            // Poll/webhook payloads can observe the same order before and after
+            // payment. Refresh source fields while preserving delivery state.
+            $this->update((int) $existing['id'], [
+                'trade_no' => $data['trade_no'] ?? $existing['trade_no'],
+                'user_id' => $data['user_id'] ?? $existing['user_id'],
+                'plan_id' => $data['plan_id'] ?? $existing['plan_id'],
+                'sku_detail' => $data['sku_detail'] ?? $existing['sku_detail'],
+                'amount_cents' => (int) ($data['amount_cents'] ?? $existing['amount_cents']),
+                'status' => $data['status'] ?? $existing['status'],
+                'raw_payload' => $data['raw_payload'] ?? $existing['raw_payload'],
+                'paid_at' => in_array((string) ($data['status'] ?? ''), ['paid', '2'], true)
+                    ? ($existing['paid_at'] ?: $this->now())
+                    : $existing['paid_at'],
+            ]);
+            return ['created' => false, 'order' => $this->findById((int) $existing['id'])];
         }
         $now = $this->now();
+        $paidAt = in_array((string) ($data['status'] ?? 'paid'), ['paid', '2'], true) ? $now : null;
         $stmt = $this->pdo()->prepare('INSERT INTO afdian_orders (out_trade_no, trade_no, user_id, plan_id, sku_detail, amount_cents, status, raw_payload, voicehub_status, voicehub_attempts, voicehub_last_error, created_at, paid_at, processed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, NULL, ?)');
-        $stmt->execute([
-            $data['out_trade_no'],
-            $data['trade_no'] ?? '',
-            $data['user_id'] ?? '',
-            $data['plan_id'] ?? '',
-            $data['sku_detail'] ?? '',
-            (int) ($data['amount_cents'] ?? 0),
-            $data['status'] ?? 'paid',
-            $data['raw_payload'] ?? '[]',
-            $data['voicehub_status'] ?? 'pending',
-            $now,
-            $now,
-            $now,
-        ]);
+        try {
+            $stmt->execute([
+                $data['out_trade_no'],
+                $data['trade_no'] ?? '',
+                $data['user_id'] ?? '',
+                $data['plan_id'] ?? '',
+                $data['sku_detail'] ?? '',
+                (int) ($data['amount_cents'] ?? 0),
+                $data['status'] ?? 'paid',
+                $data['raw_payload'] ?? '[]',
+                $data['voicehub_status'] ?? 'pending',
+                $now,
+                $paidAt,
+                $now,
+            ]);
+        } catch (\PDOException $e) {
+            if ((string) $e->getCode() !== '23000' && (string) $e->getCode() !== '23505') {
+                throw $e;
+            }
+            $existing = $this->findByOutTradeNo((string) $data['out_trade_no']);
+            if ($existing !== null) {
+                return ['created' => false, 'order' => $existing];
+            }
+            throw $e;
+        }
         return ['created' => true, 'order' => $this->findById((int) $this->pdo()->lastInsertId())];
     }
 

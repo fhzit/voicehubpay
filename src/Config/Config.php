@@ -43,8 +43,11 @@ final class Config
 
     public function get(string $key, ?string $default = null): ?string
     {
-        $value = $this->settings[$key] ?? $this->values[$key] ?? getenv($key);
-        if ($value === false || $value === '') {
+        $value = $this->values[$key] ?? getenv($key);
+        if ($value === false || $value === null || $value === '') {
+            $value = $this->settings[$key] ?? null;
+        }
+        if ($value === false || $value === null || $value === '') {
             return $default;
         }
         return (string) $value;

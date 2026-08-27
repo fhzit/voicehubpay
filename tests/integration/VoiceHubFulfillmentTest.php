@@ -61,5 +61,19 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $list2 = $deliveries->list([]);
     $t->assertSame(3, $list2['total'], 'no duplicate delivery rows after retry');
 
+    // Atomic processing claim: only the first worker may own an active lease;
+    // attempts are counted exactly once when the external request starts.
+    $claim = $deliveries->findByUnitId((int) $units[0]['id']);
+    $t->assertTrue($claim !== null);
+    $pdo->prepare("UPDATE voicehub_deliveries SET status='pending', attempts=0, updated_at=? WHERE id=?")->execute([gmdate('c'), $claim['id']]);
+    $t->assertTrue($deliveries->claimForProcessing((int) $claim['id'], '{}', 3), 'first worker claims delivery');
+    $t->assertFalse($deliveries->claimForProcessing((int) $claim['id'], '{}', 3), 'second worker cannot claim active lease');
+    $claimed = $deliveries->findById((int) $claim['id']);
+    $t->assertSame('processing', $claimed['status']);
+    $t->assertSame(1, (int) $claimed['attempts'], 'claim increments attempt once');
+    $deliveries->markFailed((int) $claim['id'], 'test failure');
+    $failedClaim = $deliveries->findById((int) $claim['id']);
+    $t->assertSame(1, (int) $failedClaim['attempts'], 'failure does not double count attempt');
+
     return ['assertions' => $t->assertions()];
 };

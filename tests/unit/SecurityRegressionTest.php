@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use VoiceHubPay\Config\Config;
+use VoiceHubPay\Controllers\AuthController;
 use VoiceHubPay\Http\Request;
 
 return static function (\VoiceHubPay\Tests\TestCase $t): array {
@@ -51,6 +53,29 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertContains('$canContinue', $installEnv, 'install env step computes availability from current checks');
     $t->assertContains('$canContinue ?', $installEnv, 'install env button uses current checks instead of session state');
     $t->assertFalse(str_contains($installEnv, "!empty(\$state['env_ok']) ? '' : 'disabled'"), 'install env button has no pre-submit session deadlock');
+
+    $installDb = file_get_contents($base . '/views/install/step-db.php') ?: '';
+    $t->assertContains('name="db_sqlite_database"', $installDb, 'SQLite and PostgreSQL database fields have distinct names');
+    $t->assertContains('name="db_pgsql_database"', $installDb, 'PostgreSQL database field has a distinct name');
+    $t->assertFalse(str_contains($installDb, 'name="db_database"'), 'hidden database form does not submit duplicate db_database values');
+
+    [$redirectApp] = $t->freshApp('safe-redirect');
+    $authController = new AuthController($redirectApp);
+    $safeRedirect = new ReflectionMethod($authController, 'safeRedirect');
+    $t->assertSame('/account/orders', $safeRedirect->invoke($authController, '/account/orders'));
+    $t->assertSame('/', $safeRedirect->invoke($authController, '//evil.example'));
+    $t->assertSame('/', $safeRedirect->invoke($authController, '/\\evil.example'));
+    $t->assertSame('/', $safeRedirect->invoke($authController, "/account\r\nLocation: https://evil.example"));
+
+    $configDir = $t->tmpDir('config-precedence');
+    mkdir($configDir . '/storage', 0777, true);
+    $config = Config::fromEnv($configDir);
+    $config->settings()->set('PRECEDENCE_TEST', 'database');
+    $config->reloadSettings();
+    $t->assertSame('database', $config->get('PRECEDENCE_TEST'));
+    $envConfig = new Config(['PRECEDENCE_TEST' => 'environment'], $configDir);
+    $envConfig->reloadSettings();
+    $t->assertSame('environment', $envConfig->get('PRECEDENCE_TEST'), 'environment overrides persistent WebUI settings');
 
     return ['assertions' => $t->assertions()];
 };

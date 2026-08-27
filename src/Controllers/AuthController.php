@@ -131,10 +131,18 @@ final class AuthController extends Controller
         if ($url === '' || $url === '/') {
             return '/';
         }
-        // Only allow internal relative redirects (no open redirect).
-        if (str_starts_with($url, '/') && !str_starts_with($url, '//')) {
-            return $url;
+        // Only allow internal relative redirects. Reject browser-normalized
+        // backslashes, control characters and any URL with authority/scheme.
+        if (!str_starts_with($url, '/')
+            || str_starts_with($url, '//')
+            || str_contains($url, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $url) === 1) {
+            return '/';
         }
-        return '/';
+        $parts = parse_url($url);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+            return '/';
+        }
+        return $url;
     }
 }

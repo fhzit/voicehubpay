@@ -32,7 +32,7 @@ foreach ($env as $c) { if ($c['label'] === 'PostgreSQL 驱动' && $c['ok']) { $e
     <div id="sqlite-fields">
       <div class="field">
         <label class="label">数据库文件路径</label>
-        <input class="input" type="text" name="db_database" value="<?= \VoiceHubPay\Http\View::e($db['database'] ?? 'storage/voicehubpay.sqlite') ?>">
+        <input class="input" type="text" name="db_sqlite_database" value="<?= \VoiceHubPay\Http\View::e(($db['connection'] ?? 'sqlite') === 'sqlite' ? ($db['database'] ?? 'storage/voicehubpay.sqlite') : 'storage/voicehubpay.sqlite') ?>">
         <div class="hint">相对站点根目录或绝对路径，SQLite 文件会自动创建</div>
       </div>
     </div>
@@ -42,7 +42,7 @@ foreach ($env as $c) { if ($c['label'] === 'PostgreSQL 驱动' && $c['ok']) { $e
         <div class="field"><label class="label">主机</label><input class="input" type="text" name="db_host" value="<?= \VoiceHubPay\Http\View::e($db['host'] ?? '127.0.0.1') ?>"></div>
         <div class="field"><label class="label">端口</label><input class="input" type="text" name="db_port" value="<?= \VoiceHubPay\Http\View::e($db['port'] ?? '5432') ?>"></div>
       </div>
-      <div class="field"><label class="label">数据库名</label><input class="input" type="text" name="db_database" value="<?= \VoiceHubPay\Http\View::e($db['database'] ?? 'voicehubpay') ?>"></div>
+      <div class="field"><label class="label">数据库名</label><input class="input" type="text" name="db_pgsql_database" value="<?= \VoiceHubPay\Http\View::e(($db['connection'] ?? '') === 'pgsql' ? ($db['database'] ?? 'voicehubpay') : 'voicehubpay') ?>"></div>
       <div class="form-grid">
         <div class="field"><label class="label">用户名</label><input class="input" type="text" name="db_username" value="<?= \VoiceHubPay\Http\View::e($db['username'] ?? '') ?>" autocomplete="off"></div>
         <div class="field">
