@@ -43,10 +43,17 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertSame('notify', $router->dispatch($mk('GET', '/payments/sg65/notify'))->body());
     $t->assertSame('notify', $router->dispatch($mk('POST', '/payments/sg65/notify'))->body());
 
-    // literal beats param when both match
-    $router->get('/x', fn () => Response::text('literal'));
-    $router->get('/x/{id}', fn (Request $r, array $p) => Response::text('param:' . $p['id']));
-    $t->assertSame('literal', $router->dispatch($mk('GET', '/x'))->body());
+    // literal beats param even when the param route is registered FIRST
+    $router->get('/y/{id}', fn (Request $r, array $p) => Response::text('param:' . $p['id']));
+    $router->get('/y', fn () => Response::text('literal'));
+    $t->assertSame('literal', $router->dispatch($mk('GET', '/y'))->body());
+
+    // regression: /auth/social/callback must not be captured by {provider}
+    // regardless of registration order
+    $router->get('/auth/social/{provider}', fn (Request $r, array $p) => Response::text('social:' . $p['provider']));
+    $router->get('/auth/social/callback', fn () => Response::text('social:callback'));
+    $t->assertSame('social:callback', $router->dispatch($mk('GET', '/auth/social/callback'))->body(), '/auth/social/callback is not captured by {provider}');
+    $t->assertSame('social:qq', $router->dispatch($mk('GET', '/auth/social/qq'))->body(), '/auth/social/qq routes to provider param');
 
     // no route
     $t->assertNull($router->dispatch($mk('GET', '/nope')));

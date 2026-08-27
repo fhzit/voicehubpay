@@ -32,17 +32,27 @@ final class Router
 
     /**
      * Dispatch request; returns the response or null when no route matched.
+     *
+     * Literal (no-{param}) routes always take precedence over parametrised
+     * routes of the same shape, regardless of registration order. This keeps
+     * routes like /auth/social/callback from being captured by a sibling
+     * /auth/social/{provider}. Within each tier the registration order is kept.
      */
     public function dispatch(Request $request): ?Response
     {
         $method = $request->method();
         $path = rtrim($request->path(), '/') ?: '/';
         $candidates = array_merge($this->routes[$method] ?? [], $this->routes['ANY'] ?? []);
-        foreach ($candidates as $route) {
-            $params = $this->match($route['pattern'], $path);
-            if ($params !== null) {
-                $handler = $route['handler'];
-                return $handler($request, $params);
+        foreach ([false, true] as $literal) {
+            foreach ($candidates as $route) {
+                $hasParam = str_contains($route['pattern'], '{');
+                if ($hasParam === $literal) {
+                    continue;
+                }
+                $params = $this->match($route['pattern'], $path);
+                if ($params !== null) {
+                    return $route['handler']($request, $params);
+                }
             }
         }
         return null;
