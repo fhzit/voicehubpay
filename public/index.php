@@ -72,21 +72,29 @@ if ($app->config->bool('MAINTENANCE_MODE', false)) {
 
 // Guest redirect: when a redirect URL is configured, anonymous visitors are
 // sent there instead of seeing the shopfront, so the site does not look like a
-// commercial shop before login. /login and /register stay reachable so guests
-// can still get into an account (after login everything renders normally).
+// commercial shop before login. Only the pure marketing page roots and the
+// login-gated areas (/account, /admin) are guarded — every functional / API /
+// auth / order / payment route passes through so the site keeps working, and
+// those controllers enforce their own login/ownership checks (redirecting to
+// /login rather than dumping the user at the external portal).
 $guestRedirect = trim((string) $app->config->get('AUTH_REDIRECT_URL', ''));
 if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
     $path = $request->path();
-    $isExternal = $path === '/webhook/afdian' || str_starts_with($path, '/payments/sg65');
-    // /login, /register and the social flow stay reachable so guests can get
-    // into an account. /install is only reachable while the system is NOT yet
-    // installed; once installed it redirects like any other path.
-    $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
-        || str_starts_with($path, '/auth/password') || str_starts_with($path, '/auth/social');
-    if (!$isInstalled && str_starts_with($path, '/install')) {
-        $isAuthFlow = true;
+    // Prefixes that must never be redirected away: the app needs them to work.
+    $passthrough = [
+        '/login', '/register', '/auth/', '/api/', '/orders', '/checkout',
+        '/payments/', '/webhook/', '/logout',
+    ];
+    $isPassthrough = false;
+    foreach ($passthrough as $p) {
+        if (str_starts_with($path, $p)) { $isPassthrough = true; break; }
     }
-    if (!$isAuthFlow && !$isExternal) {
+    // /install is only reachable while the system is NOT yet installed; once
+    // installed it is guarded like any other path.
+    if (!$isInstalled && str_starts_with($path, '/install')) {
+        $isPassthrough = true;
+    }
+    if (!$isPassthrough) {
         \VoiceHubPay\Http\Response::redirect($guestRedirect, 302)->send();
         exit;
     }
