@@ -1030,9 +1030,9 @@ details.toggle summary { cursor: pointer; font-weight: 600; color: var(--foregro
 .lc-dot-afdian { fill: var(--chart-5); }
 /* invisible hover hit area over each data point */
 .lc-hit { fill: transparent; pointer-events: all; cursor: pointer; }
-/* custom hover tooltip (absolute inside .line-chart-wrap) */
+/* custom hover tooltip — fixed to viewport so the scrollable chart can't clip it */
 .lc-tooltip {
-  position: absolute; z-index: 60; pointer-events: none;
+  position: fixed; z-index: 9990; pointer-events: none;
   min-width: 132px; padding: 9px 11px;
   background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg); font-size: 12px; line-height: 1.5;

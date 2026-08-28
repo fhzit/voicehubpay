@@ -174,6 +174,12 @@ final class DashboardService
         $totalShop = 0;
         $totalAfdian = 0;
 
+        // Channel filter: the trend buckets must honor the selected channel
+        // just like the KPI cards do; otherwise clicking 商城/爱发电 has no
+        // effect on the income trend chart.
+        $includeShop = in_array($channel, ['all', 'shop'], true);
+        $includeAfdian = in_array($channel, ['all', 'afdian'], true);
+
         foreach ($buckets as $bucket) {
             $from = $bucket['from'];
             $to = $bucket['to'];
@@ -184,23 +190,27 @@ final class DashboardService
             $units = 0;
             $vh = ['success' => 0, 'failed' => 0, 'requests' => 0];
 
-            $stmt = $this->pdo()->prepare("SELECT o.source, COALESCE(SUM(o.amount_paid_cents),0) AS rev, COUNT(*) AS cnt FROM orders o WHERE o.payment_status='paid' AND o.paid_at >= ? AND o.paid_at <= ? GROUP BY o.source");
-            $stmt->execute([$from, $to]);
-            foreach ($stmt->fetchAll() as $row) {
-                if ($row['source'] === 'shop') {
-                    $shopRev = (int) $row['rev'];
-                    $shopOrders = (int) $row['cnt'];
+            if ($includeShop) {
+                $stmt = $this->pdo()->prepare("SELECT o.source, COALESCE(SUM(o.amount_paid_cents),0) AS rev, COUNT(*) AS cnt FROM orders o WHERE o.payment_status='paid' AND o.paid_at >= ? AND o.paid_at <= ? GROUP BY o.source");
+                $stmt->execute([$from, $to]);
+                foreach ($stmt->fetchAll() as $row) {
+                    if ($row['source'] === 'shop') {
+                        $shopRev = (int) $row['rev'];
+                        $shopOrders = (int) $row['cnt'];
+                    }
                 }
+                $s = $this->pdo()->prepare("SELECT COALESCE(SUM(oi.quantity),0) AS u FROM orders o JOIN order_items oi ON oi.order_id = o.id WHERE o.source='shop' AND o.payment_status='paid' AND o.paid_at >= ? AND o.paid_at <= ?");
+                $s->execute([$from, $to]);
+                $units = (int) $s->fetchColumn();
             }
-            $s = $this->pdo()->prepare("SELECT COALESCE(SUM(oi.quantity),0) AS u FROM orders o JOIN order_items oi ON oi.order_id = o.id WHERE o.source='shop' AND o.payment_status='paid' AND o.paid_at >= ? AND o.paid_at <= ?");
-            $s->execute([$from, $to]);
-            $units = (int) $s->fetchColumn();
 
-            $a = $this->pdo()->prepare("SELECT COALESCE(SUM(amount_cents),0) AS rev, COUNT(*) AS cnt FROM afdian_orders WHERE status IN ('paid','2') AND paid_at >= ? AND paid_at <= ?");
-            $a->execute([$from, $to]);
-            $aRow = $a->fetch();
-            $afdianRev = (int) $aRow['rev'];
-            $afdianOrders = (int) $aRow['cnt'];
+            if ($includeAfdian) {
+                $a = $this->pdo()->prepare("SELECT COALESCE(SUM(amount_cents),0) AS rev, COUNT(*) AS cnt FROM afdian_orders WHERE status IN ('paid','2') AND paid_at >= ? AND paid_at <= ?");
+                $a->execute([$from, $to]);
+                $aRow = $a->fetch();
+                $afdianRev = (int) $aRow['rev'];
+                $afdianOrders = (int) $aRow['cnt'];
+            }
 
             $v = $this->pdo()->prepare('SELECT status, COUNT(*) AS c FROM voicehub_deliveries WHERE created_at >= ? AND created_at <= ? GROUP BY status');
             $v->execute([$from, $to]);

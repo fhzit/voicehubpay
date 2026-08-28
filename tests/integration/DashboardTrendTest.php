@@ -52,5 +52,23 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
         }
     }
 
+    // Channel filter must apply to the trend buckets, not just KPIs.
+    $weekShop = $svc->trends('week', 'shop');
+    foreach ($weekShop['income'] as $b) {
+        if ($b['label'] === '08-27') {
+            $t->assertSame(103, $b['shop'], 'shop channel keeps shop revenue');
+            $t->assertSame(0, $b['afdian'], 'shop channel hides afdian revenue');
+            $t->assertSame(103, $b['total'], 'shop channel total = shop only');
+        }
+    }
+    $weekAf = $svc->trends('week', 'afdian');
+    foreach ($weekAf['income'] as $b) {
+        if ($b['label'] === '08-27') {
+            $t->assertSame(0, $b['shop'], 'afdian channel hides shop revenue');
+            $t->assertSame(500, $b['afdian'], 'afdian channel keeps afdian revenue');
+            $t->assertSame(500, $b['total'], 'afdian channel total = afdian only');
+        }
+    }
+
     return ['assertions' => $t->assertions()];
 };

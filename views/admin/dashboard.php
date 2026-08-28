@@ -4,11 +4,17 @@ $k = $kpis['current'] ?? $kpis;
 $d = $kpis['deltas'] ?? [];
 $maxIncome = max(1, max(array_column($trends['income'], 'total') ?: [0]));
 /* ---- SVG line-chart geometry helpers ---- */
-$chart = static function () use ($trends, $maxIncome): string {
-    $rows = $trends['income'];                 // [label, total, shop, afdian]
+$chart = static function () use ($trends, $maxIncome, $channel): string {
+    $rows = $trends['income'];
     if ($rows === []) {
         return '';
     }
+    // Only draw the channel(s) matching the active filter.
+    $showShop = in_array($channel, ['all', 'shop'], true);
+    $showAfdian = in_array($channel, ['all', 'afdian'], true);
+    $lineKeys = [];
+    if ($showShop) { $lineKeys['shop'] = ['line' => 'lc-line-shop', 'fill' => 'lc-fill-shop', 'dot' => 'lc-dot-shop', 'mini' => 'var(--chart-2)', 'name' => '商城']; }
+    if ($showAfdian) { $lineKeys['afdian'] = ['line' => 'lc-line-afdian', 'fill' => 'lc-fill-afdian', 'dot' => 'lc-dot-afdian', 'mini' => 'var(--chart-5)', 'name' => '爱发电']; }
     $W = 640; $H = 185; $pl = 10; $pr = 10; $pt = 12; $pb = 26;
     $plotW = $W - $pl - $pr; $plotH = $H - $pt - $pb;
     $n = count($rows);
@@ -23,7 +29,7 @@ $chart = static function () use ($trends, $maxIncome): string {
         return $out;
     };
     // build
-    $svg = '<svg class="line-chart" viewBox="0 0 ' . $W . ' ' . $H . '" role="img" aria-label="收入趋势折线图">';
+    $svg = '<svg class="line-chart" viewBox="0 0 ' . $W . ' ' . $H . '" role="img" aria-label="交易趋势折线图">';
     // horizontal gridlines — Y-axis labels are shown in 元 (maxIncome is cents)
     for ($g = 0; $g <= 4; $g++) {
         $gy = $pt + $plotH * $g / 4;
@@ -31,41 +37,40 @@ $chart = static function () use ($trends, $maxIncome): string {
         $svg .= '<line x1="' . $pl . '" y1="' . round($gy, 1) . '" x2="' . ($W - $pr) . '" y2="' . round($gy, 1) . '" class="lc-grid"/>';
         $svg .= '<text x="' . ($pl + 2) . '" y="' . round($gy - 4, 1) . '" class="lc-axis-val">' . ($valYuan > 0 ? number_format($valYuan, 2) : 0) . '</text>';
     }
-    // area fills
-    foreach (['shop', 'afdian'] as $key) {
+    // area fills (only visible channels)
+    foreach ($lineKeys as $key => $meta) {
         $ptsArr = $pts($key);
         $area = 'M' . $ptsArr[0] . ' L' . implode(' L', $ptsArr) . ' L' . $xAt($n - 1) . ',' . $yAt(0) . ' L' . $xAt(0) . ',' . $yAt(0) . ' Z';
-        $svg .= '<path d="' . $area . '" class="lc-fill lc-fill-' . $key . '"></path>';
+        $svg .= '<path d="' . $area . '" class="lc-fill ' . $meta['fill'] . '"></path>';
     }
-    // lines
-    foreach (['shop' => 'lc-line-shop', 'afdian' => 'lc-line-afdian'] as $key => $cls) {
-        $svg .= '<polyline class="lc-line ' . $cls . '" points="' . implode(' ', $pts($key)) . '" fill="none"/>';
+    // lines (only visible channels)
+    foreach ($lineKeys as $key => $meta) {
+        $svg .= '<polyline class="lc-line ' . $meta['line'] . '" points="' . implode(' ', $pts($key)) . '" fill="none"/>';
     }
     // dots + hover hit areas (each data point gets an invisible large circle that
-    // drives a custom tooltip showing 时段 / 总额 / 商城 / 爱发电)
+    // drives a custom tooltip showing 时段 / 总额 / per-channel revenue)
     foreach ($rows as $i => $r) {
         $xx = round($xAt($i), 1);
-        $yyShop = round($yAt((int) $r['shop']), 1);
-        $yyAf = round($yAt((int) $r['afdian']), 1);
-        $vShop = (int) $r['shop']; $vAf = (int) $r['afdian'];
         $vTotal = (int) $r['total'];
-        $tipHtml = '<span class="lc-key">' . \VoiceHubPay\Http\View::e($r['label']) . '</span>'
-            . '<span class="lc"><i class="lc-dot-mini" style="background:var(--chart-2);"></i>商城<span class="lc-val">¥' . \VoiceHubPay\Http\View::money($vShop) . '</span></span>'
-            . '<span class="lc"><i class="lc-dot-mini" style="background:var(--chart-5);"></i>爱发电<span class="lc-val">¥' . \VoiceHubPay\Http\View::money($vAf) . '</span></span>'
-            . '<span class="lc-sep"></span>'
+        $tipHtml = '<span class="lc-key">' . \VoiceHubPay\Http\View::e($r['label']) . '</span>';
+        foreach ($lineKeys as $key => $meta) {
+            $v = (int) $r[$key];
+            $tipHtml .= '<span class="lc"><i class="lc-dot-mini" style="background:' . $meta['mini'] . ';"></i>' . $meta['name'] . '<span class="lc-val">¥' . \VoiceHubPay\Http\View::money($v) . '</span></span>';
+        }
+        $tipHtml .= '<span class="lc-sep"></span>'
             . '<span class="lc"><b>总额</b><span class="lc-val lc-val-total">¥' . \VoiceHubPay\Http\View::money($vTotal) . '</span></span>';
-        $dot = function (float $yy, string $cls) use ($xx, $tipHtml): string {
-            // data-tip holds HTML that JS injects via innerHTML, so only the
-            // double-quote attribute delimiter must be encoded — do NOT Entity-encode
-            // the inner tags (View::e would turn them into visible text).
-            $attrSafe = str_replace('"', '&quot;', $tipHtml);
-            return '<circle cx="' . $xx . '" cy="' . round($yy, 1) . '" r="3" class="' . $cls . '"></circle>'
-                . '<circle cx="' . $xx . '" cy="' . round($yy, 1) . '" r="11" class="lc-hit" data-tip="' . $attrSafe . '"></circle>';
-        };
-        // draw dots for every point in the range; the hit area always present
-        // so the user can hover each bucket even when its value is zero.
-        $svg .= $dot($yyShop, 'lc-dot lc-dot-shop');
-        $svg .= $dot($yyAf, 'lc-dot lc-dot-afdian');
+        foreach ($lineKeys as $key => $meta) {
+            $yy = round($yAt((int) $r[$key]), 1);
+            $dot = function (float $yy, string $cls) use ($xx, $tipHtml): string {
+                // data-tip holds HTML that JS injects via innerHTML, so only the
+                // double-quote attribute delimiter must be encoded — do NOT Entity-encode
+                // the inner tags (View::e would turn them into visible text).
+                $attrSafe = str_replace('"', '&quot;', $tipHtml);
+                return '<circle cx="' . $xx . '" cy="' . round($yy, 1) . '" r="3" class="' . $cls . '"></circle>'
+                    . '<circle cx="' . $xx . '" cy="' . round($yy, 1) . '" r="11" class="lc-hit" data-tip="' . $attrSafe . '"></circle>';
+            };
+            $svg .= $dot($yy, 'lc-dot ' . $meta['dot']);
+        }
     }
     // x labels (thin to <=8)
     $step = max(1, (int) ceil($n / 8));
@@ -161,10 +166,10 @@ $custom_to = $custom_to ?? '';
   <div class="grid dash-grid-2" style="gap:20px; align-items:start;">
     <div class="card">
       <div class="flex-between" style="margin-bottom:18px;">
-        <h3 class="card-title">收入趋势</h3>
+        <h3 class="card-title">交易趋势</h3>
         <span class="legend">
-          <span class="lg"><span class="sw" style="background:var(--chart-2);"></span>商城</span>
-          <span class="lg"><span class="sw" style="background:var(--chart-5);"></span>爱发电</span>
+          <?php if (in_array($channel, ['all', 'shop'], true)): ?><span class="lg"><span class="sw" style="background:var(--chart-2);"></span>商城</span><?php endif; ?>
+          <?php if (in_array($channel, ['all', 'afdian'], true)): ?><span class="lg"><span class="sw" style="background:var(--chart-5);"></span>爱发电</span><?php endif; ?>
         </span>
       </div>
       <?php if ($trends['income'] === []): ?>
@@ -310,11 +315,17 @@ $custom_to = $custom_to ?? '';
   function hide() { tip.hidden = true; }
   function move(e) {
     if (tip.hidden) return;
-    var rect = wrap.getBoundingClientRect();
-    var top = (e.clientY - rect.top) + 14;
-    var left = (e.clientX - rect.left) + 14;
+    var gap = 14;
+    var tH = tip.offsetHeight;
     var tW = tip.offsetWidth;
-    if (left + tW > rect.width) left = (e.clientX - rect.left) - tW - 14;
+    // tooltip is position:fixed → use viewport coords so the inner
+    // scrollable chart can never clip it.
+    var top = e.clientY + gap;
+    var left = e.clientX + 14;
+    // flip above when there's not enough room below / near the bottom edge.
+    if (top + tH > window.innerHeight) top = e.clientY - gap - tH;
+    if (left + tW > window.innerWidth) left = e.clientX - tW - 14;
+    if (top < 4) top = 4;
     if (left < 4) left = 4;
     tip.style.left = left + 'px';
     tip.style.top = top + 'px';
