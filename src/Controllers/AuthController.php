@@ -55,6 +55,15 @@ final class AuthController extends Controller
         if ($redirect = $this->requireCsrf($request)) {
             return $redirect;
         }
+        // Prevent duplicate accounts: a logged-in user (e.g. created via
+        // QQ/WeChat social login, no password yet) who submits the register
+        // form would otherwise get a SECOND account and silently switch to it.
+        // Point them to the "complete my account" flow instead — that sets a
+        // username + password on the SAME account.
+        if ($this->auth->isLoggedIn()) {
+            return $this->redirect('/account?complete=1')
+                ->withFlash('您已登录，请直接在账号信息中为当前账号设置用户名和密码，无需重新注册。');
+        }
         $result = $this->auth->register(
             $request->string('username'),
             $request->string('password'),

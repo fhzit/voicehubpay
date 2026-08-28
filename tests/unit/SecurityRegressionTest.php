@@ -77,5 +77,13 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $envConfig->reloadSettings();
     $t->assertSame('environment', $envConfig->get('PRECEDENCE_TEST'), 'environment overrides persistent WebUI settings');
 
+    // Duplicate-account guard: submitting the register form while already
+    // logged in (e.g. a QQ/WeChat-only account) must NOT create a second
+    // account — it should redirect the user to complete the current account.
+    $authCtrlSrc = file_get_contents($base . '/src/Controllers/AuthController.php') ?: '';
+    $t->assertContains('function register', $authCtrlSrc, 'register action exists');
+    $t->assertTrue(str_contains($authCtrlSrc, 'isLoggedIn()'), 'register guards against already-logged-in user');
+    $t->assertContains('/account?complete=1', $authCtrlSrc, 'register redirects logged-in users to complete flow');
+
     return ['assertions' => $t->assertions()];
 };
