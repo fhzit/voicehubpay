@@ -555,6 +555,16 @@ tr.row-warn td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
 }
 .filters .input, .filters .select { width: auto; }
 
+/* 仪表盘筛选：范围/渠道各自成组，手机上可整齐换行 */
+.filter-group {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 4px 10px 4px 0; margin-right: 4px; border-right: 1px solid var(--border);
+}
+.filter-group .fg-label { white-space: nowrap; }
+.filter-group .btn { white-space: nowrap; }
+.dash-filters { align-items: stretch; }
+.dash-date-form { flex: none; }
+
 /* 分段 / Pill（分类切换、范围切换） */
 .tab-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 18px; }
 .tab {
@@ -1498,6 +1508,11 @@ body.has-mobile-buybar { padding-bottom: 72px; }
   .filters .input, .filters .select,
   .filters form .input, .filters form .select { min-height: 42px; font-size: 15px; }
   .filters form .btn, .filters .btn { min-height: 42px; }
+  /* 仪表盘筛选在手机上：范围/渠道各占一行、日期表单独立占底一行 */
+  .dash-filters { flex-direction: column; align-items: stretch; gap: 8px; }
+  .dash-filters .filter-group { border-right: none; padding: 0; margin-right: 0; }
+  .dash-filters form.dash-date-form { flex-direction: row; flex-wrap: wrap; margin-left: 0; width: 100%; }
+  .dash-filters form.dash-date-form .input { flex: 1 1 130px; }
   .seg { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; display: flex; flex-wrap: nowrap; flex-shrink: 0; }
   .seg .seg-item { white-space: nowrap; }
   .search, .input, .select { font-size: 16px; } /* 防止 iOS 聚焦缩放 */

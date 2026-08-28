@@ -95,16 +95,20 @@ $range = $range ?? 'today';
 $custom_from = $custom_from ?? '';
 $custom_to = $custom_to ?? '';
 ?>
-<div class="filters" style="margin-bottom:20px;">
-  <span class="small muted">统计范围</span>
-  <?php foreach (['today' => '今日', 'week' => '本周', 'month' => '本月'] as $rk => $rl): ?>
-    <a href="/admin?range=<?= $rk ?>&channel=<?= $channel ?>" class="btn btn-sm <?= $range === $rk ? 'btn-primary' : 'btn-secondary' ?>"><?= $rl ?></a>
-  <?php endforeach; ?>
-  <span class="small muted" style="margin-left:8px;">渠道</span>
-  <?php foreach (['all' => '全部', 'shop' => '商城', 'afdian' => '爱发电'] as $ck => $cl): ?>
-    <a href="/admin?range=<?= $range ?>&channel=<?= $ck ?>" class="btn btn-sm <?= $channel === $ck ? 'btn-primary' : 'btn-secondary' ?>"><?= $cl ?></a>
-  <?php endforeach; ?>
-  <form method="get" action="/admin" class="flex" style="gap:8px;margin-left:auto;">
+<div class="filters dash-filters" style="margin-bottom:20px;">
+  <div class="filter-group">
+    <span class="small muted fg-label">统计范围</span>
+    <?php foreach (['today' => '今日', 'week' => '本周', 'month' => '本月'] as $rk => $rl): ?>
+      <a href="/admin?range=<?= $rk ?>&channel=<?= $channel ?>" class="btn btn-sm <?= $range === $rk ? 'btn-primary' : 'btn-secondary' ?>"><?= $rl ?></a>
+    <?php endforeach; ?>
+  </div>
+  <div class="filter-group">
+    <span class="small muted fg-label">渠道</span>
+    <?php foreach (['all' => '全部', 'shop' => '商城', 'afdian' => '爱发电'] as $ck => $cl): ?>
+      <a href="/admin?range=<?= $range ?>&channel=<?= $ck ?>" class="btn btn-sm <?= $channel === $ck ? 'btn-primary' : 'btn-secondary' ?>"><?= $cl ?></a>
+    <?php endforeach; ?>
+  </div>
+  <form method="get" action="/admin" class="flex dash-date-form" style="gap:8px;margin-left:auto;">
     <input type="hidden" name="range" value="custom">
     <input type="hidden" name="channel" value="<?= $channel ?>">
     <input type="date" name="from" class="input" value="<?= \VoiceHubPay\Http\View::e($custom_from) ?>">
