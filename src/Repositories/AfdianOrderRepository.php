@@ -34,6 +34,7 @@ final class AfdianOrderRepository extends Repository
             $this->update((int) $existing['id'], [
                 'trade_no' => $data['trade_no'] ?? $existing['trade_no'],
                 'user_id' => $data['user_id'] ?? $existing['user_id'],
+                'buyer_name' => $data['buyer_name'] ?? $existing['buyer_name'] ?? '',
                 'plan_id' => $data['plan_id'] ?? $existing['plan_id'],
                 'sku_detail' => $data['sku_detail'] ?? $existing['sku_detail'],
                 'amount_cents' => (int) ($data['amount_cents'] ?? $existing['amount_cents']),
@@ -47,12 +48,13 @@ final class AfdianOrderRepository extends Repository
         }
         $now = $this->now();
         $paidAt = in_array((string) ($data['status'] ?? 'paid'), ['paid', '2'], true) ? $now : null;
-        $stmt = $this->pdo()->prepare('INSERT INTO afdian_orders (out_trade_no, trade_no, user_id, plan_id, sku_detail, amount_cents, status, raw_payload, voicehub_status, voicehub_attempts, voicehub_last_error, created_at, paid_at, processed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, NULL, ?)');
+        $stmt = $this->pdo()->prepare('INSERT INTO afdian_orders (out_trade_no, trade_no, user_id, buyer_name, plan_id, sku_detail, amount_cents, status, raw_payload, voicehub_status, voicehub_attempts, voicehub_last_error, created_at, paid_at, processed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, NULL, ?)');
         try {
             $stmt->execute([
                 $data['out_trade_no'],
                 $data['trade_no'] ?? '',
                 $data['user_id'] ?? '',
+                $data['buyer_name'] ?? '',
                 $data['plan_id'] ?? '',
                 $data['sku_detail'] ?? '',
                 (int) ($data['amount_cents'] ?? 0),
@@ -78,7 +80,7 @@ final class AfdianOrderRepository extends Repository
 
     public function update(int $id, array $fields): void
     {
-        $allowed = ['trade_no', 'user_id', 'plan_id', 'sku_detail', 'amount_cents', 'status', 'raw_payload', 'voicehub_status', 'voicehub_attempts', 'voicehub_last_error', 'paid_at', 'processed_at'];
+        $allowed = ['trade_no', 'user_id', 'buyer_name', 'plan_id', 'sku_detail', 'amount_cents', 'status', 'raw_payload', 'voicehub_status', 'voicehub_attempts', 'voicehub_last_error', 'paid_at', 'processed_at'];
         $sets = [];
         $params = [];
         foreach ($fields as $key => $value) {
@@ -159,8 +161,9 @@ final class AfdianOrderRepository extends Repository
             $params[] = $voicehub;
         }
         if ($q !== '') {
-            $where[] = '(out_trade_no LIKE ? OR trade_no LIKE ?)';
+            $where[] = '(out_trade_no LIKE ? OR trade_no LIKE ? OR buyer_name LIKE ?)';
             $like = '%' . $q . '%';
+            $params[] = $like;
             $params[] = $like;
             $params[] = $like;
         }

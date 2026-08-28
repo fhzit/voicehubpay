@@ -15,6 +15,7 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
         'out_trade_no' => 'AFD20260826ORDER0001',
         'trade_no' => 'TRADE-88',
         'user_id' => 'ifdian-user-9',
+        'buyer_name' => '买家小明',
         'plan_id' => 'plan-x',
         'sku_detail' => '赞助档位',
         'amount_cents' => 6600,
@@ -31,6 +32,7 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertTrue($row !== null);
     $t->assertSame(6600, (int) $row['amount_cents']);
     $t->assertSame('paid', $row['status']);
+    $t->assertSame('买家小明', $row['buyer_name'], 'buyer_name captured from payload');
 
     // code == out_trade_no verbatim, single delivery row
     $d = $pdo->query("SELECT * FROM voicehub_deliveries WHERE source_order_no='AFD20260826ORDER0001'")->fetchAll();

@@ -62,6 +62,7 @@ final class LegacyV1Adapter implements LegacyAdapter
             'out_trade_no' => $outTradeNo,
             'trade_no' => (string) ($legacy['trade_no'] ?? ''),
             'user_id' => (string) ($legacy['afdian_user_id'] ?? ''),
+            'buyer_name' => (string) ($legacy['buyer_name'] ?? ''),
             'plan_id' => (string) ($legacy['plan_id'] ?? ''),
             'sku_detail' => (string) ($legacy['sku_detail'] ?? ''),
             'amount_cents' => $amountCents,

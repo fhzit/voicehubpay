@@ -178,6 +178,7 @@ PEM;
             'out_trade_no' => $outTradeNo,
             'trade_no' => (string) ($order['trade_no'] ?? ''),
             'user_id' => (string) ($order['user_private_id'] ?? $order['user_id'] ?? $order['buyer_id'] ?? ''),
+            'buyer_name' => (string) trim((string) ($order['user_name'] ?? $order['name'] ?? $order['buyer_name'] ?? '')),
             'plan_id' => (string) ($order['plan_id'] ?? ''),
             'sku_detail' => $skuDetail,
             'amount_cents' => $amountCents,
