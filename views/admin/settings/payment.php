@@ -3,16 +3,7 @@ $__pageTitle = '支付设置';
 $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
 $types = array_filter(explode(',', $get('SG65_ENABLED_TYPES', 'alipay,wxpay,qqpay')));
 ?>
-<div class="settings-layout">
-<div class="settings-nav">
-  <span class="nav-group" style="padding:4px 12px 8px;">设置</span>
-  <a href="/admin/settings/general">基础设置</a>
-  <a href="/admin/settings/payment" class="active">支付设置</a>
-  <a href="/admin/settings/auth">登录设置</a>
-  <a href="/admin/settings/voicehub">VoiceHub 设置</a>
-  <a href="/admin/settings/afdian">爱发电设置</a>
-  <a href="/admin/settings/security">安全设置</a>
-</div>
+<div class="settings-layout settings-layout-single">
 <div class="settings-column" style="min-width:0;">
 <div class="settings-section" style="max-width:840px;">
   <h3 class="card-title mb-2">SG65 聚合支付（V2 · RSA SHA256WithRSA）</h3>
