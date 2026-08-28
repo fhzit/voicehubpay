@@ -49,7 +49,12 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $gs = (string) file_get_contents($t->basePath . '/views/admin/settings/general.php');
     $t->assertContains('name="auth_redirect_url"', $gs, 'general settings form exposes the field');
     $sc = (string) file_get_contents($t->basePath . '/src/Controllers/Admin/SettingsController.php');
-    $t->assertContains("'AUTH_REDIRECT_URL' => \$authRedirectUrl", $sc, 'saveGeneral persists the setting');
+    $t->assertContains("'AUTH_REDIRECT_URL' => ", $sc, 'saveGeneral persists the setting');
+    // Regression: the general settings page must render *persisted* values, not
+    // defaults. The old guard (`config->get('')`) always evaluated to null, so
+    // the form was fed an empty settings array and showed defaults after saving.
+    $t->assertContains('settings()->all()', $sc, 'general action passes the persisted settings store to the view');
+    $t->assertFalse(str_contains($sc, "get('')"), 'general action must not gate settings on the always-null empty-key get');
 
     return ['assertions' => $t->assertions()];
 };

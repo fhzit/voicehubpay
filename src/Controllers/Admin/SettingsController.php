@@ -26,7 +26,7 @@ final class SettingsController extends Controller
         if ($redirect = $this->requireAdmin($request)) {
             return $redirect;
         }
-        return $this->render('admin/settings/general', ['settings' => $this->app->config->get('') === null ? [] : $this->app->config->settings()->all()], 'admin');
+        return $this->render('admin/settings/general', ['settings' => $this->app->config->settings()->all()], 'admin');
     }
 
     public function saveGeneral(Request $request): Response
