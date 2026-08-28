@@ -42,6 +42,7 @@ $__pageTitle = '用户管理';
         <td class="text-right">
           <div class="flex" style="justify-content:flex-end;gap:6px;">
             <a href="/admin/users/<?= (int) $u['id'] ?>" class="btn btn-secondary btn-sm">详情</a>
+            <a href="/admin/users/<?= (int) $u['id'] ?>#edit-profile-toggle" class="btn btn-ghost btn-sm">编辑</a>
             <?php if ($is_super && !$isTargetSuper): ?>
               <?php if ($isAdminUser): ?>
                 <form method="post" action="/admin/users/<?= (int) $u['id'] ?>/role" data-confirm="确定将「<?= \VoiceHubPay\Http\View::e($u['username']) ?>」降级为普通用户？" style="display:inline;">

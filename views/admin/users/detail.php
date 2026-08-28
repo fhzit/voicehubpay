@@ -42,10 +42,32 @@ $isSelf = (int) ($user['id']) === (int) ($__user['id'] ?? 0);
 
 <div class="grid" style="grid-template-columns:1fr 1fr;align-items:start;">
   <div class="card">
-    <h3 class="card-title mb-3">基本信息</h3>
-    <div class="summary-row"><span class="muted">用户名</span><span><?= \VoiceHubPay\Http\View::e($user['username']) ?></span></div>
-    <div class="summary-row"><span class="muted">昵称</span><span><?= \VoiceHubPay\Http\View::e($user['display_name'] ?: '—') ?></span></div>
-    <div class="summary-row"><span class="muted">邮箱</span><span><?= \VoiceHubPay\Http\View::e($user['email'] ?: '—') ?></span></div>
+    <div class="flex-between" style="margin-bottom:12px;">
+      <h3 class="card-title mb-0">基本信息</h3>
+      <button class="btn btn-ghost btn-sm" type="button" id="edit-profile-toggle">编辑</button>
+    </div>
+    <div id="profile-static">
+      <div class="summary-row"><span class="muted">用户名</span><span><?= \VoiceHubPay\Http\View::e($user['username']) ?></span></div>
+      <div class="summary-row"><span class="muted">昵称</span><span><?= \VoiceHubPay\Http\View::e($user['display_name'] ?: '—') ?></span></div>
+    </div>
+    <form id="profile-edit" method="post" action="/admin/users/<?= (int) $user['id'] ?>/update" style="display:none;">
+      <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
+      <div class="field">
+        <label class="label">用户名</label>
+        <input class="input" type="text" name="username" value="<?= \VoiceHubPay\Http\View::e($user['username']) ?>" required>
+        <div class="hint">3-32 位：字母、数字、下划线、短横线、中文。</div>
+      </div>
+      <div class="field">
+        <label class="label">昵称</label>
+        <input class="input" type="text" name="display_name" value="<?= \VoiceHubPay\Http\View::e($user['display_name'] ?? '') ?>">
+        <div class="hint">最长 50 字符。</div>
+      </div>
+      <div class="flex" style="gap:8px;">
+        <button class="btn btn-primary btn-sm">保存</button>
+        <button class="btn btn-ghost btn-sm" type="button" id="profile-edit-cancel">取消</button>
+      </div>
+    </form>
+    <div class="summary-row" style="margin-top:14px;"><span class="muted">邮箱</span><span><?= \VoiceHubPay\Http\View::e($user['email'] ?: '—') ?></span></div>
     <div class="summary-row"><span class="muted">角色</span><span><?= $isTargetSuper ? '超级管理员（初始管理员，不可降级）' : ($user['role'] === 'admin' ? '管理员' : '普通用户') ?></span></div>
     <div class="summary-row"><span class="muted">注册时间</span><span class="small"><?= \VoiceHubPay\Http\View::datetime($user['created_at']) ?></span></div>
     <div class="summary-row"><span class="muted">最后登录</span><span class="small"><?= \VoiceHubPay\Http\View::datetime($user['last_login_at']) ?></span></div>
@@ -80,3 +102,27 @@ $isSelf = (int) ($user['id']) === (int) ($__user['id'] ?? 0);
     </tbody>
   </table></div>
 </div>
+
+<script>
+(function () {
+  var toggle = document.getElementById('edit-profile-toggle');
+  if (!toggle) return;
+  var st = document.getElementById('profile-static');
+  var edit = document.getElementById('profile-edit');
+  var cancel = document.getElementById('profile-edit-cancel');
+  function show() {
+    st.style.display = 'none';
+    edit.style.display = '';
+    toggle.style.display = 'none';
+    edit.querySelector('input[name=username]').focus();
+  }
+  toggle.addEventListener('click', show);
+  if (cancel) cancel.addEventListener('click', function () {
+    edit.style.display = 'none';
+    st.style.display = '';
+    toggle.style.display = '';
+  });
+  // 从列表“编辑”按钮带锚点进入时自动展开编辑表单
+  if (window.location.hash === '#edit-profile-toggle') show();
+})();
+</script>

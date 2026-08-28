@@ -204,6 +204,7 @@ $router->post('/admin/afdian/retry', fn ($r) => (new AfdianController($app))->re
 
 $router->get('/admin/users', fn ($r) => (new UserController($app))->index($r));
 $router->get('/admin/users/{id}', fn ($r, $p) => (new UserController($app))->show($r, $p));
+$router->post('/admin/users/{id}/update', fn ($r, $p) => (new UserController($app))->updateProfile($r, $p));
 $router->post('/admin/users/{id}/status', fn ($r, $p) => (new UserController($app))->toggleStatus($r, $p));
 $router->post('/admin/users/{id}/delete', fn ($r, $p) => (new UserController($app))->destroy($r, $p));
 $router->post('/admin/users/{id}/role', fn ($r, $p) => (new UserController($app))->setRole($r, $p));

@@ -70,6 +70,50 @@ final class UserController extends Controller
         ], 'admin');
     }
 
+    public function updateProfile(Request $request, array $params): Response
+    {
+        if ($redirect = $this->requireAdmin($request)) {
+            return $redirect;
+        }
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $users = $this->app->make('users');
+        $id = (int) ($params['id'] ?? 0);
+        $target = $users->findById($id);
+        if ($target === null) {
+            return $this->redirect('/admin/users')->withFlash('用户不存在。', 'error');
+        }
+
+        $username = trim($request->string('username'));
+        $displayName = trim($request->string('display_name'));
+
+        // Username validation mirrors AuthService rules.
+        $usernameError = '';
+        if (strlen($username) < 3 || strlen($username) > 32) {
+            $usernameError = '用户名长度需为 3-32 个字符。';
+        } elseif (preg_match('/^[a-zA-Z0-9_\-一-龥]+$/u', $username) !== 1) {
+            $usernameError = '用户名仅支持字母、数字、下划线、短横线与中文。';
+        }
+        if ($usernameError !== '') {
+            return $this->redirect('/admin/users/' . $id)->withFlash($usernameError, 'error');
+        }
+        $existing = $users->findByUsername($username);
+        if ($existing !== null && (int) $existing['id'] !== $id) {
+            return $this->redirect('/admin/users/' . $id)->withFlash('该用户名已被占用。', 'error');
+        }
+        if (mb_strlen($displayName) > 50) {
+            return $this->redirect('/admin/users/' . $id)->withFlash('昵称长度不能超过 50 个字符。', 'error');
+        }
+
+        $users->update($id, ['username' => $username, 'display_name' => $displayName]);
+        $this->audit($this->adminUserId(), 'user.update', 'user', (string) $id, [
+            'username' => $username,
+            'changed' => array_keys(array_diff_assoc(['username' => $username, 'display_name' => $displayName], ['username' => $target['username'], 'display_name' => $target['display_name']])),
+        ], $request);
+        return $this->redirect('/admin/users/' . $id)->withFlash('用户名与昵称已更新。');
+    }
+
     public function toggleStatus(Request $request, array $params): Response
     {
         if ($redirect = $this->requireAdmin($request)) {
