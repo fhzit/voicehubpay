@@ -72,17 +72,17 @@ if ($app->config->bool('MAINTENANCE_MODE', false)) {
 
 // Guest redirect: when a redirect URL is configured, anonymous visitors are
 // sent there instead of seeing the shopfront, so the site does not look like a
-// commercial shop before login. Only the pure marketing page roots and the
-// login-gated areas (/account, /admin) are guarded — every functional / API /
-// auth / order / payment route passes through so the site keeps working, and
-// those controllers enforce their own login/ownership checks (redirecting to
-// /login rather than dumping the user at the external portal).
+// commercial shop before login. Only the entry points for a user to get into
+// an account (/login, /register and the auth flows) plus the payment/webhook
+// callbacks and logout are reachable while logged out; every other route —
+// the marketing pages AND the order/API/checkout/account/admin areas — is
+// redirected to the configured URL until the visitor logs in.
 $guestRedirect = trim((string) $app->config->get('AUTH_REDIRECT_URL', ''));
 if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
     $path = $request->path();
-    // Prefixes that must never be redirected away: the app needs them to work.
+    // Prefixes reachable while logged out (entry points + external callbacks).
     $passthrough = [
-        '/login', '/register', '/auth/', '/api/', '/orders', '/checkout',
+        '/login', '/register', '/auth/',
         '/payments/', '/webhook/', '/logout',
     ];
     $isPassthrough = false;

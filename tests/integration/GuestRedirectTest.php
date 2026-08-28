@@ -33,13 +33,15 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     // Functional prefixes must pass through so the site keeps working.
     $t->assertContains("'/login'", $fc, '/login stays reachable when logged out');
     $t->assertContains("'/register'", $fc, '/register stays reachable when logged out');
-    $t->assertContains("'/auth/'", $fc, 'auth (password + social) flow stays reachable (regression: login was redirected to AUTH_REDIRECT_URL)');
-    $t->assertContains("'/api/'", $fc, 'API routes are never redirected away (regression: site could not function)');
-    $t->assertContains("'/orders'", $fc, 'order create/detail/pay routes stay reachable');
-    $t->assertContains("'/checkout'", $fc, 'checkout stays reachable');
+    $t->assertContains("'/auth/'", $fc, 'auth (password + social) flow stays reachable when logged out');
     $t->assertContains("'/payments/'", $fc, 'payment notify + return callbacks stay reachable');
     $t->assertContains("'/webhook/'", $fc, 'afdian webhook stays reachable');
     $t->assertContains("'/logout'", $fc, 'logout stays reachable');
+    // Order / API / checkout areas are NOT exempt: anonymous access to them is
+    // redirected to the configured URL (the visitor must log in first). The auth
+    // entry in the passthrough array is directly followed by the payments entry,
+    // proving no order/api/checkout routes sit in the exempt list.
+    $t->assertContains("'/auth/',\n        '/payments/'", $fc, 'passthrough list goes /auth/ directly to /payments/ (order/API/checkout are NOT exempted)');
     $t->assertContains("str_starts_with(\$path, '/install')", $fc, 'install wizard is gated on install state (regression: only reachable while not installed)');
     $t->assertContains('isInstalled', $fc, 'front controller gates /install on installed state');
 
