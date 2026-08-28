@@ -41,7 +41,7 @@ $group = static function (string $label): string {
 <title><?= isset($__pageTitle) ? \VoiceHubPay\Http\View::e($__pageTitle) . ' · ' : '' ?>管理后台 · <?= \VoiceHubPay\Http\View::e($__site['name']) ?></title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234F46E5'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>V</text></svg>">
 <script>(function(){try{var t=localStorage.getItem('vhpay_theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();</script>
-<link rel="stylesheet" href="/assets/css/app.css?v=4">
+<link rel="stylesheet" href="/assets/css/app.css?v=5">
 </head>
 <body>
 <div class="admin-shell">
@@ -80,6 +80,7 @@ $group = static function (string $label): string {
       </button>
       <span class="admin-title"><?= \VoiceHubPay\Http\View::e($__pageTitle ?? '管理后台') ?></span>
       <div class="flex-1"></div>
+      <div class="theme-wrap">
       <button class="btn-icon" data-theme-toggle="theme-menu" aria-label="切换主题" title="切换主题">
         <span data-ico-sun style="display:none;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
@@ -92,6 +93,7 @@ $group = static function (string $label): string {
         <button type="button" data-theme-option="light" role="menuitemradio" aria-checked="false">☀ 浅色</button>
         <button type="button" data-theme-option="dark" role="menuitemradio" aria-checked="false">☾ 深色</button>
         <button type="button" data-theme-option="system" role="menuitemradio" aria-checked="false">◐ 跟随系统</button>
+      </div>
       </div>
       <?php if ($__user !== null): ?>
         <span class="avatar avatar-sm"><?= \VoiceHubPay\Http\View::e(mb_substr($__user['display_name'] ?: $__user['username'], 0, 1)) ?></span>

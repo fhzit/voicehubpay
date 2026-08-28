@@ -3,6 +3,74 @@ $__pageTitle = '仪表盘';
 $k = $kpis['current'] ?? $kpis;
 $d = $kpis['deltas'] ?? [];
 $maxIncome = max(1, max(array_column($trends['income'], 'total') ?: [0]));
+/* ---- SVG line-chart geometry helpers ---- */
+$chart = static function () use ($trends, $maxIncome): string {
+    $rows = $trends['income'];                 // [label, total, shop, afdian]
+    if ($rows === []) {
+        return '';
+    }
+    $W = 640; $H = 185; $pl = 10; $pr = 10; $pt = 12; $pb = 26;
+    $plotW = $W - $pl - $pr; $plotH = $H - $pt - $pb;
+    $n = count($rows);
+    $xAt = fn (int $i): float => $n === 1 ? $pl + $plotW / 2 : $pl + ($plotW * $i) / ($n - 1);
+    $yAt = fn (int $v): float => $pt + $plotH - ($v / $maxIncome) * $plotH;
+
+    $pts = static function (string $key) use ($rows, $xAt, $yAt): array {
+        $out = [];
+        foreach ($rows as $i => $r) {
+            $out[] = round($xAt($i), 1) . ',' . round($yAt((int) $r[$key]), 1);
+        }
+        return $out;
+    };
+    // build
+    $svg = '<svg class="line-chart" viewBox="0 0 ' . $W . ' ' . $H . '" role="img" aria-label="收入趋势折线图">';
+    // horizontal gridlines
+    for ($g = 0; $g <= 4; $g++) {
+        $gy = $pt + $plotH * $g / 4;
+        $val = round($maxIncome * (4 - $g) / 4);
+        $svg .= '<line x1="' . $pl . '" y1="' . round($gy, 1) . '" x2="' . ($W - $pr) . '" y2="' . round($gy, 1) . '" class="lc-grid"/>';
+        $svg .= '<text x="' . ($pl + 2) . '" y="' . round($gy - 4, 1) . '" class="lc-axis-val">' . ($val > 0 ? $val : 0) . '</text>';
+    }
+    // area fills
+    foreach (['shop', 'afdian'] as $key) {
+        $ptsArr = $pts($key);
+        $area = 'M' . $ptsArr[0] . ' L' . implode(' L', $ptsArr) . ' L' . $xAt($n - 1) . ',' . $yAt(0) . ' L' . $xAt(0) . ',' . $yAt(0) . ' Z';
+        $svg .= '<path d="' . $area . '" class="lc-fill lc-fill-' . $key . '"></path>';
+    }
+    // lines
+    foreach (['shop' => 'lc-line-shop', 'afdian' => 'lc-line-afdian'] as $key => $cls) {
+        $svg .= '<polyline class="lc-line ' . $cls . '" points="' . implode(' ', $pts($key)) . '" fill="none"/>';
+    }
+    // dots
+    foreach ($rows as $i => $r) {
+        $xx = round($xAt($i), 1);
+        $yyShop = round($yAt((int) $r['shop']), 1);
+        $yyAf = round($yAt((int) $r['afdian']), 1);
+        $tip = \VoiceHubPay\Http\View::e($r['label']) . ' 商城 ¥' . \VoiceHubPay\Http\View::money((int) $r['shop']) . ' · 爱发电 ¥' . \VoiceHubPay\Http\View::money((int) $r['afdian']) . ' · 合计 ¥' . \VoiceHubPay\Http\View::money((int) $r['total']);
+        $dot = function (float $yy, string $cls) use ($xx, $tip): string {
+            return '<circle cx="' . round($xx, 1) . '" cy="' . round($yy, 1) . '" r="3" class="' . $cls . '"><title>' . $tip . '</title></circle>';
+        };
+        // only draw dots where value > 0 to reduce clutter
+        if ((int) $r['shop'] > 0 || (int) $r['afdian'] > 0) {
+            $svg .= $dot($yyShop, 'lc-dot lc-dot-shop');
+            if ((int) $r['afdian'] > 0) {
+                $svg .= $dot($yyAf, 'lc-dot lc-dot-afdian');
+            }
+        }
+    }
+    // x labels (thin to <=8)
+    $step = max(1, (int) ceil($n / 8));
+    foreach ($rows as $i => $r) {
+        if ($i % $step !== 0 && $i !== $n - 1) {
+            continue;
+        }
+        $xx = round($xAt($i), 1);
+        $svg .= '<text x="' . $xx . '" y="' . ($H - 8) . '" class="lc-axis" text-anchor="middle">' . \VoiceHubPay\Http\View::e($r['label']) . '</text>';
+    }
+    $svg .= '</svg>';
+    return $svg;
+};
+$chartSvg = $chart();
 $deltaHtml = static function ($name, float $val): string {
     if ($val > 0) { return '<span class="stat-delta up">▲ ' . number_format($val, 1) . '%</span>'; }
     if ($val < 0) { return '<span class="stat-delta down">▼ ' . number_format(abs($val), 1) . '%</span>'; }
@@ -92,19 +160,8 @@ $custom_to = $custom_to ?? '';
       </div>
       <?php if ($trends['income'] === []): ?>
         <div class="muted small text-center" style="padding:40px 0;">所选范围内暂无收入数据</div>
-      <?php else: ?>
-        <div class="bar-chart">
-          <?php foreach ($trends['income'] as $row): ?>
-            <div class="bc-col" title="<?= \VoiceHubPay\Http\View::e($row['label']) ?>：商城 ¥<?= \VoiceHubPay\Http\View::money((int) $row['shop']) ?> · 爱发电 ¥<?= \VoiceHubPay\Http\View::money((int) $row['afdian']) ?>">
-              <div class="bc-label"><?= \VoiceHubPay\Http\View::e($row['label']) ?></div>
-              <div class="bc-bars">
-                <div class="bc-bar" style="background:var(--chart-2);height:<?= max(2, round($row['shop'] / $maxIncome * 100)) ?>%;"></div>
-                <div class="bc-bar" style="background:var(--chart-5);height:<?= max(2, round($row['afdian'] / $maxIncome * 100)) ?>%;"></div>
-              </div>
-              <div class="bc-total">¥<?= \VoiceHubPay\Http\View::money((int) $row['total']) ?></div>
-            </div>
-          <?php endforeach; ?>
-        </div>
+      <?php elseif ($chartSvg !== ''): ?>
+        <div class="line-chart-wrap"><?= $chartSvg ?></div>
       <?php endif; ?>
     </div>
 
