@@ -14,17 +14,16 @@ $sourceLabels = ['inventory' => '库存卡密', 'shop_order_no' => '商城订单
 
 <div class="card card-pad-0">
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>ID</th><th>来源单号</th><th>来源</th><th>码（掩码）</th><th>尝试</th><th>错误</th><th>最后时间</th><th></th></tr></thead>
+    <thead><tr><th>ID</th><th>来源单号</th><th>来源</th><th>尝试</th><th>错误</th><th>最后时间</th><th></th></tr></thead>
     <tbody>
     <?php if ($deliveries === []): ?>
-      <tr><td colspan="8" class="text-center muted">暂无失败记录</td></tr>
+      <tr><td colspan="7" class="text-center muted">暂无失败记录</td></tr>
     <?php endif; ?>
     <?php foreach ($deliveries as $d): ?>
       <tr>
         <td class="small mono faint">#<?= (int) $d['id'] ?></td>
         <td class="mono small"><?= \VoiceHubPay\Http\View::e($d['source_order_no']) ?></td>
         <td class="small"><?= \VoiceHubPay\Http\View::e($sourceLabels[$d['code_source']] ?? $d['code_source']) ?></td>
-        <td class="mono small"><?= \VoiceHubPay\Http\View::e($d['code_masked']) ?></td>
         <td class="small" style="color:<?= (int) $d['attempts'] > 3 ? 'var(--warning)' : 'var(--foreground-secondary)' ?>;font-weight:600;"><?= (int) $d['attempts'] ?></td>
         <td class="small" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= \VoiceHubPay\Http\View::e($d['last_error'] ?? '') ?>"><?= \VoiceHubPay\Http\View::e($d['last_error'] ?? '') ?></td>
         <td class="small muted"><?= \VoiceHubPay\Http\View::datetime($d['updated_at']) ?></td>

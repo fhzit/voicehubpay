@@ -32,16 +32,15 @@ $sourceLabels = ['inventory' => '库存卡密', 'shop_order_no' => '商城订单
 
 <div class="card card-pad-0">
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>ID</th><th>来源单号</th><th>码（掩码）</th><th>来源</th><th>状态</th><th>尝试</th><th>错误</th><th>时间</th><th></th></tr></thead>
+    <thead><tr><th>ID</th><th>来源单号</th><th>来源</th><th>状态</th><th>尝试</th><th>错误</th><th>时间</th><th></th></tr></thead>
     <tbody>
     <?php if ($deliveries === []): ?>
-      <tr><td colspan="9" class="text-center muted">暂无推送记录</td></tr>
+      <tr><td colspan="8" class="text-center muted">暂无推送记录</td></tr>
     <?php endif; ?>
     <?php foreach ($deliveries as $d): ?>
       <tr>
         <td class="small mono faint">#<?= (int) $d['id'] ?></td>
         <td class="mono small"><?= \VoiceHubPay\Http\View::e($d['source_order_no']) ?></td>
-        <td class="mono small"><?= \VoiceHubPay\Http\View::e($d['code_masked']) ?></td>
         <td class="small"><?= \VoiceHubPay\Http\View::e($sourceLabels[$d['code_source']] ?? $d['code_source']) ?></td>
         <td><?= $__app->view->partial('partials/status-badge', ['kind' => 'delivery', 'status' => $d['status']]) ?></td>
         <td><?= (int) $d['attempts'] ?></td>
