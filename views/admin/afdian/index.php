@@ -2,15 +2,11 @@
 $__pageTitle = '爱发电订单';
 ?>
 <div class="page-head flex-between flex-wrap">
-  <div><h1 class="page-title">爱发电订单</h1><p class="page-sub">out_trade_no 原样作为 VoiceHub code，每条一次请求，成功不重复推送</p></div>
+  <div><h1 class="page-title">爱发电订单</h1></div>
   <form method="post" action="/admin/afdian/sync" data-confirm="将拉取爱发电最近订单并同步，确认？">
     <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
     <button class="btn btn-primary">手动同步</button>
   </form>
-</div>
-
-<div class="notice" style="border-left-color:var(--manual);background:var(--manual-soft);border-color:var(--manual-border);margin-bottom:18px;">
-  <strong style="color:var(--manual);">爱发电订单号（out_trade_no）直接作为 VoiceHub 券码</strong> —— 每条一次请求，成功不重复推送。历史已成功的订单不会被重推。
 </div>
 
 <div class="stat-grid" style="margin-bottom:16px;grid-template-columns:repeat(4,1fr);">
@@ -41,7 +37,7 @@ $__pageTitle = '爱发电订单';
 
 <div class="card card-pad-0">
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>out_trade_no（VoiceHub code）</th><th>买家</th><th class="num">金额</th><th>推送</th><th>尝试</th><th>时间</th><th></th></tr></thead>
+    <thead><tr><th>订单号</th><th>买家</th><th class="num">金额</th><th>推送</th><th>尝试</th><th>时间</th><th></th></tr></thead>
     <tbody>
     <?php if ($orders === []): ?>
       <tr><td colspan="7" class="text-center muted">暂无爱发电订单</td></tr>

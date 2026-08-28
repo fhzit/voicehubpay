@@ -176,7 +176,7 @@ final class AfdianOrderRepository extends Repository
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
         $offset = max(0, ($page - 1) * $perPage);
-        $sql = 'SELECT * FROM afdian_orders ' . $whereSql . ' ORDER BY id DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset;
+        $sql = 'SELECT * FROM afdian_orders ' . $whereSql . ' ORDER BY created_at DESC, id DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset;
         $stmt = $this->pdo()->prepare($sql);
         $stmt->execute($params);
         return ['items' => $stmt->fetchAll(), 'total' => $total, 'page' => $page, 'perPage' => $perPage];
@@ -184,7 +184,7 @@ final class AfdianOrderRepository extends Repository
 
     public function listRecent(int $limit = 10): array
     {
-        $sql = 'SELECT * FROM afdian_orders ORDER BY id DESC LIMIT ' . (int) $limit;
+        $sql = 'SELECT * FROM afdian_orders ORDER BY created_at DESC, id DESC LIMIT ' . (int) $limit;
         return $this->pdo()->query($sql)->fetchAll();
     }
 

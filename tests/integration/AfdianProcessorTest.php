@@ -103,5 +103,19 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertSame('2026-08-31T18:30:00+00:00', $norm['created_at'], 'webhook create_time → ISO created_at');
     $t->assertSame('2026-08-31T18:30:00+00:00', $norm['paid_at'], 'paid webhook gets paid_at from create_time');
 
+    // listAdmin sorts newest purchase time first (created_at DESC, id DESC).
+    // Create a newer order and assert it appears before the older one.
+    $proc->processNormalizedOrder([
+        'out_trade_no' => 'AFD20260831LATEST',
+        'user_id' => 'newuser1',
+        'buyer_name' => '新买家',
+        'amount_cents' => 200,
+        'status' => 'paid',
+        'created_at' => '2026-08-31T19:00:00+00:00',
+        'paid_at' => '2026-08-31T19:00:00+00:00',
+    ]);
+    $list = $app->make('afdianOrders')->listAdmin('', '', '', 1, 20)['items'];
+    $t->assertSame('AFD20260831LATEST', $list[0]['out_trade_no'], 'newest purchase time appears first');
+
     return ['assertions' => $t->assertions()];
 };
