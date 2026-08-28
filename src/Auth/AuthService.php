@@ -155,11 +155,9 @@ final class AuthService
             return ['ok' => false, 'error' => '请先阅读并同意服务说明。', 'user' => null];
         }
         $username = trim($username);
-        if (strlen($username) < 3 || strlen($username) > 32) {
-            return ['ok' => false, 'error' => '用户名长度需为 3-32 个字符。', 'user' => null];
-        }
-        if (!preg_match('/^[a-zA-Z0-9_\-\x{4e00}-\x{9fa5}]+$/u', $username)) {
-            return ['ok' => false, 'error' => '用户名仅支持字母、数字、下划线、短横线与中文。', 'user' => null];
+        $usernameError = $this->usernameError($username);
+        if ($usernameError !== '') {
+            return ['ok' => false, 'error' => $usernameError, 'user' => null];
         }
         if (strlen($password) < 8) {
             return ['ok' => false, 'error' => '密码至少需要 8 位。', 'user' => null];
@@ -175,6 +173,72 @@ final class AuthService
             'password' => $password,
             'display_name' => $displayName !== '' ? $displayName : $username,
         ]);
+        return ['ok' => true, 'error' => '', 'user' => $user];
+    }
+
+    public function updateNickname(int $userId, string $nickname): array
+    {
+        $nickname = trim($nickname);
+        if (mb_strlen($nickname) > 50) {
+            return ['ok' => false, 'error' => '昵称长度不能超过 50 个字符。', 'user' => null];
+        }
+        $this->users->update($userId, ['display_name' => $nickname]);
+
+        $user = $this->users->findById($userId);
+        return ['ok' => true, 'error' => '', 'user' => $user];
+    }
+
+    /**
+     * Change the username for the given user. Returns
+     * ['ok' => bool, 'error' => string, 'user' => ?array].
+     */
+    public function changeUsername(int $userId, string $username): array
+    {
+        $username = trim($username);
+        $error = $this->usernameError($username);
+        if ($error !== '') {
+            return ['ok' => false, 'error' => $error, 'user' => null];
+        }
+        $existing = $this->users->findByUsername($username);
+        if ($existing !== null && (int) $existing['id'] !== $userId) {
+            return ['ok' => false, 'error' => '该用户名已被占用。', 'user' => null];
+        }
+        $this->users->update($userId, ['username' => $username]);
+
+        $user = $this->users->findById($userId);
+        return ['ok' => true, 'error' => '', 'user' => $user];
+    }
+
+    /**
+     * Complete a social-only account: set a real username and password.
+     * Used when the account was created via QQ/WeChat and has no password yet.
+     * Returns ['ok' => bool, 'error' => string, 'user' => ?array].
+     */
+    public function completeUsernamePassword(int $userId, string $username, string $password, string $confirm): array
+    {
+        $user = $this->users->findById($userId);
+        if ($user === null) {
+            return ['ok' => false, 'error' => '账号不存在。', 'user' => null];
+        }
+        // Only accounts without a password may use this one-shot completion;
+        // if a password already exists they should use the profile page instead.
+        if (!empty($user['password_hash'])) {
+            return ['ok' => false, 'error' => '该账号已设置密码，请直接在账号信息中修改。', 'user' => null];
+        }
+
+        $usernameResult = $this->changeUsername($userId, $username);
+        if (!$usernameResult['ok']) {
+            return ['ok' => false, 'error' => $usernameResult['error'], 'user' => null];
+        }
+        if (strlen($password) < 8) {
+            return ['ok' => false, 'error' => '密码至少需要 8 位。', 'user' => null];
+        }
+        if ($password !== $confirm) {
+            return ['ok' => false, 'error' => '两次输入的密码不一致。', 'user' => null];
+        }
+        $this->users->setPassword($userId, $password);
+
+        $user = $this->users->findById($userId);
         return ['ok' => true, 'error' => '', 'user' => $user];
     }
 
@@ -243,5 +307,19 @@ final class AuthService
         $avatar = (string) ($profile['avatar_url'] ?? '');
         $this->social->bind((int) $user['id'], $provider, $socialUid, $nickname, $avatar);
         return ['ok' => true, 'error' => '', 'already_bound' => false, 'user' => $user];
+    }
+
+    /**
+     * Validate a username. Returns an error message or '' when valid.
+     * Shared by registration and username changes so rules stay consistent.
+     */
+    private function usernameError(string $username): string
+    {
+        if (strlen($username) < 3 || strlen($username) > 32) {
+            return '用户名长度需为 3-32 个字符。';
+        }
+        return preg_match('/^[a-zA-Z0-9_\-一-龥]+$/u', $username) === 1
+            ? ''
+            : '用户名仅支持字母、数字、下划线、短横线与中文。';
     }
 }

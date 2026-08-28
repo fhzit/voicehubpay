@@ -131,6 +131,9 @@ $router->get('/account/orders', fn ($r) => $accountC($app)->orders($r));
 $router->get('/account/cards', fn ($r) => $accountC($app)->cards($r));
 $router->get('/account/connections', fn ($r) => $accountC($app)->connections($r));
 $router->get('/account/security', fn ($r) => $accountC($app)->security($r));
+$router->get('/account/profile', fn ($r) => $accountC($app)->profile($r));
+$router->post('/account/profile', fn ($r) => $accountC($app)->updateProfile($r));
+$router->post('/account/complete', fn ($r) => $accountC($app)->complete($r));
 $router->post('/account/connections/unbind', fn ($r) => $accountC($app)->unbind($r));
 $router->post('/account/security/password', fn ($r) => $accountC($app)->changePassword($r));
 

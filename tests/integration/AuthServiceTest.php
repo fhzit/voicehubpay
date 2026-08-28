@@ -71,5 +71,32 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $count = (int) $pdo->query("SELECT COUNT(*) FROM social_identities WHERE provider='qq' AND social_uid='QQ-UID-1'")->fetchColumn();
     $t->assertSame(1, $count, 'one identity row');
 
+    // --- username / nickname / social-completion (账号资料) ---
+    // change username
+    $renamed = $auth->changeUsername((int) $s1['user']['id'], 'alice_new');
+    $t->assertTrue($renamed['ok']);
+    $t->assertSame('alice_new', (string) $renamed['user']['username'], 'username changed');
+    // duplicate username rejected
+    $dup = $auth->changeUsername((int) $s1['user']['id'], 'alice'); // alice exists
+    $t->assertFalse($dup['ok'], 'duplicate username rejected');
+    // invalid username rejected
+    $bad = $auth->changeUsername((int) $s1['user']['id'], '!bad name');
+    $t->assertFalse($bad['ok'], 'invalid username rejected');
+    // nickname update
+    $nick = $auth->updateNickname((int) $s1['user']['id'], '新昵称');
+    $t->assertTrue($nick['ok']);
+    $t->assertSame('新昵称', (string) $nick['user']['display_name'], 'nickname updated');
+
+    // social-created account (no password) can complete username+password
+    $s3 = $auth->loginWithSocial('wx', ['openid' => 'WX-UID-1', 'nickname' => '微信用户']);
+    $t->assertTrue($s3['ok'] && empty($s3['user']['password_hash']), 'social user has no password');
+    $done = $auth->completeUsernamePassword((int) $s3['user']['id'], 'wechat_user', 'password123', 'password123');
+    $t->assertTrue($done['ok'], 'social account completion ok');
+    $t->assertTrue(!empty($done['user']['password_hash']), 'password now set');
+    $t->assertSame('wechat_user', (string) $done['user']['username'], 'username set on completion');
+    // completion refused when already has password
+    $twice = $auth->completeUsernamePassword((int) $s3['user']['id'], 'again', 'newpass123', 'newpass123');
+    $t->assertFalse($twice['ok'], 'completion refused when password already set');
+
     return ['assertions' => $t->assertions()];
 };

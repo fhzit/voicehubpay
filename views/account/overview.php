@@ -1,10 +1,18 @@
-<?php /** @var array $recent_orders @var int $order_count @var int $card_count @var array $connections @var \VoiceHubPay\App $__app @var ?array $__user */
+<?php /** @var array $recent_orders @var int $order_count @var int $card_count @var array $connections @var \VoiceHubPay\App $__app @var ?array $__user @var bool $has_password */
 $GLOBALS['__nav'] = 'account';
 ?>
 <div class="page-head">
   <h1 class="page-title" style="font-size:26px;">欢迎回来，<?= \VoiceHubPay\Http\View::e($__user['display_name'] ?: $__user['username']) ?></h1>
   <p class="page-sub">管理你的服务记录、权益与登录方式</p>
 </div>
+
+<?php if (!$has_password): ?>
+  <div class="alert alert-warning" style="max-width:680px;margin-bottom:22px;">
+    <div style="font-weight:650;margin-bottom:4px;">您通过第三方（QQ / 微信）登录，尚未设置用户名和密码</div>
+    <div class="small" style="margin-bottom:10px;">为方便您使用账号密码登录，建议完善用户名与密码（第三方登录仅作为辅助）。</div>
+    <a href="/account/profile" class="btn btn-primary btn-sm">立即完善账号</a>
+  </div>
+<?php endif; ?>
 
 <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:28px;">
   <a href="/account/orders" class="stat-card card-hover" style="display:block;text-decoration:none;">

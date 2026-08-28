@@ -28,6 +28,7 @@ final class AccountController extends Controller
             'order_count' => $orderCount,
             'card_count' => $cardCount,
             'connections' => $connections,
+            'has_password' => !empty($user['password_hash']),
         ], 'shop');
     }
 
@@ -161,6 +162,67 @@ final class AccountController extends Controller
         $users->setPassword((int) $user['id'], $new);
         $this->audit((int) $user['id'], 'password.change', 'user', (string) $user['id'], [], $request);
         return $this->redirect('/account/security')->withFlash('密码已更新。');
+    }
+
+    public function profile(Request $request): Response
+    {
+        if ($redirect = $this->requireLogin($request)) {
+            return $redirect;
+        }
+        return $this->render('account/profile', [
+            'has_password' => !empty($this->currentUser()['password_hash']),
+        ], 'shop');
+    }
+
+    public function updateProfile(Request $request): Response
+    {
+        if ($redirect = $this->requireLogin($request)) {
+            return $redirect;
+        }
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $user = $this->currentUser();
+
+        $username = $request->string('username');
+        $nickname = $request->string('display_name');
+
+        // Username is optional to change — only update when a new value is given.
+        if ($username !== '' && $username !== (string) $user['username']) {
+            $result = $this->auth->changeUsername((int) $user['id'], $username);
+            if (!$result['ok']) {
+                return $this->redirect('/account/profile')->withFlash($result['error'], 'error');
+            }
+        }
+        if ($nickname !== '') {
+            $result = $this->auth->updateNickname((int) $user['id'], $nickname);
+            if (!$result['ok']) {
+                return $this->redirect('/account/profile')->withFlash($result['error'], 'error');
+            }
+        }
+        $this->audit((int) $user['id'], 'profile.update', 'user', (string) $user['id'], [], $request);
+        return $this->redirect('/account/profile')->withFlash('账号信息已更新。');
+    }
+
+    public function complete(Request $request): Response
+    {
+        if ($redirect = $this->requireLogin($request)) {
+            return $redirect;
+        }
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $user = $this->currentUser();
+        $result = $this->auth->completeUsernamePassword(
+            (int) $user['id'],
+            $request->string('username'),
+            $request->string('password'),
+            $request->string('password_confirm'),
+        );
+        if (!$result['ok']) {
+            return $this->redirect('/account?complete=1')->withFlash($result['error'], 'error');
+        }
+        return $this->redirect('/account')->withFlash('账号设置完成，已使用用户名和密码登录。');
     }
 
     private function sourceLabel(array $item): string

@@ -8,14 +8,17 @@ $GLOBALS['__nav'] = 'connections';
 
 <div class="card" style="max-width:640px;padding:0;overflow:hidden;">
   <div class="settings-section" style="border:none;border-radius:0;padding:22px;">
-    <div class="flex-between">
+    <div class="flex-between flex-wrap" style="gap:10px;">
       <div>
-        <h3 style="margin:0 0 2px;">账号密码</h3>
-        <p class="sec-desc" style="margin:0;">使用用户名 + 密码登录</p>
+        <h3 style="margin:0 0 2px;">账号密码（主要登录方式）</h3>
+        <p class="sec-desc" style="margin:0;">使用用户名 + 密码登录，QQ / 微信仅作为辅助</p>
       </div>
-      <a href="/account/security" class="btn btn-secondary btn-sm"><?= $has_password ? '修改' : '设置' ?></a>
+      <div class="flex" style="gap:8px;">
+        <a href="/account/profile" class="btn btn-secondary btn-sm">账号资料</a>
+        <a href="/account/security" class="btn btn-outline btn-sm"><?= $has_password ? '修改密码' : '设置密码' ?></a>
+      </div>
     </div>
-    <div style="margin-top:8px;"><?= $has_password ? '<span class="status-dot status-dot-success">已设置</span>' : '<span class="status-dot status-dot-muted">未设置密码</span>' ?></div>
+    <div style="margin-top:8px;"><?= $has_password ? '<span class="status-dot status-dot-success">已设置用户名和密码</span>' : '<span class="status-dot status-dot-warning">未设置密码，建议尽快设置</span>' ?></div>
   </div>
 
   <?php foreach (['qq' => ['QQ 登录', 'QQ'], 'wx' => ['微信登录', '微信']] as $provider => [$label, $short]): ?>
