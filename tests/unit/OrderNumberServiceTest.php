@@ -5,9 +5,14 @@ declare(strict_types=1);
 use VoiceHubPay\Shop\OrderNumberService;
 
 return static function (\VoiceHubPay\Tests\TestCase $t): array {
-    // order number format: VH + 8-digit date + 8 alnum letters
+    // order number format: 20-digit timestamp (with microseconds) + 4 random digits = 24 numeric chars
     $no = OrderNumberService::generate();
-    $t->assertMatches('/^VH\d{8}[A-Za-z0-9]{8}$/', $no);
+    $t->assertMatches('/^\d{24}$/', $no, 'order number is pure 24-digit numeric');
+    // starts with the current UTC date (Ymd), ends with 4 digits
+    $now = gmdate('YmdHis');
+    $t->assertSame(0, strpos($no, substr($now, 0, 8)), 'order number begins with current date');
+    $t->assertMatches('/^\d{20}\d{4}$/', $no, '20-digit timestamp (with microseconds) + 4 random digits');
+    $t->assertSame(0, preg_match('/[^0-9]/', $no), 'no non-digit characters');
 
     // unit numbering: -001..-00N for order_no source
     $t->assertSame($no . '-001', OrderNumberService::unitNo($no, 1));

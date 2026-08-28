@@ -7,21 +7,26 @@ namespace VoiceHubPay\Shop;
 /**
  * Public order number generator.
  *
- * Format: VH + YYYYMMDD + 8 random base36 chars (unpredictable, does not
- * expose user id or database id). Example: VH20260826ABC123XY.
+ * Format: YYYYMMDDHHMMSSuuuuuu + 4 random digits = 24 numeric chars
+ * (14-char second timestamp + 6-char microseconds + 4 random digits).
+ * Example: 20260828123456 123456 7890
+ *
+ * Uniqueness is guaranteed by the caller (ShopService::uniqueOrderNo retries
+ * against the orders.order_no UNIQUE constraint). The microsecond-precision
+ * timestamp plus random suffix makes collisions impossible for realistic
+ * order rates, even across many concurrent orders in the same second.
+ * Pure digits: safe for payment gateways, parsing, and display.
  */
 final class OrderNumberService
 {
-    private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
     public static function generate(?\DateTimeInterface $when = null): string
     {
         $dt = $when ?? new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $rand = '';
-        for ($i = 0; $i < 8; $i++) {
-            $rand .= self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
+        for ($i = 0; $i < 4; $i++) {
+            $rand .= (string) random_int(0, 9);
         }
-        return 'VH' . $dt->format('Ymd') . $rand;
+        return $dt->format('YmdHisu') . $rand;
     }
 
     /**
