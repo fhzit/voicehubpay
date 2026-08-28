@@ -26,6 +26,11 @@ $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
       <label class="label">Logo URL（可选）</label>
       <input class="input" type="text" name="site_logo" value="<?= \VoiceHubPay\Http\View::e($get('SITE_LOGO')) ?>">
     </div>
+    <div class="field">
+      <label class="label">备案号（可选）</label>
+      <input class="input" type="text" name="icp_beian_no" maxlength="64" value="<?= \VoiceHubPay\Http\View::e($get('ICP_BEIAN_NO')) ?>" placeholder="如：京ICP备12345678号-1">
+      <div class="hint">填写后显示在网站底部并链接至工信部备案查询系统 beian.miit.gov.cn；留空则不显示</div>
+    </div>
     <div class="form-grid">
       <div class="field">
         <label class="label">时区</label>

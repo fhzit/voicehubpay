@@ -9,7 +9,7 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
 <meta name="description" content="安全便捷的账户服务，凭证加密保存，登录后随时管理您的服务记录。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234F46E5'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>V</text></svg>">
 <script>(function(){try{var t=localStorage.getItem('vhpay_theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();</script>
-<link rel="stylesheet" href="/assets/css/app.css?v=8">
+<link rel="stylesheet" href="/assets/css/app.css?v=9">
 </head>
 <body>
 <nav class="shop-nav">
@@ -66,6 +66,11 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
   <div class="container flex-between flex-wrap">
     <span>© <?= gmdate('Y') ?> <?= \VoiceHubPay\Http\View::e($__site['name']) ?></span>
   </div>
+  <?php $__beian = trim((string) $__app->config->get('ICP_BEIAN_NO', '')); if ($__beian !== ''): ?>
+  <div class="container beian-line">
+    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"><?= \VoiceHubPay\Http\View::e($__beian) ?></a>
+  </div>
+  <?php endif; ?>
 </footer>
 <script src="/assets/js/app.js?v=2" defer></script>
 </body>

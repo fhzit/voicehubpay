@@ -56,5 +56,15 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertContains('settings()->all()', $sc, 'general action passes the persisted settings store to the view');
     $t->assertFalse(str_contains($sc, "get('')"), 'general action must not gate settings on the always-null empty-key get');
 
+    // 备案号 (ICP filing no.): admin sets it; site/account footers render it
+    // centered, linking to the MIIT lookup, only when configured.
+    $t->assertContains('icp_beian_no', $gs, 'general settings form exposes the ICP beian field');
+    $t->assertContains("'ICP_BEIAN_NO' => ", $sc, 'saveGeneral persists the ICP beian no');
+    $shopFooter = (string) file_get_contents($t->basePath . '/views/layouts/shop.php');
+    $t->assertContains('ICP_BEIAN_NO', $shopFooter, 'shop footer reads the ICP beian setting');
+    $t->assertContains('https://beian.miit.gov.cn/', $shopFooter, 'footer link targets the MIIT beian system');
+    $accFooter = (string) file_get_contents($t->basePath . '/views/layouts/account.php');
+    $t->assertContains('https://beian.miit.gov.cn/', $accFooter, 'account footer also links the MIIT beian system');
+
     return ['assertions' => $t->assertions()];
 };

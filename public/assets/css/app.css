@@ -1437,6 +1437,9 @@ body.has-mobile-buybar { padding-bottom: 72px; }
 .site-footer { border-top: 1px solid var(--border); background: var(--surface); margin-top: 56px; padding: 24px 0; color: var(--muted-foreground); font-size: 13px; }
 .site-footer a { color: var(--muted-foreground); }
 .site-footer a:hover { color: var(--primary); }
+.beian-line { display: flex; justify-content: center; margin-top: 10px; }
+.beian-line a { color: var(--muted-foreground); text-decoration: none; }
+.beian-line a:hover { color: var(--primary); text-decoration: underline; }
 
 /* ----------------------------------------------------------------------------
    34. Theme Toggle 微下拉

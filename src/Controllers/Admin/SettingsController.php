@@ -69,6 +69,7 @@ final class SettingsController extends Controller
             'ORDER_TTL_MINUTES' => (string) max(5, $request->int('order_ttl', 30)),
             'PAGE_SIZE' => (string) max(5, $request->int('page_size', 20)),
             'AUTH_REDIRECT_URL' => $authRedirectUrl,
+            'ICP_BEIAN_NO' => trim($request->string('icp_beian_no')),
         ]);
         $this->app->config->reloadSettings();
         $this->audit($this->adminUserId(), 'settings.general', 'settings', 'general', ['site' => $siteName], $request);
