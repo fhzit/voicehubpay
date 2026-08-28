@@ -60,6 +60,7 @@ if ($app->config->bool('MAINTENANCE_MODE', false)) {
     $path = $request->path();
     $isExternal = $path === '/webhook/afdian' || $path === '/payments/sg65/notify' || str_starts_with($path, '/payments/sg65/notify');
     $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
+        || str_starts_with($path, '/complete-social')
         || str_starts_with($path, '/auth/password') || str_starts_with($path, '/auth/social');
     if (!$isInstalled && str_starts_with($path, '/install')) {
         $isAuthFlow = true;
@@ -82,7 +83,7 @@ if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
     $path = $request->path();
     // Prefixes reachable while logged out (entry points + external callbacks).
     $passthrough = [
-        '/login', '/register', '/auth/',
+        '/login', '/register', '/complete-social', '/auth/',
         '/payments/', '/webhook/', '/logout',
     ];
     $isPassthrough = false;
@@ -118,6 +119,8 @@ $router->get('/login', fn ($r) => $authC($app)->showLogin($r));
 $router->get('/register', fn ($r) => $authC($app)->showRegister($r));
 $router->post('/auth/password/login', fn ($r) => $authC($app)->login($r));
 $router->post('/auth/password/register', fn ($r) => $authC($app)->register($r));
+$router->get('/complete-social', fn ($r) => $authC($app)->showCompleteSocial($r));
+$router->post('/complete-social', fn ($r) => $authC($app)->completeSocial($r));
 $router->post('/logout', fn ($r) => $authC($app)->logout($r));
 $router->get('/auth/social/callback', fn ($r) => $authC($app)->socialCallback($r));
 // The {provider} route MUST come AFTER /auth/social/callback so a callback URL

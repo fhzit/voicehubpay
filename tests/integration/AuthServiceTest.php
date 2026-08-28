@@ -63,40 +63,69 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertContains('禁用', $dis['error']);
 
     // social identity uniqueness: same provider+uid -> same account, no merge by nickname
+    // (first social login requires signup; after completing it, the same
+    // identity must resolve to that one account and NO duplicate identity row)
     $s1 = $auth->loginWithSocial('qq', ['openid' => 'QQ-UID-1', 'nickname' => '甲']);
+    $t->assertTrue(!empty($s1['needs_signup']), 'first QQ login requires signup');
+    $s1u = $auth->completeSocialSignup($s1['profile'], 'user_q1', 'password123', 'password123');
+    $t->assertTrue($s1u['ok'], 'QQ signup ok');
     $s2 = $auth->loginWithSocial('qq', ['openid' => 'QQ-UID-1', 'nickname' => '完全不同的名字']);
-    $t->assertTrue($s1['ok'] && $s2['ok']);
-    $t->assertSame((int) $s1['user']['id'], (int) $s2['user']['id'], 'same identity same account');
+    $t->assertTrue($s2['ok']);
+    $t->assertTrue(empty($s2['needs_signup']), 'existing identity does not re-trigger signup');
+    $t->assertSame((int) $s1u['user']['id'], (int) $s2['user']['id'], 'same identity same account');
 
     $count = (int) $pdo->query("SELECT COUNT(*) FROM social_identities WHERE provider='qq' AND social_uid='QQ-UID-1'")->fetchColumn();
     $t->assertSame(1, $count, 'one identity row');
 
     // --- username / nickname / social-completion (账号资料) ---
     // change username
-    $renamed = $auth->changeUsername((int) $s1['user']['id'], 'alice_new');
+    $renamed = $auth->changeUsername((int) $s1u['user']['id'], 'alice_new');
     $t->assertTrue($renamed['ok']);
     $t->assertSame('alice_new', (string) $renamed['user']['username'], 'username changed');
     // duplicate username rejected
-    $dup = $auth->changeUsername((int) $s1['user']['id'], 'alice'); // alice exists
+    $dup = $auth->changeUsername((int) $s1u['user']['id'], 'alice'); // alice exists
     $t->assertFalse($dup['ok'], 'duplicate username rejected');
     // invalid username rejected
-    $bad = $auth->changeUsername((int) $s1['user']['id'], '!bad name');
+    $bad = $auth->changeUsername((int) $s1u['user']['id'], '!bad name');
     $t->assertFalse($bad['ok'], 'invalid username rejected');
     // nickname update
-    $nick = $auth->updateNickname((int) $s1['user']['id'], '新昵称');
+    $nick = $auth->updateNickname((int) $s1u['user']['id'], '新昵称');
     $t->assertTrue($nick['ok']);
     $t->assertSame('新昵称', (string) $nick['user']['display_name'], 'nickname updated');
 
-    // social-created account (no password) can complete username+password
+    // New social signup flow: first-time social does NOT create an account; it
+    // returns needs_signup + profile, then completeSocialSignup requires a
+    // username (pre-filled from nickname) and password.
     $s3 = $auth->loginWithSocial('wx', ['openid' => 'WX-UID-1', 'nickname' => '微信用户']);
-    $t->assertTrue($s3['ok'] && empty($s3['user']['password_hash']), 'social user has no password');
-    $done = $auth->completeUsernamePassword((int) $s3['user']['id'], 'wechat_user', 'password123', 'password123');
-    $t->assertTrue($done['ok'], 'social account completion ok');
-    $t->assertTrue(!empty($done['user']['password_hash']), 'password now set');
-    $t->assertSame('wechat_user', (string) $done['user']['username'], 'username set on completion');
-    // completion refused when already has password
-    $twice = $auth->completeUsernamePassword((int) $s3['user']['id'], 'again', 'newpass123', 'newpass123');
-    $t->assertFalse($twice['ok'], 'completion refused when password already set');
+    $t->assertTrue($s3['ok']);
+    $t->assertTrue(!empty($s3['needs_signup']), 'new social login requires signup');
+    $t->assertNull($s3['user'], 'no account auto-created on first social login');
+    $t->assertSame('微信用户', (string) ($s3['profile']['nickname'] ?? ''), 'profile carries nickname for default username');
+
+    // Creating with an explicit username + password binds social and sets pw.
+    $s3done = $auth->completeSocialSignup($s3['profile'], 'wechat_user', 'password123', 'password123');
+    $t->assertTrue($s3done['ok'], 'social signup ok');
+    $t->assertSame('wechat_user', (string) $s3done['user']['username'], 'username set on social signup');
+    $t->assertTrue(!empty($s3done['user']['password_hash']), 'password set on social signup');
+    $t->assertTrue(!empty($s3done['user']['display_name']), 'nickname used as display name');
+
+    // After binding, the same social identity now logs in directly (no signup).
+    $repeat = $auth->loginWithSocial('wx', ['openid' => 'WX-UID-1', 'nickname' => '微信用户']);
+    $t->assertTrue($repeat['ok']);
+    $t->assertTrue(empty($repeat['needs_signup']), 'existing social identity logs in without signup');
+    $t->assertSame((int) $s3done['user']['id'], (int) $repeat['user']['id'], 'same account returned');
+
+    // default username from nickname when the field is left empty (unique-ified)
+    $s4 = $auth->loginWithSocial('wx', ['openid' => 'WX-UID-2', 'nickname' => '小A']);
+    $s4done = $auth->completeSocialSignup($s4['profile'], '', 'password123', 'password123');
+    $t->assertTrue($s4done['ok'], 'empty username defaults to nickname');
+    $t->assertTrue(str_starts_with((string) $s4done['user']['username'], '小A'), 'username derived from nickname');
+
+    // validation: mismatch + short password rejected
+    $s5 = $auth->loginWithSocial('qq', ['openid' => 'QQ-UID-VALID', 'nickname' => '企鹅']);
+    $t->assertTrue(!empty($s5['needs_signup']), 'fresh qq identity needs signup');
+    $t->assertFalse($auth->completeSocialSignup($s5['profile'], 'penguin', '12345678', 'different')['ok'], 'password mismatch rejected');
+    $t->assertFalse($auth->completeSocialSignup($s5['profile'], 'penguin', 'short', 'short')['ok'], 'short password rejected');
 
     return ['assertions' => $t->assertions()];
 };

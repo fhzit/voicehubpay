@@ -78,6 +78,50 @@ final class AuthController extends Controller
         return $this->redirect('/account')->withFlash('注册成功，欢迎加入！');
     }
 
+    /**
+     * First-time QQ/WeChat registration steps: show a form that REQUIRES the
+     * user to choose a username (pre-filled with the social nickname) and set a
+     * password before any account is created. No auto-generated qq_<uid>
+     * usernames, no password-less social-only accounts.
+     */
+    public function showCompleteSocial(Request $request): Response
+    {
+        $profile = $_SESSION['social_signup_pending'] ?? null;
+        if (!is_array($profile) || ($profile['social_uid'] ?? '') === '') {
+            return $this->redirect('/login')->withFlash('请先使用 QQ / 微信登录后再完善账号。', 'error');
+        }
+        $provider = in_array((string) ($profile['provider'] ?? ''), ['qq', 'wx'], true) ? (string) $profile['provider'] : 'qq';
+        return $this->render('auth/complete-social', [
+            'provider' => $provider,
+            'nickname' => (string) ($profile['nickname'] ?? ''),
+            'avatar' => (string) ($profile['avatar_url'] ?? ''),
+        ], 'auth');
+    }
+
+    public function completeSocial(Request $request): Response
+    {
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $profile = $_SESSION['social_signup_pending'] ?? null;
+        if (!is_array($profile) || ($profile['social_uid'] ?? '') === '') {
+            return $this->redirect('/login')->withFlash('登录状态已失效，请重新使用 QQ / 微信登录。', 'error');
+        }
+        $result = $this->auth->completeSocialSignup(
+            $profile,
+            $request->string('username'),
+            $request->string('password'),
+            $request->string('password_confirm'),
+        );
+        if (!$result['ok']) {
+            // Keep the pending profile so the user can retry without re-auth.
+            return $this->redirect('/complete-social')->withFlash($result['error'], 'error');
+        }
+        unset($_SESSION['social_signup_pending']);
+        $this->auth->loginUser($result['user']);
+        return $this->redirect('/account')->withFlash('账号创建成功，欢迎加入！');
+    }
+
     public function socialRedirect(Request $request, array $params): Response
     {
         // The聚合登录平台 can bounce the user back to a /auth/social/{provider}
@@ -164,6 +208,14 @@ final class AuthController extends Controller
             $result = $this->auth->loginWithSocial($provider, $profile);
             if (!$result['ok']) {
                 return $this->redirect('/login')->withFlash($result['error'], 'error');
+            }
+            // First-time social login: force username + password before the
+            // account exists. Stash the profile, go to the signup-completion
+            // page (nickname pre-filled as the default username).
+            if (!empty($result['needs_signup'])) {
+                unset($_SESSION['social_bind_mode']);
+                $_SESSION['social_signup_pending'] = $result['profile'];
+                return $this->redirect('/complete-social')->withFlash('请设置您的用户名和密码以完成账号创建。');
             }
             $this->auth->loginUser($result['user']);
             return $this->redirect($this->safeRedirect($redirectAfter))->withFlash('登录成功！');

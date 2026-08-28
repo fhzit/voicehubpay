@@ -245,6 +245,12 @@ final class AuthService
     /**
      * Social login: bind by (provider, social_uid) or create a fresh user.
      * Never merges accounts by nickname/avatar.
+     *
+     * For a brand-new social identity this does NOT create an account yet;
+     * it returns needs_signup=true with the social profile so the caller can
+     * require the user to choose a username (defaulting to the social
+     * nickname) and a password before signing up — no more auto-generated
+     * qq_<uid> system usernames and no password-less social-only accounts.
      */
     public function loginWithSocial(string $provider, array $profile): array
     {
@@ -262,18 +268,99 @@ final class AuthService
             if ($user === null || $user['status'] !== 'active') {
                 return ['ok' => false, 'error' => '账号不可用。', 'user' => null];
             }
-            return ['ok' => true, 'error' => '', 'user' => $user];
+            return ['ok' => true, 'needs_signup' => false, 'user' => $user];
         }
 
-        // Create new user bound to this social identity.
-        $username = $this->users->uniqueUsername($provider . '_', $socialUid);
+        // New social identity — require username + password before creating the
+        // account. The nickname is offered as the default username but the user
+        // must explicitly confirm it and set a password.
+        return [
+            'ok' => true,
+            'needs_signup' => true,
+            'user' => null,
+            'profile' => [
+                'provider' => $provider,
+                'social_uid' => $socialUid,
+                'nickname' => $nickname,
+                'avatar_url' => $avatar,
+            ],
+        ];
+    }
+
+    /**
+     * Complete a brand-new social signup: create the account with the chosen
+     * username + password and bind the social identity to it. Username
+     * defaults to the social nickname when empty; validation mirrors the
+     * password-register rules. Returns user on success.
+     */
+    public function completeSocialSignup(array $profile, string $username, string $password, string $confirm): array
+    {
+        $provider = in_array((string) ($profile['provider'] ?? ''), ['qq', 'wx'], true)
+            ? (string) $profile['provider'] : 'qq';
+        $socialUid = (string) ($profile['social_uid'] ?? '');
+        if ($socialUid === '') {
+            return ['ok' => false, 'error' => '第三方身份标识缺失，请重新使用 QQ/微信登录。', 'user' => null];
+        }
+        // Refuse if that social identity somehow became bound while the user
+        // was on the completion form (e.g. a racing callback).
+        if ($this->social->findByIdentity($provider, $socialUid) !== null) {
+            return ['ok' => false, 'error' => '该第三方账号已绑定其他账户，请使用账号密码直接登录。', 'user' => null];
+        }
+
+        $username = trim($username);
+        $nickname = (string) ($profile['nickname'] ?? '');
+        if ($username === '') {
+            // Derive a username from the social nickname, keeping Chinese chars
+            // (usernames allow letters/digits/underscore/dash/CJK). Fall back
+            // to a short uid-based value if the nickname has no usable chars.
+            $slug = preg_replace('/[^a-zA-Z0-9_一-龥-]/u', '', $nickname) ?? '';
+            $slug = substr($slug, 0, 24);
+            // Usernames require >= 3 chars; pad short nicknames so the derived
+            // username still satisfies the rule (e.g. 2-char "小A" → "小A_").
+            while ($slug !== '' && mb_strlen($slug) < 3) {
+                $slug .= '_';
+            }
+            $username = $slug !== '' ? $slug : ('u_' . substr(preg_replace('/[^a-zA-Z0-9_]/', '', $socialUid) ?: '', 0, 16));
+            // Ensure uniqueness, preserving CJK (uniqueUsername() strips non-ASCII
+            // which would drop Chinese from the nickname-derived username).
+            $candidate = $username;
+            $i = 1;
+            while ($this->users->findByUsername($candidate) !== null) {
+                $candidate = $username . '_' . $i;
+                if (++$i > 50) {
+                    $candidate = $username . '_' . bin2hex(random_bytes(3));
+                }
+            }
+            $username = $candidate;
+        }
+
+        $usernameError = (function (string $u): string {
+            if (strlen($u) < 3 || strlen($u) > 32) {
+                return '用户名长度需为 3-32 个字符。';
+            }
+            return preg_match('/^[a-zA-Z0-9_一-龥-]+$/u', $u) === 1
+                ? '' : '用户名仅支持字母、数字、下划线、短横线与中文。';
+        })($username);
+        if ($usernameError !== '') {
+            return ['ok' => false, 'error' => $usernameError, 'user' => null];
+        }
+        if ($this->users->findByUsername($username) !== null) {
+            return ['ok' => false, 'error' => '该用户名已被占用。', 'user' => null];
+        }
+        if (strlen($password) < 8) {
+            return ['ok' => false, 'error' => '密码至少需要 8 位。', 'user' => null];
+        }
+        if ($password !== $confirm) {
+            return ['ok' => false, 'error' => '两次输入的密码不一致。', 'user' => null];
+        }
+
         $user = $this->users->create([
             'username' => $username,
-            'password' => '',
+            'password' => $password,
             'display_name' => $nickname !== '' ? $nickname : $username,
-            'avatar_url' => $avatar,
+            'avatar_url' => (string) ($profile['avatar_url'] ?? ''),
         ]);
-        $this->social->bind((int) $user['id'], $provider, $socialUid, $nickname, $avatar);
+        $this->social->bind((int) $user['id'], $provider, $socialUid, $nickname, (string) ($profile['avatar_url'] ?? ''));
         return ['ok' => true, 'error' => '', 'user' => $user];
     }
 
