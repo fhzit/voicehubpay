@@ -19,6 +19,7 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
         'plan_id' => 'plan-x',
         'sku_detail' => '赞助档位',
         'amount_cents' => 6600,
+        'remark' => '要歌王的话麻烦备注一下',
         // normalizeOrder converts afdian create_time → ISO UTC; the processor
         // receives the normalized shape (created_at/paid_at already ISO).
         'created_at' => '2026-08-31T18:30:00+00:00',
@@ -37,6 +38,7 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertSame(6600, (int) $row['amount_cents']);
     $t->assertSame('paid', $row['status']);
     $t->assertSame('买家小明', $row['buyer_name'], 'buyer_name captured from payload');
+    $t->assertSame('要歌王的话麻烦备注一下', $row['remark'], 'remark captured from payload');
     // created_at/paid_at reflect the Afdian purchase time (create_time unix → ISO)
     $t->assertSame('2026-08-31T18:30:00+00:00', $row['created_at'], 'created_at from Afdian create_time');
     $t->assertSame('2026-08-31T18:30:00+00:00', $row['paid_at'], 'paid_at from Afdian create_time for paid order');

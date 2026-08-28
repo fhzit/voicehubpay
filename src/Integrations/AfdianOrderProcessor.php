@@ -49,6 +49,7 @@ final class AfdianOrderProcessor
             'trade_no' => (string) ($normalized['trade_no'] ?? ''),
             'user_id' => (string) ($normalized['user_id'] ?? ''),
             'buyer_name' => (string) ($normalized['buyer_name'] ?? ''),
+            'remark' => (string) ($normalized['remark'] ?? ''),
             'plan_id' => (string) ($normalized['plan_id'] ?? ''),
             'sku_detail' => (string) ($normalized['sku_detail'] ?? ''),
             'amount_cents' => (int) ($normalized['amount_cents'] ?? 0),

@@ -37,15 +37,16 @@ $__pageTitle = '爱发电订单';
 
 <div class="card card-pad-0">
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>订单号</th><th>买家</th><th class="num">金额</th><th>推送</th><th>尝试</th><th>时间</th><th></th></tr></thead>
+    <thead><tr><th>订单号</th><th>买家</th><th>备注</th><th class="num">金额</th><th>推送</th><th>尝试</th><th>时间</th><th></th></tr></thead>
     <tbody>
     <?php if ($orders === []): ?>
-      <tr><td colspan="7" class="text-center muted">暂无爱发电订单</td></tr>
+      <tr><td colspan="8" class="text-center muted">暂无爱发电订单</td></tr>
     <?php endif; ?>
     <?php foreach ($orders as $o): ?>
       <tr>
         <td class="mono"><?= \VoiceHubPay\Http\View::e($o['out_trade_no']) ?></td>
         <td class="small"><?= \VoiceHubPay\Http\View::e($o['buyer_name'] ?? '') ?></td>
+        <td class="small muted"><?= \VoiceHubPay\Http\View::e($o['remark'] ?? '') ?></td>
         <td class="num">¥<?= \VoiceHubPay\Http\View::money((int) $o['amount_cents']) ?></td>
         <td><?= $__app->view->partial('partials/status-badge', ['kind' => 'voicehub', 'status' => $o['voicehub_status']]) ?></td>
         <td><?= (int) $o['voicehub_attempts'] ?></td>

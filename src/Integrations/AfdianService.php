@@ -246,6 +246,7 @@ PEM;
             'trade_no' => (string) ($order['trade_no'] ?? ''),
             'user_id' => (string) ($order['user_private_id'] ?? $order['user_id'] ?? $order['buyer_id'] ?? ''),
             'buyer_name' => (string) trim((string) ($order['user_name'] ?? $order['name'] ?? $order['buyer_name'] ?? '')),
+            'remark' => (string) trim((string) ($order['remark'] ?? $order['order_msg'] ?? '')),
             'plan_id' => (string) ($order['plan_id'] ?? ''),
             'sku_detail' => $skuDetail,
             'amount_cents' => $amountCents,
