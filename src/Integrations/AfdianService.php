@@ -109,6 +109,73 @@ PEM;
         return array_slice($orders, 0, $limit);
     }
 
+    /**
+     * Resolve a buyer's display name from the AffDian sponsor endpoint.
+     *
+     * The order/webhook payloads do not carry the buyer's username — only the
+     * public user_id (and user_private_id). Their display name is available
+     * via query-sponsor (data.list[].user.name). We look the name up per
+     * order's user_id and cache it in settings keyed by AFDIAN_SPONSOR_CACHE to
+     * avoid hammering the endpoint on every admin page render.
+     *
+     * Returns '' when unknown or the API is unavailable.
+     */
+    public function sponsorName(string $userId): string
+    {
+        if ($userId === '') {
+            return '';
+        }
+        $cache = $this->sponsorCache();
+        if (isset($cache[$userId]) && $cache[$userId] !== '') {
+            return $cache[$userId];
+        }
+        $name = $this->fetchSponsorName($userId);
+        if ($name !== '') {
+            $cache[$userId] = $name;
+            $this->persistSponsorCache($cache);
+        }
+        return $name;
+    }
+
+    private function sponsorCache(): array
+    {
+        $raw = (string) $this->app->config->get('AFDIAN_SPONSOR_CACHE', '{}');
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function persistSponsorCache(array $cache): void
+    {
+        $this->app->config->settings()->set('AFDIAN_SPONSOR_CACHE', json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function fetchSponsorName(string $userId): string
+    {
+        $token = $this->app->config->secret('AFDIAN_API_TOKEN', $this->app->config->get('AFDIAN_API_TOKEN', ''));
+        if ($token === '') {
+            return '';
+        }
+        $base = rtrim((string) $this->app->config->get('AFDIAN_API_BASE', 'https://ifdian.net'), '/');
+        $path = (string) $this->app->config->get('AFDIAN_SPONSOR_ENDPOINT', '/api/open/query-sponsor');
+        try {
+            $response = $this->httpRequest($base . $path, $this->signedPayload($this->required('AFDIAN_USER_ID'), $token, ['page' => 1, 'per_page' => 20, 'user_id' => $userId]));
+            $data = $response['data'] ?? [];
+            $list = is_array($data) ? ($data['list'] ?? []) : [];
+            foreach ($list as $sponsor) {
+                if (!is_array($sponsor)) {
+                    continue;
+                }
+                $u = $sponsor['user'] ?? null;
+                if (is_array($u) && (string) ($u['user_id'] ?? '') === $userId) {
+                    return (string) trim((string) ($u['name'] ?? ''));
+                }
+            }
+        } catch (\Throwable) {
+            // Sponsor API is best-effort; fall back to empty name.
+        }
+        return '';
+    }
+
     private function signedPayload(string $userId, string $token, array $params): array
     {
         $paramsJson = json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

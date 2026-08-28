@@ -28,6 +28,16 @@ final class AfdianController extends Controller
         $page = max(1, $request->int('page', 1));
         $afdian = $this->app->make('afdianOrders');
         $result = $afdian->listAdmin($status, $voicehub, $q, $page, 20);
+        $afdianService = $this->app->make('afdian');
+        // Orders may not store a username (Afdian order payload has no username);
+        // resolve the buyer display name via the sponsor endpoint when needed.
+        foreach ($result['items'] as &$row) {
+            $stored = trim((string) ($row['buyer_name'] ?? ''));
+            $row['buyer_name'] = $stored !== ''
+                ? $stored
+                : $afdianService->sponsorName((string) ($row['user_id'] ?? ''));
+        }
+        unset($row);
         return $this->render('admin/afdian/index', [
             'orders' => $result['items'],
             'total' => $result['total'],

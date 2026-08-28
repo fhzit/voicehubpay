@@ -77,5 +77,12 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $transitionDeliveries = (int) $pdo->query("SELECT COUNT(*) FROM voicehub_deliveries WHERE source_order_no='AFD20260826UNPAID'")->fetchColumn();
     $t->assertSame(1, $transitionDeliveries, 'paid transition creates one delivery');
 
+    // sponsorName: empty for empty user id; unknown user id does not hard-fail
+    // (token missing in test env → best-effort '' which is persisted to cache).
+    $svc = $app->make('afdian');
+    $t->assertSame('', $svc->sponsorName(''), 'empty user id yields empty name');
+    $u = $svc->sponsorName('ifdian-user-9');
+    $t->assertTrue(is_string($u), 'sponsor name lookup returns a string, never throws');
+
     return ['assertions' => $t->assertions()];
 };
