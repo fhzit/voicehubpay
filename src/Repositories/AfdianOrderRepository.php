@@ -40,14 +40,18 @@ final class AfdianOrderRepository extends Repository
                 'amount_cents' => (int) ($data['amount_cents'] ?? $existing['amount_cents']),
                 'status' => $data['status'] ?? $existing['status'],
                 'raw_payload' => $data['raw_payload'] ?? $existing['raw_payload'],
-                'paid_at' => in_array((string) ($data['status'] ?? ''), ['paid', '2'], true)
-                    ? ($existing['paid_at'] ?: $this->now())
-                    : $existing['paid_at'],
+                'created_at' => $data['created_at'] ?? $existing['created_at'],
+                'paid_at' => isset($data['paid_at'])
+                    ? $data['paid_at']
+                    : (in_array((string) ($data['status'] ?? ''), ['paid', '2'], true)
+                        ? ($existing['paid_at'] ?: $this->now())
+                        : $existing['paid_at']),
             ]);
             return ['created' => false, 'order' => $this->findById((int) $existing['id'])];
         }
         $now = $this->now();
-        $paidAt = in_array((string) ($data['status'] ?? 'paid'), ['paid', '2'], true) ? $now : null;
+        $paidAt = $data['paid_at'] ?? (in_array((string) ($data['status'] ?? 'paid'), ['paid', '2'], true) ? $now : null);
+        $createdAt = $data['created_at'] ?? $now;
         $stmt = $this->pdo()->prepare('INSERT INTO afdian_orders (out_trade_no, trade_no, user_id, buyer_name, plan_id, sku_detail, amount_cents, status, raw_payload, voicehub_status, voicehub_attempts, voicehub_last_error, created_at, paid_at, processed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, NULL, ?)');
         try {
             $stmt->execute([
@@ -61,7 +65,7 @@ final class AfdianOrderRepository extends Repository
                 $data['status'] ?? 'paid',
                 $data['raw_payload'] ?? '[]',
                 $data['voicehub_status'] ?? 'pending',
-                $now,
+                $createdAt,
                 $paidAt,
                 $now,
             ]);
@@ -80,7 +84,7 @@ final class AfdianOrderRepository extends Repository
 
     public function update(int $id, array $fields): void
     {
-        $allowed = ['trade_no', 'user_id', 'buyer_name', 'plan_id', 'sku_detail', 'amount_cents', 'status', 'raw_payload', 'voicehub_status', 'voicehub_attempts', 'voicehub_last_error', 'paid_at', 'processed_at'];
+        $allowed = ['trade_no', 'user_id', 'buyer_name', 'plan_id', 'sku_detail', 'amount_cents', 'status', 'raw_payload', 'voicehub_status', 'voicehub_attempts', 'voicehub_last_error', 'paid_at', 'created_at', 'processed_at'];
         $sets = [];
         $params = [];
         foreach ($fields as $key => $value) {

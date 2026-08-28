@@ -53,6 +53,8 @@ final class AfdianOrderProcessor
             'sku_detail' => (string) ($normalized['sku_detail'] ?? ''),
             'amount_cents' => (int) ($normalized['amount_cents'] ?? 0),
             'status' => (string) ($normalized['status'] ?? 'paid'),
+            'created_at' => isset($normalized['created_at']) ? (string) $normalized['created_at'] : null,
+            'paid_at' => isset($normalized['paid_at']) ? (string) $normalized['paid_at'] : null,
             'raw_payload' => json_encode($normalized['raw'] ?? $normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]',
         ]);
         $order = $stored['order'];

@@ -250,8 +250,29 @@ PEM;
             'sku_detail' => $skuDetail,
             'amount_cents' => $amountCents,
             'status' => ((string) ($order['status'] ?? '2')) === '2' ? 'paid' : (string) ($order['status'] ?? 'unknown'),
+            'created_at' => $this->purchaseTime($order),
+            'paid_at' => ((string) ($order['status'] ?? '2')) === '2' ? $this->purchaseTime($order) : null,
             'raw' => $order,
         ];
+    }
+
+    /**
+     * Derive the Afdian purchase time from the payload's create_time (Unix
+     * seconds) as ISO-8601 UTC, matching the app's created_at/paid_at format.
+     * Returns null when the payload has no usable create_time.
+     */
+    private function purchaseTime(array $order): ?string
+    {
+        $raw = $order['create_time'] ?? $order['createTime'] ?? '';
+        if (is_array($raw)) {
+            $raw = '';
+        }
+        $secs = (int) $raw;
+        if ($secs <= 0) {
+            return null;
+        }
+        $dt = (new \DateTimeImmutable('@' . $secs))->setTimezone(new \DateTimeZone('UTC'));
+        return $dt->format('c');
     }
 
     private function httpRequest(string $url, array $payload): array
