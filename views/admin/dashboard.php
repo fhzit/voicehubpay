@@ -150,9 +150,9 @@ $custom_to = $custom_to ?? '';
     <?= $deltaHtml('sold_units', (float) ($d['sold_units'] ?? 0)) ?>
   </div>
   <div class="stat-card">
-    <div class="stat-label">VoiceHub 请求</div>
-    <div class="stat-value"><?= (int) $k['voicehub_requests'] ?></div>
-    <?= $deltaHtml('voicehub_requests', (float) ($d['voicehub_requests'] ?? 0)) ?>
+    <div class="stat-label">实际收入</div>
+    <div class="stat-value">¥<?= \VoiceHubPay\Http\View::money((int) $k['actual_revenue']) ?></div>
+    <?= $deltaHtml('actual_revenue', (float) ($d['actual_revenue'] ?? 0)) ?>
   </div>
   <div class="stat-card">
     <div class="stat-label">VoiceHub 成功率</div>

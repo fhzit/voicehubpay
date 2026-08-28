@@ -64,6 +64,14 @@ $types = array_filter(explode(',', $get('SG65_ENABLED_TYPES', 'alipay,wxpay,qqpa
       <div class="small mt-1"><code class="inline">同步跳转：</code><code class="inline mono"><?= \VoiceHubPay\Http\View::e($return_url) ?></code></div>
     </div>
 
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">商城手续费率（%）</label>
+        <input class="input" type="number" name="shop_fee_percent" min="0" max="100" step="0.1" value="<?= $get('SHOP_FEE_PERCENT', '3') ?>">
+        <div class="hint">商城订单的实际收入按此比例扣除，默认 3%。仪表盘"实际收入"= 商城×(1−手续费%)＋爱发电×(1−手续费%)。</div>
+      </div>
+    </div>
+
     <div class="flex">
       <button class="btn btn-primary">保存支付设置</button>
       <button class="btn btn-secondary" type="button" id="test-sg65">测试连接</button>

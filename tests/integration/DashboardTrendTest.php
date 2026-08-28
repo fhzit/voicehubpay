@@ -70,5 +70,13 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
         }
     }
 
+    // Actual (net) income: gross minus each channel's configured fee%.
+    // shop 103 * (1 - 0.03) = 100 ; afdian 500 * (1 - 0.06) = 470 ; net = 570
+    $kpi = $svc->computeKpi('2026-08-27T00:00:00+00:00', '2026-08-28T00:00:00+00:00', 'all');
+    $t->assertSame(100, $kpi['actual_shop'], 'shop net after 3% fee');
+    $t->assertSame(470, $kpi['actual_afdian'], 'afdian net after 6% fee');
+    $t->assertSame(570, $kpi['actual_revenue'], 'actual revenue = both net sums');
+    $t->assertSame(603, $kpi['total_revenue'], 'gross untouched');
+
     return ['assertions' => $t->assertions()];
 };

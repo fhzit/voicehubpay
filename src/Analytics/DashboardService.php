@@ -41,6 +41,7 @@ final class DashboardService
 
         $current['deltas'] = [
             'total_revenue' => $delta($current['total_revenue'], $previous['total_revenue']),
+            'actual_revenue' => $delta($current['actual_revenue'], $previous['actual_revenue']),
             'shop_revenue' => $delta($current['shop_revenue'], $previous['shop_revenue']),
             'afdian_revenue' => $delta($current['afdian_revenue'], $previous['afdian_revenue']),
             'paid_orders' => $delta($current['paid_orders'], $previous['paid_orders']),
@@ -90,6 +91,13 @@ final class DashboardService
         $totalRevenue = $shopRevenue + $afdianRevenue;
         $paidOrders = $shopOrders + $afdianOrders;
 
+        // Actual (net) income = gross minus each channel's fee%.
+        $shopFee = (float) $this->app->config->get('SHOP_FEE_PERCENT', '3');
+        $afdianFee = (float) $this->app->config->get('AFDIAN_FEE_PERCENT', '6');
+        $actualShop = (int) round($shopRevenue * (1 - min(100, max(0, $shopFee)) / 100));
+        $actualAfdian = (int) round($afdianRevenue * (1 - min(100, max(0, $afdianFee)) / 100));
+        $actualRevenue = $actualShop + $actualAfdian;
+
         $vh = $this->voicehubStats($from, $to, $channel);
         $vhRequests = $vh['requests'];
         $vhSuccess = $vh['success'];
@@ -112,6 +120,9 @@ final class DashboardService
 
         return [
             'total_revenue' => $totalRevenue,
+            'actual_revenue' => $actualRevenue,
+            'actual_shop' => $actualShop,
+            'actual_afdian' => $actualAfdian,
             'shop_revenue' => $shopRevenue,
             'afdian_revenue' => $afdianRevenue,
             'paid_orders' => $paidOrders,

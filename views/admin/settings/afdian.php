@@ -45,6 +45,13 @@ $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
         <input class="input" type="number" name="afdian_poll_per_page" min="1" max="100" value="<?= (int) $get('AFDIAN_POLL_PER_PAGE', '50') ?>">
       </div>
     </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">爱发电手续费率（%）</label>
+        <input class="input" type="number" name="afdian_fee_percent" min="0" max="100" step="0.1" value="<?= $get('AFDIAN_FEE_PERCENT', '6') ?>">
+        <div class="hint">爱发电订单的实际收入按此比例扣除，默认 6%。</div>
+      </div>
+    </div>
     <div class="field checkbox-row">
       <input type="checkbox" name="afdian_require_signature" id="afdian_require_signature" value="1" <?= $get('AFDIAN_WEBHOOK_REQUIRE_SIGNATURE', '1') === '1' ? 'checked' : '' ?>>
       <label for="afdian_require_signature" class="small muted">校验 Webhook 请求签名（RSA）</label>

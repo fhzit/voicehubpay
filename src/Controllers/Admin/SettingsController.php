@@ -124,6 +124,7 @@ final class SettingsController extends Controller
             'SG65_DEFAULT_PAYMENT_TYPE' => $defaultType,
             'SG65_DEFAULT_METHOD' => $request->string('sg65_default_method', 'jump') === 'web' ? 'web' : 'jump',
             'SG65_ENABLED_TYPES' => implode(',', $enabledTypes),
+            'SHOP_FEE_PERCENT' => (string) min(100, max(0, (float) $request->string('shop_fee_percent', '3'))),
         ]);
         // Secrets: only overwrite when a new value is provided (not placeholder).
         $privateKey = trim($request->string('sg65_merchant_private_key'));
@@ -351,6 +352,7 @@ final class SettingsController extends Controller
             'AFDIAN_WEBHOOK_REQUIRE_SIGNATURE' => $request->int('afdian_require_signature', 1) === 1 ? '1' : '0',
             'AFDIAN_POLL_LIMIT' => (string) max(1, $request->int('afdian_poll_limit', 20)),
             'AFDIAN_POLL_PER_PAGE' => (string) max(1, min(100, $request->int('afdian_poll_per_page', 50))),
+            'AFDIAN_FEE_PERCENT' => (string) min(100, max(0, (float) $request->string('afdian_fee_percent', '6'))),
         ]);
         $token = trim($request->string('afdian_api_token'));
         if ($token !== '' && $token !== '••••••••') {
