@@ -66,5 +66,14 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $accFooter = (string) file_get_contents($t->basePath . '/views/layouts/account.php');
     $t->assertContains('https://beian.miit.gov.cn/', $accFooter, 'account footer also links the MIIT beian system');
 
+    // 统计代码 (site analytics snippet): admin sets it; head of public layouts
+    // echo it raw so arbitrary HTML/JS runs, only when configured.
+    $t->assertContains('site_stat_code', $gs, 'general settings form exposes the stat-code field');
+    $t->assertContains("'SITE_STAT_CODE' => ", $sc, 'saveGeneral persists the stat code');
+    $shopHead = (string) file_get_contents($t->basePath . '/views/layouts/shop.php');
+    $t->assertContains('SITE_STAT_CODE', $shopHead, 'shop head reads the stat-code setting');
+    $t->assertContains('<?= $__stat ?>', $shopHead, 'stat code echoed raw (unescaped) so HTML/JS executes');
+    $t->assertContains('</head>', $shopHead, 'stat code injected before </head>');
+
     return ['assertions' => $t->assertions()];
 };

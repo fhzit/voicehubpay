@@ -31,6 +31,11 @@ $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
       <input class="input" type="text" name="icp_beian_no" maxlength="64" value="<?= \VoiceHubPay\Http\View::e($get('ICP_BEIAN_NO')) ?>" placeholder="如：京ICP备12345678号-1">
       <div class="hint">填写后显示在网站底部并链接至工信部备案查询系统 beian.miit.gov.cn；留空则不显示</div>
     </div>
+    <div class="field">
+      <label class="label">统计代码（可选）</label>
+      <textarea class="input" name="site_stat_code" rows="5" style="font-family:var(--font-mono);font-size:13px;" placeholder="&lt;script async src=&#39;https://…/analytics.js&#39;&gt;&lt;/script&gt;"><?= \VoiceHubPay\Http\View::e($get('SITE_STAT_CODE')) ?></textarea>
+      <div class="hint">任意 HTML / JS 统计代码片段，原样插入到所有前台页面的 &lt;head&gt; 中；留空则不加载</div>
+    </div>
     <div class="form-grid">
       <div class="field">
         <label class="label">时区</label>

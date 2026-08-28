@@ -70,6 +70,7 @@ final class SettingsController extends Controller
             'PAGE_SIZE' => (string) max(5, $request->int('page_size', 20)),
             'AUTH_REDIRECT_URL' => $authRedirectUrl,
             'ICP_BEIAN_NO' => trim($request->string('icp_beian_no')),
+            'SITE_STAT_CODE' => trim($request->string('site_stat_code')),
         ]);
         $this->app->config->reloadSettings();
         $this->audit($this->adminUserId(), 'settings.general', 'settings', 'general', ['site' => $siteName], $request);
