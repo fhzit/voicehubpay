@@ -83,10 +83,45 @@ final class UserController extends Controller
         if ($user === null) {
             return $this->redirect('/admin/users')->withFlash('用户不存在。', 'error');
         }
+        // A deleted user is a terminal state — it cannot be revived to active.
+        if (($user['status'] ?? '') === 'deleted') {
+            return $this->redirect('/admin/users')->withFlash('已删除的用户不可被恢复。', 'error');
+        }
         $newStatus = $user['status'] === 'disabled' ? 'active' : 'disabled';
         $this->app->make('users')->setStatus($id, $newStatus);
         $this->audit($this->adminUserId(), 'user.status', 'user', (string) $id, ['to' => $newStatus, 'username' => $user['username']], $request);
         return $this->redirect('/admin/users')->withFlash('用户状态已更新。');
+    }
+
+    public function destroy(Request $request, array $params): Response
+    {
+        if ($redirect = $this->requireAdmin($request)) {
+            return $redirect;
+        }
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $users = $this->app->make('users');
+        $id = (int) ($params['id'] ?? 0);
+        $target = $users->findById($id);
+        if ($target === null) {
+            return $this->redirect('/admin/users')->withFlash('用户不存在。', 'error');
+        }
+        if ((int) $id === (int) $this->adminUserId()) {
+            return $this->redirect('/admin/users')->withFlash('不能删除当前登录的账号。', 'error');
+        }
+        if ($users->isSuperAdmin($id)) {
+            return $this->redirect('/admin/users')->withFlash('超级管理员不可被删除。', 'error');
+        }
+        // Delete is intentionally only allowed after an account has been
+        // disabled (or is already deleted) — an accidental deletion is less
+        // likely when the admin has already deliberately disabled the account.
+        if (!in_array($target['status'] ?? '', ['disabled', 'deleted'], true)) {
+            return $this->redirect('/admin/users')->withFlash('请先禁用该用户后再删除。', 'error');
+        }
+        $users->delete($id);
+        $this->audit($this->adminUserId(), 'user.delete', 'user', (string) $id, ['username' => $target['username']], $request);
+        return $this->redirect('/admin/users')->withFlash('用户「' . $target['username'] . '」已删除。');
     }
 
     public function setRole(Request $request, array $params): Response
@@ -108,8 +143,6 @@ final class UserController extends Controller
         $newRole = $request->string('role') === 'admin' ? 'admin' : 'user';
         $wasAdmin = in_array($target['role'] ?? 'user', ['admin', 'superadmin'], true);
         $isTargetSuper = $users->isSuperAdmin($id);
-
-        // Guard rails:
         // 1. Only the super admin may change another admin's role.
         // 2. The super admin itself can never be demoted (even by itself).
         if ($wasAdmin && !$isSuper) {

@@ -7,7 +7,7 @@ $map = [
     'delivery' => ['success' => ['green', '成功'], 'failed' => ['red', '失败'], 'processing' => ['blue', '处理中'], 'pending' => ['amber', '待处理'], 'not_required' => ['gray', '无需推送']],
     'voicehub' => ['success' => ['green', '成功'], 'failed' => ['red', '失败'], 'processing' => ['blue', '处理中'], 'pending' => ['amber', '待处理'], 'not_required' => ['gray', '—'], 'already_success' => ['green', '已成功']],
     'inventory' => ['available' => ['green', '可售'], 'reserved' => ['blue', '已占用'], 'sold' => ['gray', '已售'], 'disabled' => ['red', '停用']],
-    'user' => ['active' => ['green', '正常'], 'disabled' => ['red', '已禁用']],
+    'user' => ['active' => ['green', '正常'], 'disabled' => ['amber', '已禁用'], 'deleted' => ['red', '已删除']],
     'afdian' => ['paid' => ['green', '已支付'], 'unpaid' => ['amber', '未支付'], 'pending' => ['blue', '处理中'], 'failed' => ['red', '失败'], 'success' => ['green', '已发货']],
     'status' => ['active' => ['green', '上架'], 'draft' => ['gray', '草稿'], 'disabled' => ['red', '下架'], 'success' => ['green', '成功'], 'failed' => ['red', '失败']],
 ];

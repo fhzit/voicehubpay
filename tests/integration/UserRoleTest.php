@@ -59,5 +59,33 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertTrue($auth->isAdmin());
     $t->assertFalse($auth->isSuperAdmin(), 'admin2 is an admin but not super');
 
+    // --- delete(user) soft-deletes the account ---
+    // Seed a disposable user with a password + an OAuth binding.
+    $del = $users->create(['username' => 'delme', 'password' => 'pwX', 'display_name' => '要删除']);
+    $delId = (int) $del['id'];
+    $app->make('social')->bind($delId, 'qq', 'delme-qq-uid', 'QQ昵称');
+
+    // Login works while active.
+    $loginD = $auth->loginWithPassword('delme', 'pwX', $req);
+    $t->assertTrue($loginD['ok'], 'active user can log in');
+
+    // Must be disabled (or deleted) before delete is permitted, like the UI flow.
+    $users->setStatus($delId, 'disabled');
+
+    // Delete: soft-delete row + physically remove the OAuth binding.
+    $users->delete($delId);
+    $row = $users->findById($delId);
+    $t->assertFalse($row === null, 'row is soft-deleted, not physically removed');
+    $t->assertSame('deleted', $row['status'], 'status flips to deleted');
+    $t->assertSame('要删除', $row['display_name'], 'display_name preserved for traceability');
+    $t->assertSame('delme', $row['username'], 'username preserved for traceability');
+
+    // OAuth binding removed so the provider can never log back in.
+    $t->assertSame([], $app->make('social')->listForUser($delId), 'social identities physically deleted');
+
+    // Deleted user cannot log in (status !== active).
+    $loginX = $auth->loginWithPassword('delme', 'pwX', $req);
+    $t->assertFalse($loginX['ok'], 'deleted user cannot log in');
+
     return [];
 };

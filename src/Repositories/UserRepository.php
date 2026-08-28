@@ -143,6 +143,24 @@ final class UserRepository extends Repository
     }
 
     /**
+     * Permanently delete a user and its login bindings.
+     *
+     * The users row itself is soft-deleted to status 'deleted' rather than
+     * physically removed: historical orders, audit log entries and fulfilled
+     * card units keep referencing this id, so the row must survive for the
+     * LEFT JOINs and findById() lookups to stay traceable. The original
+     * username/display_name are preserved so order history still shows who
+     * the buyer was. login is already impossible because status !== 'active'.
+     * The user's social_identities (OAuth bindings) are physically deleted so
+     * the provider identity can never sign in as this account again.
+     */
+    public function delete(int $id): void
+    {
+        $this->update($id, ['status' => 'deleted', 'last_login_at' => null]);
+        $this->pdo()->prepare('DELETE FROM social_identities WHERE user_id = ?')->execute([$id]);
+    }
+
+    /**
      * The super admin is the admin with the lowest user id — i.e. the first
      * admin account ever created. Only that account may promote/demote other
      * admins, and it cannot itself be demoted.
