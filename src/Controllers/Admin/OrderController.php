@@ -402,6 +402,9 @@ final class OrderController extends Controller
         // Release + soft-cancel (never hard delete money-related rows).
         $this->app->make('inventory')->releaseForOrder((int) $order['id']);
         $this->app->make('orders')->update((int) $order['id'], ['order_status' => 'cancelled', 'cancelled_at' => gmdate('c')]);
+        // Mark this order's (unpaid/pending) payment transactions as cancelled so
+        // the payment ledger does not keep showing them as "待确认".
+        $this->app->make('payments')->markCancelledForOrder((int) $order['id']);
         $this->audit($this->adminUserId(), 'order.cancel', 'order', (string) $order['order_no'], ['reason' => $request->string('reason') ?: 'admin_cancel'], $request);
         return $this->redirect('/admin/orders')->withFlash('订单已取消并释放库存。');
     }

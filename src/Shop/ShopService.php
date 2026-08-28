@@ -209,6 +209,9 @@ final class ShopService
                 'order_status' => 'cancelled',
                 'cancelled_at' => gmdate('c'),
             ]);
+            // Mark this order's (unpaid/pending) payment transactions as cancelled
+            // so the payment ledger does not keep showing them as "待确认".
+            $this->app->make('payments')->markCancelledForOrder($orderId);
             $this->app->db->pdo()->commit();
         } catch (\Throwable $e) {
             if ($this->app->db->pdo()->inTransaction()) {

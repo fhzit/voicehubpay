@@ -92,5 +92,42 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $byName = $inv->listAll('数字', 1, 20);
     $t->assertSame(3, $byName['total'], 'listAll product-name substring still works');
 
+    // --- cancel marks pending payment transactions as cancelled ---
+    // A fresh order with 1 remaining available card (CC33) + a pending tx,
+    // then cancelUnpaidOrder must flip the tx status to 'cancelled'.
+    $payments = $app->make('payments');
+    $o3 = $shop->createOrder((int) $u['id'], (int) $product['id'], 1);
+    $payments->upsert([
+        'order_id' => (int) $o3['id'],
+        'gateway' => 'sg65',
+        'merchant_order_no' => (string) $o3['order_no'],
+        'amount_cents' => (int) $o3['amount_due_cents'],
+        'status' => 'pending',
+        'pay_type' => 'wxpay',
+        'pay_url' => 'https://example.test/pay',
+    ]);
+    $before = $payments->listForOrder((int) $o3['id']);
+    $t->assertSame('pending', $before[0]['status'], 'tx starts pending (待确认)');
+    $shop->cancelUnpaidOrder((int) $o3['id'], 'user_cancel');
+    $t->assertSame('cancelled', $app->make('orders')->findById((int) $o3['id'])['order_status'], 'order is cancelled');
+    $after = $payments->listForOrder((int) $o3['id']);
+    $t->assertSame(1, count($after), 'one tx row remains');
+    $t->assertSame('cancelled', $after[0]['status'], 'cancel flips pending tx to cancelled');
+
+    // markCancelledForOrder never downgrades a paid transaction
+    $payments->upsert([
+        'order_id' => (int) $paid['id'], // a paid order
+        'gateway' => 'sg65',
+        'merchant_order_no' => (string) $paid['order_no'] . '-RESET',
+        'amount_cents' => (int) $paid['amount_due_cents'],
+        'status' => 'paid',
+        'pay_type' => 'wxpay',
+    ]);
+    $payments->markCancelledForOrder((int) $paid['id']);
+    $paidTxs = $payments->listForOrder((int) $paid['id']);
+    foreach ($paidTxs as $pt) {
+        $t->assertSame('paid', $pt['status'], 'paid transactions are never downgraded to cancelled');
+    }
+
     return ['assertions' => $t->assertions()];
 };

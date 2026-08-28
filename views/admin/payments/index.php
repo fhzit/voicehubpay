@@ -12,7 +12,7 @@ $__pageTitle = '支付流水';
     </select>
     <select name="status" class="select">
       <option value="">全部状态</option>
-      <?php foreach (['unpaid' => '未支付', 'paid' => '已支付', 'pending' => '待确认'] as $sk => $sl): ?>
+      <?php foreach (['unpaid' => '未支付', 'paid' => '已支付', 'pending' => '待确认', 'cancelled' => '已取消'] as $sk => $sl): ?>
         <option value="<?= $sk ?>" <?= $status === $sk ? 'selected' : '' ?>><?= $sl ?></option>
       <?php endforeach; ?>
     </select>

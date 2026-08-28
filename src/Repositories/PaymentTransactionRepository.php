@@ -94,6 +94,19 @@ final class PaymentTransactionRepository extends Repository
         $stmt->execute(['paid', $gatewayTradeNo, $apiTradeNo, $confirmationSource, $now, $now, $id]);
     }
 
+    /**
+     * Mark an order's payment transactions as cancelled. Only touches
+     * transactions that are not already paid — a paid transaction is never
+     * downgraded — so safe to call on any cancel path.
+     */
+    public function markCancelledForOrder(int $orderId): int
+    {
+        $now = $this->now();
+        $stmt = $this->pdo()->prepare("UPDATE payment_transactions SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status <> 'paid'");
+        $stmt->execute([$now, $orderId]);
+        return $stmt->rowCount();
+    }
+
     public function listAdmin(string $payType = '', string $status = '', string $q = '', int $page = 1, int $perPage = 20): array
     {
         $where = [];
