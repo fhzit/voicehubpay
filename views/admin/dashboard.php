@@ -24,12 +24,12 @@ $chart = static function () use ($trends, $maxIncome): string {
     };
     // build
     $svg = '<svg class="line-chart" viewBox="0 0 ' . $W . ' ' . $H . '" role="img" aria-label="收入趋势折线图">';
-    // horizontal gridlines
+    // horizontal gridlines — Y-axis labels are shown in 元 (maxIncome is cents)
     for ($g = 0; $g <= 4; $g++) {
         $gy = $pt + $plotH * $g / 4;
-        $val = round($maxIncome * (4 - $g) / 4);
+        $valYuan = ($maxIncome * (4 - $g)) / 4 / 100;
         $svg .= '<line x1="' . $pl . '" y1="' . round($gy, 1) . '" x2="' . ($W - $pr) . '" y2="' . round($gy, 1) . '" class="lc-grid"/>';
-        $svg .= '<text x="' . ($pl + 2) . '" y="' . round($gy - 4, 1) . '" class="lc-axis-val">' . ($val > 0 ? $val : 0) . '</text>';
+        $svg .= '<text x="' . ($pl + 2) . '" y="' . round($gy - 4, 1) . '" class="lc-axis-val">' . ($valYuan > 0 ? number_format($valYuan, 2) : 0) . '</text>';
     }
     // area fills
     foreach (['shop', 'afdian'] as $key) {
@@ -41,22 +41,31 @@ $chart = static function () use ($trends, $maxIncome): string {
     foreach (['shop' => 'lc-line-shop', 'afdian' => 'lc-line-afdian'] as $key => $cls) {
         $svg .= '<polyline class="lc-line ' . $cls . '" points="' . implode(' ', $pts($key)) . '" fill="none"/>';
     }
-    // dots
+    // dots + hover hit areas (each data point gets an invisible large circle that
+    // drives a custom tooltip showing 时段 / 总额 / 商城 / 爱发电)
     foreach ($rows as $i => $r) {
         $xx = round($xAt($i), 1);
         $yyShop = round($yAt((int) $r['shop']), 1);
         $yyAf = round($yAt((int) $r['afdian']), 1);
-        $tip = \VoiceHubPay\Http\View::e($r['label']) . ' 商城 ¥' . \VoiceHubPay\Http\View::money((int) $r['shop']) . ' · 爱发电 ¥' . \VoiceHubPay\Http\View::money((int) $r['afdian']) . ' · 合计 ¥' . \VoiceHubPay\Http\View::money((int) $r['total']);
-        $dot = function (float $yy, string $cls) use ($xx, $tip): string {
-            return '<circle cx="' . round($xx, 1) . '" cy="' . round($yy, 1) . '" r="3" class="' . $cls . '"><title>' . $tip . '</title></circle>';
+        $vShop = (int) $r['shop']; $vAf = (int) $r['afdian'];
+        $vTotal = (int) $r['total'];
+        $tipHtml = '<span class="lc-key">' . \VoiceHubPay\Http\View::e($r['label']) . '</span>'
+            . '<span class="lc"><i class="lc-dot-mini" style="background:var(--chart-2);"></i>商城<span class="lc-val">¥' . \VoiceHubPay\Http\View::money($vShop) . '</span></span>'
+            . '<span class="lc"><i class="lc-dot-mini" style="background:var(--chart-5);"></i>爱发电<span class="lc-val">¥' . \VoiceHubPay\Http\View::money($vAf) . '</span></span>'
+            . '<span class="lc-sep"></span>'
+            . '<span class="lc"><b>总额</b><span class="lc-val lc-val-total">¥' . \VoiceHubPay\Http\View::money($vTotal) . '</span></span>';
+        $dot = function (float $yy, string $cls) use ($xx, $tipHtml): string {
+            // data-tip holds HTML that JS injects via innerHTML, so only the
+            // double-quote attribute delimiter must be encoded — do NOT Entity-encode
+            // the inner tags (View::e would turn them into visible text).
+            $attrSafe = str_replace('"', '&quot;', $tipHtml);
+            return '<circle cx="' . $xx . '" cy="' . round($yy, 1) . '" r="3" class="' . $cls . '"></circle>'
+                . '<circle cx="' . $xx . '" cy="' . round($yy, 1) . '" r="11" class="lc-hit" data-tip="' . $attrSafe . '"></circle>';
         };
-        // only draw dots where value > 0 to reduce clutter
-        if ((int) $r['shop'] > 0 || (int) $r['afdian'] > 0) {
-            $svg .= $dot($yyShop, 'lc-dot lc-dot-shop');
-            if ((int) $r['afdian'] > 0) {
-                $svg .= $dot($yyAf, 'lc-dot lc-dot-afdian');
-            }
-        }
+        // draw dots for every point in the range; the hit area always present
+        // so the user can hover each bucket even when its value is zero.
+        $svg .= $dot($yyShop, 'lc-dot lc-dot-shop');
+        $svg .= $dot($yyAf, 'lc-dot lc-dot-afdian');
     }
     // x labels (thin to <=8)
     $step = max(1, (int) ceil($n / 8));
@@ -161,7 +170,10 @@ $custom_to = $custom_to ?? '';
       <?php if ($trends['income'] === []): ?>
         <div class="muted small text-center" style="padding:40px 0;">所选范围内暂无收入数据</div>
       <?php elseif ($chartSvg !== ''): ?>
-        <div class="line-chart-wrap"><?= $chartSvg ?></div>
+        <div class="line-chart-wrap">
+          <?= $chartSvg ?>
+          <div class="lc-tooltip" id="lc-tooltip" hidden></div>
+        </div>
       <?php endif; ?>
     </div>
 
@@ -282,3 +294,39 @@ $custom_to = $custom_to ?? '';
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var wrap = document.querySelector('.line-chart-wrap');
+  if (!wrap) return;
+  var tip = document.getElementById('lc-tooltip');
+  var svgEl = wrap.querySelector('svg.line-chart');
+  if (!svgEl || !tip) return;
+
+  function show(circle) {
+    tip.innerHTML = circle.getAttribute('data-tip') || '';
+    tip.hidden = false;
+  }
+  function hide() { tip.hidden = true; }
+  function move(e) {
+    if (tip.hidden) return;
+    var rect = wrap.getBoundingClientRect();
+    var top = (e.clientY - rect.top) + 14;
+    var left = (e.clientX - rect.left) + 14;
+    var tW = tip.offsetWidth;
+    if (left + tW > rect.width) left = (e.clientX - rect.left) - tW - 14;
+    if (left < 4) left = 4;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
+  wrap.addEventListener('mouseover', function (e) {
+    var c = e.target.closest('.lc-hit');
+    if (c) show(c);
+  });
+  wrap.addEventListener('mouseout', function (e) {
+    if (!e.target.closest('.lc-hit')) hide();
+  });
+  wrap.addEventListener('mousemove', move);
+})();
+</script>

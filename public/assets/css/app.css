@@ -1017,7 +1017,7 @@ details.toggle summary { cursor: pointer; font-weight: 600; color: var(--foregro
 .bar-chart .bc-total { font-size: 11.5px; font-weight: 700; color: var(--foreground-secondary); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 /* Line chart (SVG) for revenue trend */
-.line-chart-wrap { width: 100%; overflow-x: auto; }
+.line-chart-wrap { width: 100%; overflow-x: auto; position: relative; }
 .line-chart { width: 100%; height: auto; min-width: 320px; display: block; }
 .lc-grid { stroke: var(--border); stroke-width: 1; }
 .lc-axis-val { font-size: 10px; fill: var(--chart-axis); }
@@ -1028,6 +1028,23 @@ details.toggle summary { cursor: pointer; font-weight: 600; color: var(--foregro
 .lc-fill-afdian { fill: var(--chart-5); opacity: .08; }
 .lc-dot-shop { fill: var(--chart-2); }
 .lc-dot-afdian { fill: var(--chart-5); }
+/* invisible hover hit area over each data point */
+.lc-hit { fill: transparent; pointer-events: all; cursor: pointer; }
+/* custom hover tooltip (absolute inside .line-chart-wrap) */
+.lc-tooltip {
+  position: absolute; z-index: 60; pointer-events: none;
+  min-width: 132px; padding: 9px 11px;
+  background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); font-size: 12px; line-height: 1.5;
+  display: flex; flex-direction: column; gap: 3px; color: var(--foreground-secondary);
+}
+.lc-tooltip .lc-key { font-weight: 700; color: var(--foreground); margin-bottom: 2px; }
+.lc-tooltip span.lc { display: flex; align-items: center; gap: 6px; }
+.lc-tooltip .lc-dot-mini { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.lc-tooltip .lc-val { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--foreground); }
+.lc-tooltip .lc-val-total { color: var(--chart-2); font-size: 13px; }
+.lc-tooltip .lc-sep { height: 1px; background: var(--border); margin: 2px 0; }
+.lc-tooltip[hidden] { display: none; }
 
 .chart-row-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .chart-row-item .cr-label { width: 72px; font-size: 12.5px; color: var(--muted-foreground); flex: none; }
