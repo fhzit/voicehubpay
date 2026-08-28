@@ -83,10 +83,6 @@ final class UserController extends Controller
         if ($user === null) {
             return $this->redirect('/admin/users')->withFlash('用户不存在。', 'error');
         }
-        // A deleted user is a terminal state — it cannot be revived to active.
-        if (($user['status'] ?? '') === 'deleted') {
-            return $this->redirect('/admin/users')->withFlash('已删除的用户不可被恢复。', 'error');
-        }
         $newStatus = $user['status'] === 'disabled' ? 'active' : 'disabled';
         $this->app->make('users')->setStatus($id, $newStatus);
         $this->audit($this->adminUserId(), 'user.status', 'user', (string) $id, ['to' => $newStatus, 'username' => $user['username']], $request);
@@ -114,9 +110,10 @@ final class UserController extends Controller
             return $this->redirect('/admin/users')->withFlash('超级管理员不可被删除。', 'error');
         }
         // Delete is intentionally only allowed after an account has been
-        // disabled (or is already deleted) — an accidental deletion is less
-        // likely when the admin has already deliberately disabled the account.
-        if (!in_array($target['status'] ?? '', ['disabled', 'deleted'], true)) {
+        // disabled — an accidental deletion is less likely when the admin has
+        // already deliberately disabled the account. Deletion is a physical
+        // DELETE; the account disappears from the user list entirely.
+        if (($target['status'] ?? '') !== 'disabled') {
             return $this->redirect('/admin/users')->withFlash('请先禁用该用户后再删除。', 'error');
         }
         $users->delete($id);

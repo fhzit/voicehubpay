@@ -8,7 +8,6 @@ $__pageTitle = '用户管理';
       <option value="">全部状态</option>
       <option value="active" <?= $status === 'active' ? 'selected' : '' ?>>正常</option>
       <option value="disabled" <?= $status === 'disabled' ? 'selected' : '' ?>>已禁用</option>
-      <option value="deleted" <?= $status === 'deleted' ? 'selected' : '' ?>>已删除</option>
     </select>
     <button class="btn btn-secondary">筛选</button>
   </form>
@@ -58,14 +57,14 @@ $__pageTitle = '用户管理';
                 </form>
               <?php endif; ?>
             <?php endif; ?>
-            <?php if (!$isSelf && $u['status'] !== 'deleted'): ?>
+            <?php if (!$isSelf): ?>
               <form method="post" action="/admin/users/<?= (int) $u['id'] ?>/status" data-confirm="确定<?= $u['status'] === 'active' ? '禁用' : '恢复' ?>用户「<?= \VoiceHubPay\Http\View::e($u['username']) ?>」？" style="display:inline;">
                 <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
                 <button class="btn btn-<?= $u['status'] === 'active' ? 'danger' : 'ghost' ?> btn-sm"><?= $u['status'] === 'active' ? '禁用' : '恢复' ?></button>
               </form>
             <?php endif; ?>
             <?php if ($u['status'] === 'disabled' && !$isSelf && !$isTargetSuper): ?>
-              <form method="post" action="/admin/users/<?= (int) $u['id'] ?>/delete" data-confirm="确定删除用户「<?= \VoiceHubPay\Http\View::e($u['username']) ?>」？此操作将移除其登录绑定，订单/卡券等记录保留但用户将被标记为已删除。" style="display:inline;">
+              <form method="post" action="/admin/users/<?= (int) $u['id'] ?>/delete" data-confirm="确定永久删除用户「<?= \VoiceHubPay\Http\View::e($u['username']) ?>」？该用户将从列表中彻底移除，其登录绑定一并删除，不可恢复。" style="display:inline;">
                 <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
                 <button class="btn btn-danger btn-sm">删除</button>
               </form>

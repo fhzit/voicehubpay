@@ -25,7 +25,7 @@ $isSelf = (int) ($user['id']) === (int) ($__user['id'] ?? 0);
       </form>
     <?php endif; ?>
   <?php endif; ?>
-  <?php if (!$isSelf && $user['status'] !== 'deleted'): ?>
+  <?php if (!$isSelf): ?>
     <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/status" data-confirm="确定<?= $user['status'] === 'active' ? '禁用' : '恢复' ?>该用户？">
       <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
       <button class="btn btn-<?= $user['status'] === 'active' ? 'danger' : 'ghost' ?> btn-sm"><?= $user['status'] === 'active' ? '禁用' : '恢复' ?></button>

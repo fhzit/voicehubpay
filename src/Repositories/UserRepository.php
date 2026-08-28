@@ -143,21 +143,19 @@ final class UserRepository extends Repository
     }
 
     /**
-     * Permanently delete a user and its login bindings.
+     * Permanently remove a user and its login bindings from the database.
      *
-     * The users row itself is soft-deleted to status 'deleted' rather than
-     * physically removed: historical orders, audit log entries and fulfilled
-     * card units keep referencing this id, so the row must survive for the
-     * LEFT JOINs and findById() lookups to stay traceable. The original
-     * username/display_name are preserved so order history still shows who
-     * the buyer was. login is already impossible because status !== 'active'.
-     * The user's social_identities (OAuth bindings) are physically deleted so
-     * the provider identity can never sign in as this account again.
+     * The users row and the user's social_identities (OAuth bindings) are
+     * physically DELETEd, so the account no longer appears anywhere (user
+     * list, auth, etc.). Historical orders keep their order_no and amounts;
+     * their user_id becomes a dangling reference that order views render as
+     * '—' (via LEFT JOIN / null-username handling). login is impossible
+     * because neither the row nor its bindings exist anymore.
      */
     public function delete(int $id): void
     {
-        $this->update($id, ['status' => 'deleted', 'last_login_at' => null]);
         $this->pdo()->prepare('DELETE FROM social_identities WHERE user_id = ?')->execute([$id]);
+        $this->pdo()->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
     }
 
     /**
