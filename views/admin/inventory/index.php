@@ -1,4 +1,4 @@
-<?php /** @var array $products @var ?int $product_id @var string $status @var array $stats @var array $cards @var int $total @var int $page @var int $pages @var \VoiceHubPay\App $__app */
+<?php /** @var array $products @var ?int $product_id @var string $status @var string $q @var array $stats @var array $cards @var int $total @var int $page @var int $pages @var \VoiceHubPay\App $__app */
 $__pageTitle = '库存卡密';
 ?>
 <div class="filters">
@@ -17,6 +17,7 @@ $__pageTitle = '库存卡密';
         <option value="<?= $sk ?>" <?= $status === $sk ? 'selected' : '' ?>><?= $sl ?></option>
       <?php endforeach; ?>
     </select>
+    <input type="text" name="q" class="input" style="max-width:240px;" value="<?= \VoiceHubPay\Http\View::e($q) ?>" placeholder="搜索卡密或商品名…">
     <button class="btn btn-secondary">筛选</button>
   </form>
   <a href="/admin/inventory/import?product=<?= (int) $product_id ?>" class="btn btn-primary">＋ 导入卡密</a>
@@ -62,7 +63,7 @@ $__pageTitle = '库存卡密';
 <?php if ($pages > 1): ?>
   <div class="pagination">
     <?php for ($i = 1; $i <= $pages; $i++): ?>
-      <?php if ($i === $page): ?><span class="current"><?= $i ?></span><?php else: ?><a href="/admin/inventory?product=<?= (int) $product_id ?>&status=<?= \VoiceHubPay\Http\View::e($status) ?>&page=<?= $i ?>"><?= $i ?></a><?php endif; ?>
+      <?php if ($i === $page): ?><span class="current"><?= $i ?></span><?php else: ?><a href="/admin/inventory?product=<?= (int) $product_id ?>&status=<?= \VoiceHubPay\Http\View::e($status) ?>&q=<?= \VoiceHubPay\Http\View::e(urlencode($q)) ?>&page=<?= $i ?>"><?= $i ?></a><?php endif; ?>
     <?php endfor; ?>
   </div>
 <?php endif; ?>

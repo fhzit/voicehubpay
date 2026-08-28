@@ -199,6 +199,12 @@ final class InventoryRepository extends Repository
             $where[] = 'status = ?';
             $params[] = $status;
         }
+        if ($q !== '') {
+            // Cards are stored encrypted (SHA-256 hash of the plaintext). Match
+            // by hash so a card value entered in search resolves its row.
+            $where[] = 'secret_hash = ?';
+            $params[] = hash('sha256', $q);
+        }
         $whereSql = 'WHERE ' . implode(' AND ', $where);
         $countStmt = $this->pdo()->prepare('SELECT COUNT(*) FROM inventory_cards ' . $whereSql);
         $countStmt->execute($params);
@@ -211,15 +217,18 @@ final class InventoryRepository extends Repository
     }
 
     /**
-     * Admin-wide inventory list with product names.
+     * Admin-wide inventory list with product names. The optional query matches
+     * either a product name (substring) or an exact card value (by SHA-256 hash).
      */
     public function listAll(string $q = '', int $page = 1, int $perPage = 20): array
     {
         $where = [];
         $params = [];
         if ($q !== '') {
-            $where[] = 'p.name LIKE ?';
+            $hash = hash('sha256', $q);
+            $where[] = '(p.name LIKE ? OR ic.secret_hash = ?)';
             $params[] = '%' . $q . '%';
+            $params[] = $hash;
         }
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
         $countStmt = $this->pdo()->prepare('SELECT COUNT(*) FROM inventory_cards ic JOIN products p ON p.id = ic.product_id ' . $whereSql);

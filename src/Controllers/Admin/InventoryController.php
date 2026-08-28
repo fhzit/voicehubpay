@@ -23,6 +23,7 @@ final class InventoryController extends Controller
         }
         $productId = $request->int('product', 0) ?: null;
         $status = $request->string('status');
+        $q = trim($request->string('q'));
         $page = max(1, $request->int('page', 1));
         $crypto = $this->app->crypto;
 
@@ -34,8 +35,8 @@ final class InventoryController extends Controller
         $inventory = $this->app->make('inventory');
         $stats = $productId !== null ? $inventory->stats($productId) : $inventory->totalStats();
         $result = $productId !== null
-            ? $inventory->listForProduct($productId, $status, '', $page, 20)
-            : $inventory->listAll('', $page, 20);
+            ? $inventory->listForProduct($productId, $status, $q, $page, 20)
+            : $inventory->listAll($q, $page, 20);
 
         foreach ($result['items'] as &$row) {
             $row['secret_masked'] = $row['secret_ciphertext'] !== '' ? $crypto->mask($crypto->decrypt($row['secret_ciphertext'])) : '';
@@ -45,6 +46,7 @@ final class InventoryController extends Controller
             'products' => $products,
             'product_id' => $productId,
             'status' => $status,
+            'q' => $q,
             'stats' => $stats,
             'cards' => $result['items'],
             'total' => $result['total'],

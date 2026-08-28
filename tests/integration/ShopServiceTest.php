@@ -74,5 +74,23 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $remaining = (int) $pdo->query('SELECT COUNT(*) FROM orders')->fetchColumn();
     $t->assertSame(2, $remaining, 'failed order leaves no rows');
 
+    // --- card search (by value via SHA-256 hash) ---
+    // exact card value resolves its row
+    $hit = $inv->listForProduct((int) $product['id'], '', 'CC33--SECRET3', 1, 20);
+    $t->assertSame(1, $hit['total'], 'search by exact card value finds the row');
+    $t->assertSame(1, count($hit['items']));
+    // hash comparison is unambiguous to the exact card
+    $miss = $inv->listForProduct((int) $product['id'], '', 'CC33--SECRET3x', 1, 20);
+    $t->assertSame(0, $miss['total'], 'near-miss card value does not match');
+    // already-sold card is still searchable by its value
+    $soldHit = $inv->listForProduct((int) $product['id'], '', 'AA11-SECRET-ONE', 1, 20);
+    $t->assertSame(1, $soldHit['total'], 'sold card still found by value');
+    // listAll: card value match (not only product-name substring)
+    $all = $inv->listAll('BB22/SECRET/TWO', 1, 20);
+    $t->assertSame(1, $all['total'], 'listAll matches by card value');
+    // listAll: product-name substring still works
+    $byName = $inv->listAll('数字', 1, 20);
+    $t->assertSame(3, $byName['total'], 'listAll product-name substring still works');
+
     return ['assertions' => $t->assertions()];
 };
