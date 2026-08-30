@@ -42,6 +42,16 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $js = file_get_contents($base . '/public/assets/js/app.js') ?: '';
     $t->assertContains("body.set('_csrf', csrf)", $js, 'AJAX POST test actions include CSRF');
     $t->assertContains("(cents / 100).toFixed(2)", $js, 'frontend money keeps two decimals');
+    // 复制卡密：必须拉取真实卡密（reveal API）而非复制页面上的掩码。
+    $t->assertContains('data-copy-unit', $js, 'copy-card handler reads data-copy-unit');
+    $t->assertContains("/api/cards/' + id + '/reveal", $js, 'copy-card handler calls the reveal API for the real code');
+    $t->assertContains('data-revealed', $js, 'copy-card handler detects when the real code is already shown');
+    $cards = file_get_contents($base . '/views/account/cards.php') ?: '';
+    $t->assertContains('data-copy-unit=', $cards, 'cards page copy buttons carry data-copy-unit (not masked copy)');
+    $t->assertFalse(str_contains($cards, 'data-copy-target'), 'cards page no longer copies the masked #code-box via target');
+    $detail = file_get_contents($base . '/views/account/order-detail.php') ?: '';
+    $t->assertContains('data-copy-unit=', $detail, 'order-detail copy buttons carry data-copy-unit');
+    $t->assertFalse(str_contains($detail, 'data-copy-target'), 'order-detail no longer copies the masked #code-box via target');
 
     foreach (glob($base . '/views/install/step-*.php') ?: [] as $view) {
         if (str_contains((string) file_get_contents($view), '<form method="post"')) {

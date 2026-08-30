@@ -75,7 +75,7 @@ $modeLabels = ['card' => '库存卡密', 'voicehub' => 'VoiceHub 发券', 'card_
                 </div>
                 <div class="flex">
                   <?php if ($u['unit']['delivery_code_ciphertext'] !== null): ?>
-                    <button class="btn btn-ghost btn-sm copy-btn" data-copy-target="#code-box-<?= (int) $u['unit']['id'] ?>" data-copy="__target">复制</button>
+                    <button class="btn btn-ghost btn-sm copy-btn" data-copy-unit="<?= (int) $u['unit']['id'] ?>">复制</button>
                     <button class="btn btn-primary btn-sm" data-reveal-unit="<?= (int) $u['unit']['id'] ?>">查看</button>
                   <?php endif; ?>
                 </div>

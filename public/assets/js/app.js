@@ -339,6 +339,39 @@
     updateTotal();
   });
 
+  /* 复制卡密：始终复制真实卡密（若已显示则复制页面内容，否则静默拉取真实卡密再复制） */
+  document.querySelectorAll('[data-copy-unit]').forEach(function (btn) {
+    var origHTML = btn.innerHTML;
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-copy-unit');
+      var box = document.getElementById('code-box-' + id);
+      // 若卡密已经在页面上展示（真实内容，非掩码），直接复制当前内容
+      var shown = box && box.getAttribute('data-revealed') === '1';
+      if (shown) {
+        copyText(box.textContent.trim(), function (ok) { toast(ok ? '已复制到剪贴板' : '复制失败', ok ? 'success' : 'error'); });
+        return;
+      }
+      // 尚未显示：调用解密接口获取真实卡密复制（不展示在页面上）
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>';
+      function restore() {
+        btn.disabled = false;
+        btn.innerHTML = origHTML;
+      }
+      postForm('/api/cards/' + id + '/reveal', {}).then(function (res) {
+        restore();
+        if (res.ok && res.data.ok) {
+          copyText(res.data.code, function (ok) { toast(ok ? '已复制到剪贴板' : '复制失败', ok ? 'success' : 'error'); });
+        } else {
+          toast((res.data && res.data.error) || '获取失败', 'error');
+        }
+      }).catch(function () {
+        restore();
+        toast('网络错误', 'error');
+      });
+    });
+  });
+
   /* ------------------------------------------------------------ 支付方式选择 */
   function selectPayMethod(el) {
     document.querySelectorAll('.pay-method').forEach(function (o) { o.classList.remove('active'); o.setAttribute('aria-checked', 'false'); });
@@ -367,7 +400,7 @@
       postForm('/api/cards/' + id + '/reveal', {}).then(function (res) {
         if (res.ok && res.data.ok) {
           var box = document.getElementById('code-box-' + id);
-          if (box) { box.textContent = res.data.code; }
+          if (box) { box.textContent = res.data.code; box.setAttribute('data-revealed', '1'); }
           var mask = document.getElementById('mask-' + id);
           if (mask) { mask.style.display = 'none'; }
           btn.remove();

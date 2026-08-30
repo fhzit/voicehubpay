@@ -38,6 +38,6 @@
       </div>
     </div>
   </div>
-  <script src="/assets/js/app.js?v=2" defer></script>
+  <script src="/assets/js/app.js?v=6" defer></script>
 </body>
 </html>

@@ -69,7 +69,7 @@ foreach ($cards as $c) {
                 <div class="ci-code" id="code-box-<?= (int) $c['id'] ?>"><?= \VoiceHubPay\Http\View::e($c['code_masked'] ?? '') ?></div>
               </div>
               <div class="flex" style="gap:8px;flex:none;">
-                <button class="btn btn-ghost btn-sm" data-copy-target="#code-box-<?= (int) $c['id'] ?>" data-copy="__target">
+                <button class="btn btn-ghost btn-sm" data-copy-unit="<?= (int) $c['id'] ?>">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                   复制
                 </button>
