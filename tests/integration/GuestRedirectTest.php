@@ -75,5 +75,14 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertContains('<?= $__stat ?>', $shopHead, 'stat code echoed raw (unescaped) so HTML/JS executes');
     $t->assertContains('</head>', $shopHead, 'stat code injected before </head>');
 
+    // 首页热门服务开关: admin can toggle it from the general settings page;
+    // the homepage renders the section only when it is enabled (default on),
+    // so when off there is no hot-product card and thus no direct buy link.
+    $t->assertContains('name="show_hot"', $gs, 'general settings form exposes the show-hot toggle');
+    $t->assertContains("'HOT_SERVICES_ENABLED' => ", $sc, 'saveGeneral persists the hot-services toggle');
+    $home = (string) file_get_contents($t->basePath . '/views/shop/home.php');
+    $t->assertContains("<?php if (\$showHot): ?>", $home, 'home view gates the hot-services section on $showHot');
+    $t->assertContains('HOT_SERVICES_ENABLED', (string) file_get_contents($t->basePath . '/src/Controllers/HomeController.php'), 'HomeController reads the hot-services setting');
+
     return ['assertions' => $t->assertions()];
 };

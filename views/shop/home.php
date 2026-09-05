@@ -1,4 +1,4 @@
-<?php /** @var array $hot @var array $__site @var ?array $__user @var \VoiceHubPay\App $__app */
+<?php /** @var array $hot @var bool $showHot @var array $__site @var ?array $__user @var \VoiceHubPay\App $__app */
 $GLOBALS['__nav'] = 'home';
 ?>
 <section class="hero">
@@ -49,6 +49,7 @@ $GLOBALS['__nav'] = 'home';
 </section>
 
 <div class="container" style="margin-top:8px;">
+  <?php if ($showHot): ?>
   <div class="section-head">
     <h2>热门服务</h2>
     <a href="/products" class="btn btn-ghost btn-sm">查看全部</a>
@@ -68,6 +69,7 @@ $GLOBALS['__nav'] = 'home';
         <?= $__app->view->partial('partials/product-card', ['p' => $p]) ?>
       <?php endforeach; ?>
     </div>
+  <?php endif; ?>
   <?php endif; ?>
 
   <div class="feature-grid">

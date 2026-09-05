@@ -71,6 +71,7 @@ final class SettingsController extends Controller
             'AUTH_REDIRECT_URL' => $authRedirectUrl,
             'ICP_BEIAN_NO' => trim($request->string('icp_beian_no')),
             'SITE_STAT_CODE' => trim($request->string('site_stat_code')),
+            'HOT_SERVICES_ENABLED' => $request->int('show_hot', 0) === 1 ? '1' : '0',
         ]);
         $this->app->config->reloadSettings();
         $this->audit($this->adminUserId(), 'settings.general', 'settings', 'general', ['site' => $siteName], $request);

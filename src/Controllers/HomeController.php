@@ -13,7 +13,11 @@ final class HomeController extends Controller
     public function index(Request $request): Response
     {
         $products = $this->app->make('products');
-        $hot = $products->listHot(8);
-        return $this->render('shop/home', ['hot' => $hot], 'shop');
+        $hot = [];
+        $showHot = $this->app->config->get('HOT_SERVICES_ENABLED', '1') === '1';
+        if ($showHot) {
+            $hot = $products->listHot(8);
+        }
+        return $this->render('shop/home', ['hot' => $hot, 'showHot' => $showHot], 'shop');
     }
 }

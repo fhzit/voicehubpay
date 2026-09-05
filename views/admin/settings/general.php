@@ -36,6 +36,13 @@ $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
       <textarea class="input" name="site_stat_code" rows="5" style="font-family:var(--font-mono);font-size:13px;" placeholder="&lt;script async src=&#39;https://…/analytics.js&#39;&gt;&lt;/script&gt;"><?= \VoiceHubPay\Http\View::e($get('SITE_STAT_CODE')) ?></textarea>
       <div class="hint">任意 HTML / JS 统计代码片段，原样插入到所有前台页面的 &lt;head&gt; 中；留空则不加载</div>
     </div>
+    <div class="field">
+      <label class="label">首页热门服务</label>
+      <div class="checkbox-row" style="margin-top:8px;">
+        <input type="checkbox" name="show_hot" id="show_hot" value="1" <?= $get('HOT_SERVICES_ENABLED', '1') === '1' ? 'checked' : '' ?>>
+        <label for="show_hot" class="small muted">在前台首页展示「热门服务」区块（关闭后首页不再展示，也不可直接跳转获取服务）</label>
+      </div>
+    </div>
     <div class="form-grid">
       <div class="field">
         <label class="label">时区</label>
