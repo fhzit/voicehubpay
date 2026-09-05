@@ -220,6 +220,7 @@ final class FulfillmentService
         if ($order === null || $order['payment_status'] !== 'paid') {
             return ['processed' => 0, 'success' => 0, 'failed' => 0, 'skipped' => 0];
         }
+        $beforeStatus = (string) ($order['fulfillment_status'] ?? '');
         $units = $this->orders->units($orderId);
         $processed = 0;
         $success = 0;
@@ -247,7 +248,47 @@ final class FulfillmentService
             }
         }
         $this->orders->recalcFulfillmentStatus($orderId);
+        // Notify the buyer once when the whole order flips to fully fulfilled.
+        try {
+            $afterOrder = $this->orders->findById($orderId);
+            if ($afterOrder !== null && $afterOrder['fulfillment_status'] === 'success' && $beforeStatus !== 'success') {
+                $this->notifyOrderFulfilled($afterOrder);
+            }
+        } catch (\Throwable $e) {
+            error_log('[mail fulfilled] ' . $e->getMessage());
+        }
         return ['processed' => $processed, 'success' => $success, 'failed' => $failed, 'skipped' => $skipped];
+    }
+
+    private function notifyOrderFulfilled(array $order): void
+    {
+        $app = $this->app;
+        $userId = (int) ($order['user_id'] ?? 0);
+        if ($userId <= 0) {
+            return;
+        }
+        $user = $app->make('users')->findById($userId);
+        if ($user === null) {
+            return;
+        }
+        $to = (string) ($user['email'] ?? '');
+        if ($to === '') {
+            return;
+        }
+        $itemName = '';
+        try {
+            $stmt = $this->db()->prepare('SELECT product_name_snapshot FROM order_items WHERE order_id = ? ORDER BY id ASC LIMIT 1');
+            $stmt->execute([(int) $order['id']]);
+            $row = $stmt->fetch();
+            $itemName = $row !== false ? (string) ($row['product_name_snapshot'] ?? '') : '';
+        } catch (\Throwable) {
+        }
+        $app->make('mailer')->orderFulfilled((string) $order['order_no'], $itemName, $to);
+    }
+
+    private function db(): \PDO
+    {
+        return $this->app->db->pdo();
     }
 
     /**

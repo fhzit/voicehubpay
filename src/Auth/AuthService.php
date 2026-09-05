@@ -146,7 +146,7 @@ final class AuthService
     /**
      * Register a new user. Returns ['ok' => bool, 'error' => string, 'user' => ?array].
      */
-    public function register(string $username, string $password, string $confirm, string $displayName = '', bool $accepted = false): array
+    public function register(string $username, string $password, string $confirm, string $displayName = '', bool $accepted = false, string $email = ''): array
     {
         if (!$this->app->config->bool('REGISTRATION_ENABLED', true)) {
             return ['ok' => false, 'error' => '当前未开放注册。', 'user' => null];
@@ -168,11 +168,33 @@ final class AuthService
         if ($this->users->findByUsername($username) !== null) {
             return ['ok' => false, 'error' => '该用户名已被占用。', 'user' => null];
         }
+        $email = trim($email);
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => '邮箱格式不正确。', 'user' => null];
+        }
         $user = $this->users->create([
             'username' => $username,
             'password' => $password,
             'display_name' => $displayName !== '' ? $displayName : $username,
+            'email' => $email,
         ]);
+        return ['ok' => true, 'error' => '', 'user' => $user];
+    }
+
+    /**
+     * Update the email address on a user account. Empty string clears it.
+     */
+    public function updateEmail(int $userId, string $email): array
+    {
+        $email = trim($email);
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => '邮箱格式不正确。', 'user' => null];
+        }
+        if (mb_strlen($email) > 254) {
+            return ['ok' => false, 'error' => '邮箱长度不能超过 254 个字符。', 'user' => null];
+        }
+        $this->users->update($userId, ['email' => $email]);
+        $user = $this->users->findById($userId);
         return ['ok' => true, 'error' => '', 'user' => $user];
     }
 
@@ -293,7 +315,7 @@ final class AuthService
      * defaults to the social nickname when empty; validation mirrors the
      * password-register rules. Returns user on success.
      */
-    public function completeSocialSignup(array $profile, string $username, string $password, string $confirm): array
+    public function completeSocialSignup(array $profile, string $username, string $password, string $confirm, string $email = ''): array
     {
         $provider = in_array((string) ($profile['provider'] ?? ''), ['qq', 'wx'], true)
             ? (string) $profile['provider'] : 'qq';
@@ -353,12 +375,17 @@ final class AuthService
         if ($password !== $confirm) {
             return ['ok' => false, 'error' => '两次输入的密码不一致。', 'user' => null];
         }
+        $email = trim($email);
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => '邮箱格式不正确。', 'user' => null];
+        }
 
         $user = $this->users->create([
             'username' => $username,
             'password' => $password,
             'display_name' => $nickname !== '' ? $nickname : $username,
             'avatar_url' => (string) ($profile['avatar_url'] ?? ''),
+            'email' => $email,
         ]);
         $this->social->bind((int) $user['id'], $provider, $socialUid, $nickname, (string) ($profile['avatar_url'] ?? ''));
         return ['ok' => true, 'error' => '', 'user' => $user];

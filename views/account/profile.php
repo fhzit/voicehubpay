@@ -23,6 +23,11 @@
     <input class="input" type="text" id="display_name" name="display_name" value="<?= \VoiceHubPay\Http\View::e($__user['display_name'] ?: $__user['username']) ?>" maxlength="50">
     <div class="hint">昵称会展示在网页顶部与各处，最长 50 个字符</div>
   </div>
+  <div class="field">
+    <label class="label" for="email">邮箱（可选，用于接收支付/发货通知）</label>
+    <input class="input" type="email" id="email" name="email" value="<?= \VoiceHubPay\Http\View::e($__user['email'] ?? '') ?>" maxlength="254" autocomplete="email">
+    <div class="hint">支付成功、权益已发放等通知会发送到该邮箱；留空则不发送买家邮件</div>
+  </div>
   <div class="sec-actions" style="margin-top:6px;"><button class="btn btn-primary">保存</button></div>
 </form>
 

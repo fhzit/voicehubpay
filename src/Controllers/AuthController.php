@@ -70,6 +70,7 @@ final class AuthController extends Controller
             $request->string('password_confirm'),
             $request->string('display_name'),
             (bool) $request->int('agreed', 0),
+            $request->string('email'),
         );
         if (!$result['ok']) {
             return $this->redirect('/register')->withFlash($result['error'], 'error');
@@ -112,6 +113,7 @@ final class AuthController extends Controller
             $request->string('username'),
             $request->string('password'),
             $request->string('password_confirm'),
+            $request->string('email'),
         );
         if (!$result['ok']) {
             // Keep the pending profile so the user can retry without re-auth.

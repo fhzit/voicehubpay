@@ -106,15 +106,18 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertSame('2026-08-31T18:30:00+00:00', $norm['paid_at'], 'paid webhook gets paid_at from create_time');
 
     // listAdmin sorts newest purchase time first (created_at DESC, id DESC).
-    // Create a newer order and assert it appears before the older one.
+    // Create a newer order (created_at in the near future relative to real
+    // "now", so it always sorts above orders that defaulted to now()) and
+    // assert it appears before the older one.
+    $future = gmdate('Y-m-d\TH:i:s\Z', time() + 3600); // +1h, clearly newest
     $proc->processNormalizedOrder([
         'out_trade_no' => 'AFD20260831LATEST',
         'user_id' => 'newuser1',
         'buyer_name' => '新买家',
         'amount_cents' => 200,
         'status' => 'paid',
-        'created_at' => '2026-08-31T19:00:00+00:00',
-        'paid_at' => '2026-08-31T19:00:00+00:00',
+        'created_at' => $future,
+        'paid_at' => $future,
     ]);
     $list = $app->make('afdianOrders')->listAdmin('', '', '', 1, 20)['items'];
     $t->assertSame('AFD20260831LATEST', $list[0]['out_trade_no'], 'newest purchase time appears first');

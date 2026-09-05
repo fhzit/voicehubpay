@@ -227,6 +227,9 @@ $router->post('/admin/settings/afdian', fn ($r) => (new SettingsController($app)
 $router->post('/admin/settings/afdian/test', fn ($r) => (new SettingsController($app))->testAfdian($r));
 $router->get('/admin/settings/security', fn ($r) => (new SettingsController($app))->security($r));
 $router->post('/admin/settings/security', fn ($r) => (new SettingsController($app))->saveSecurity($r));
+$router->get('/admin/settings/smtp', fn ($r) => (new SettingsController($app))->smtp($r));
+$router->post('/admin/settings/smtp', fn ($r) => (new SettingsController($app))->saveSmtp($r));
+$router->post('/admin/settings/smtp/test', fn ($r) => (new SettingsController($app))->testSmtp($r));
 
 $router->get('/admin/audit', fn ($r) => (new AuditController($app))->index($r));
 $router->get('/admin/system/database', fn ($r) => (new SystemController($app))->database($r));

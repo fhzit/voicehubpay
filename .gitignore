@@ -9,3 +9,7 @@
 .DS_Store
 
 skills/
+
+# local php test runtime (untracked, built on demand)
+.review-php/
+.review-debs/

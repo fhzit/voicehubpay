@@ -72,6 +72,7 @@ final class App
             'voicehub' => new \VoiceHubPay\Integrations\VoiceHubApiClient($this),
             'afdianProcessor' => new \VoiceHubPay\Integrations\AfdianOrderProcessor($this),
             'dashboard' => new \VoiceHubPay\Analytics\DashboardService($this),
+            'mailer' => new \VoiceHubPay\Support\Mailer($this->config),
             'controllers.error' => new \VoiceHubPay\Controllers\ErrorController($this),
             default => throw new \RuntimeException('Unknown service: ' . $name),
         };

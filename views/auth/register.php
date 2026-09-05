@@ -31,6 +31,10 @@
   <?php endif; ?>
   <form method="post" action="/auth/password/register" id="reg-form">
     <input type="hidden" name="_csrf" value="<?= \VoiceHubPay\Security\Csrf::token() ?>">
+    <div class="field">
+      <label class="label" for="reg-email">邮箱（可选，用于接收支付/发货通知）</label>
+      <input class="input" type="email" id="reg-email" name="email" maxlength="254" autocomplete="email">
+    </div>
     <div class="form-grid">
       <div class="field">
         <label class="label" for="username">用户名</label>

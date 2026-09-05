@@ -77,6 +77,102 @@ final class SettingsController extends Controller
         return $this->redirect('/admin/settings/general')->withFlash('基础设置已保存。');
     }
 
+    // ---------------------------------------------------------------- smtp
+
+    public function smtp(Request $request): Response
+    {
+        if ($redirect = $this->requireAdmin($request)) {
+            return $redirect;
+        }
+        $config = $this->app->config;
+        $secretStore = $config->secretStore();
+        $password = (string) $secretStore->get('SMTP_PASSWORD');
+        return $this->render('admin/settings/smtp', [
+            'settings' => $config->settings()->all(),
+            'password_placeholder' => $password !== '' ? '已配置，留空表示不修改。' : '',
+        ], 'admin');
+    }
+
+    public function saveSmtp(Request $request): Response
+    {
+        if ($redirect = $this->requireAdmin($request)) {
+            return $redirect;
+        }
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $host = trim($request->string('smtp_host'));
+        $port = max(1, $request->int('smtp_port', 587));
+        $from = trim($request->string('smtp_from'));
+        // host must be present whenever SMTP is enabled
+        $enabled = $request->int('smtp_enabled', 0) === 1;
+        if ($enabled && ($host === '' || $from === '')) {
+            return $this->redirect('/admin/settings/smtp')->withFlash('启用 SMTP 时，服务器和发件人邮箱不能为空。', 'error');
+        }
+        if (!filter_var($from, FILTER_VALIDATE_EMAIL)) {
+            return $this->redirect('/admin/settings/smtp')->withFlash('发件人邮箱格式不正确。', 'error');
+        }
+        $notify = trim($request->string('notify_email'));
+        if ($notify !== '' && !filter_var($notify, FILTER_VALIDATE_EMAIL)) {
+            return $this->redirect('/admin/settings/smtp')->withFlash('管理员通知邮箱格式不正确。', 'error');
+        }
+        $this->app->config->settings()->setMany([
+            'SMTP_ENABLED' => $enabled ? '1' : '0',
+            'SMTP_HOST' => $host,
+            'SMTP_PORT' => (string) $port,
+            'SMTP_ENCRYPTION' => trim($request->string('smtp_encryption')),
+            'SMTP_USERNAME' => trim($request->string('smtp_username')),
+            'SMTP_FROM' => $from,
+            'SMTP_FROM_NAME' => trim($request->string('smtp_from_name')),
+            'NOTIFY_EMAIL' => $notify,
+        ]);
+        $password = $request->string('smtp_password');
+        if ($password !== '' && $password !== '••••') {
+            $this->app->config->secretStore()->set('SMTP_PASSWORD', $password);
+        }
+        $this->app->config->reloadSettings();
+        $this->audit($this->adminUserId(), 'settings.smtp', 'settings', 'smtp', [], $request);
+        return $this->redirect('/admin/settings/smtp')->withFlash('邮件设置已保存。');
+    }
+
+    public function testSmtp(Request $request): Response
+    {
+        if ($redirect = $this->requireAdmin($request)) {
+            return $redirect;
+        }
+        if ($redirect = $this->requireCsrf($request)) {
+            return $redirect;
+        }
+        $config = $this->app->config;
+        // If the form just changed values, read the submitted ones so the test
+        // reflects what the admin intends, without requiring a save first.
+        $host = trim($request->string('smtp_host')) ?: (string) $config->get('SMTP_HOST', '');
+        $port = $request->int('smtp_port', 0) ?: (int) $config->get('SMTP_PORT', '587');
+        $target = trim($request->string('notify_email')) ?: (string) $config->get('NOTIFY_EMAIL', '');
+        if ($host === '' || $target === '') {
+            return $this->json(['ok' => false, 'error' => '请先填写 SMTP 服务器与收件邮箱。'], 400);
+        }
+        $client = new \VoiceHubPay\Support\SmtpMailer([
+            'host' => $host,
+            'port' => $port,
+            'encryption' => trim($request->string('smtp_encryption')) ?: (string) $config->get('SMTP_ENCRYPTION', 'tls'),
+            'username' => trim($request->string('smtp_username')) ?: (string) $config->get('SMTP_USERNAME', ''),
+            'password' => $request->string('smtp_password') !== '' ? $request->string('smtp_password') : (string) $config->secret('SMTP_PASSWORD', ''),
+            'from' => trim($request->string('smtp_from')) ?: (string) $config->get('SMTP_FROM', ''),
+            'from_name' => trim($request->string('smtp_from_name')) ?: (string) $config->get('SMTP_FROM_NAME', $config->get('SITE_NAME', '')),
+        ]);
+        $subject = '【' . (string) $config->get('SITE_NAME', '') . '】SMTP 测试邮件';
+        $html = '<p>这是一封测试邮件，用于确认 <code>' . \VoiceHubPay\Support\Mailer::esc($host) . '</code> SMTP 配置无误。</p><p>如果你收到此邮件，说明配置成功。</p>';
+        try {
+            $client->send($target, $subject, $html);
+            $this->audit($this->adminUserId(), 'settings.smtp_test', 'settings', 'smtp', ['target' => $target], $request);
+            return $this->json(['ok' => true, 'note' => '测试邮件已发送至 ' . $target]);
+        } catch (\Throwable $e) {
+            $this->audit($this->adminUserId(), 'settings.smtp_test', 'settings', 'smtp', ['error' => substr($e->getMessage(), 0, 200)], $request);
+            return $this->json(['ok' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     // -------------------------------------------------------------- payment
 
     public function payment(Request $request): Response

@@ -166,6 +166,13 @@ final class PaymentService
             return;
         }
         $this->orders->markPaid((int) $order['id'], (int) $order['amount_due_cents'], $gateway, $confirmationSource);
+        // Notifications are best-effort and must never break the payment path.
+        // Sent before fulfillment so the buyer gets "paid" then "fulfilled".
+        try {
+            $this->notifyOrderPaid($order);
+        } catch (\Throwable $e) {
+            error_log('[mail paid] ' . $e->getMessage());
+        }
         try {
             $this->fulfillment->preparePaidOrder((int) $order['id']);
         } catch (\Throwable $e) {
@@ -177,6 +184,46 @@ final class PaymentService
         } catch (\Throwable $e) {
             error_log('[fulfillment quick] ' . $e->getMessage());
         }
+    }
+
+    private function notifyOrderPaid(array $order): void
+    {
+        $app = $this->app;
+        $orderNo = (string) $order['order_no'];
+        $amountYuan = \VoiceHubPay\Support\Money::format((int) ($order['amount_due_cents'] ?? 0));
+        $itemName = $this->firstItemName((int) $order['id']);
+
+        // Admin alert for every paid order.
+        $buyer = '';
+        $userId = (int) ($order['user_id'] ?? 0);
+        if ($userId > 0) {
+            $user = $app->make('users')->findById($userId);
+            $buyer = $user !== null ? ((string) ($user['display_name'] ?: $user['username'] ?: '')) : '';
+            $to = (string) ($user['email'] ?? '');
+            if ($to !== '') {
+                $app->make('mailer')->orderPaid($orderNo, $itemName, $amountYuan, $to);
+            }
+        }
+        $app->make('mailer')->adminOrderReceived($orderNo, $amountYuan, $buyer !== '' ? $buyer : '游客');
+    }
+
+    private function firstItemName(int $orderId): string
+    {
+        try {
+            $stmt = $this->db()->prepare(
+                'SELECT product_name_snapshot FROM order_items WHERE order_id = ? ORDER BY id ASC LIMIT 1'
+            );
+            $stmt->execute([$orderId]);
+            $row = $stmt->fetch();
+            return $row !== false ? (string) ($row['product_name_snapshot'] ?? '') : '';
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    private function db(): \PDO
+    {
+        return $this->app->db->pdo();
     }
 
     /**

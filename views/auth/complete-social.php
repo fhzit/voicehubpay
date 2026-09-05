@@ -20,6 +20,10 @@
     <div class="hint">已默认填入您的<?= $provider === 'wx' ? '微信' : 'QQ' ?>昵称，可修改。3-32 位字母、数字、下划线、短横线或中文。</div>
   </div>
   <div class="field">
+    <label class="label" for="cs-email">邮箱（可选，用于接收支付/发货通知）</label>
+    <input class="input" type="email" id="cs-email" name="email" maxlength="254" autocomplete="email">
+  </div>
+  <div class="field">
     <label class="label" for="cs-password">密码</label>
     <input class="input" type="password" id="cs-password" name="password" required minlength="8" autocomplete="new-password">
     <div class="pw-checklist" id="cs-checklist">

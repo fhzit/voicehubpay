@@ -200,6 +200,14 @@ final class AccountController extends Controller
                 return $this->redirect('/account/profile')->withFlash($result['error'], 'error');
             }
         }
+        // Email is optional to keep; empty clears it.
+        $email = $request->string('email');
+        if ($email !== (string) ($user['email'] ?? '')) {
+            $result = $this->auth->updateEmail((int) $user['id'], $email);
+            if (!$result['ok']) {
+                return $this->redirect('/account/profile')->withFlash($result['error'], 'error');
+            }
+        }
         $this->audit((int) $user['id'], 'profile.update', 'user', (string) $user['id'], [], $request);
         return $this->redirect('/account/profile')->withFlash('账号信息已更新。');
     }
