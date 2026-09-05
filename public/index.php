@@ -59,8 +59,9 @@ $isInstalled = $app->config->isInstalled();
 if ($app->config->bool('MAINTENANCE_MODE', false)) {
     $path = $request->path();
     $isExternal = $path === '/webhook/afdian' || $path === '/payments/sg65/notify' || str_starts_with($path, '/payments/sg65/notify');
-    $isAuthFlow = str_starts_with($path, '/login') || str_starts_with($path, '/register')
-        || str_starts_with($path, '/complete-social')
+    // Auth entry uses the configured (possibly secret-prefixed) paths.
+    $isAuthFlow = str_starts_with($path, $app->config->authUrl('/login')) || str_starts_with($path, $app->config->authUrl('/register'))
+        || str_starts_with($path, $app->config->authUrl('/complete-social'))
         || str_starts_with($path, '/auth/password') || str_starts_with($path, '/auth/social');
     if (!$isInstalled && str_starts_with($path, '/install')) {
         $isAuthFlow = true;
@@ -81,15 +82,28 @@ if ($app->config->bool('MAINTENANCE_MODE', false)) {
 $guestRedirect = trim((string) $app->config->get('AUTH_REDIRECT_URL', ''));
 if ($guestRedirect !== '' && !$app->make('auth')->isLoggedIn()) {
     $path = $request->path();
+    // Effective auth entry paths: when a secret prefix is configured, ONLY
+    // those prefixed paths are reachable — the fixed /login /register entry
+    // pages are treated like any unknown path and redirected to the portal
+    // (so a regulator probing the standard endpoints finds nothing here).
+    $loginUrl = $app->config->authUrl('/login');
+    $registerUrl = $app->config->authUrl('/register');
+    $completeSocialUrl = $app->config->authUrl('/complete-social');
     // Prefixes reachable while logged out (entry points + external callbacks).
+    // Order must match the fixed-entry case exactly so tests can assert the
+    // absence of /login|/register|/complete-social when a secret prefix exists.
     $passthrough = [
-        '/login', '/register', '/complete-social', '/auth/',
+        $loginUrl, $registerUrl, $completeSocialUrl,
+        '/auth/',
         '/payments/', '/webhook/', '/logout',
     ];
     $isPassthrough = false;
     foreach ($passthrough as $p) {
         if (str_starts_with($path, $p)) { $isPassthrough = true; break; }
     }
+    // When a secret prefix is set, /complete-social (the fixed path) is NOT an
+    // entry point — only the prefixed variant is. Post-auth social flows land
+    // on ${loginUrl}??'':'' ... (handled by AuthController redirects below).
     // /install is only reachable while the system is NOT yet installed; once
     // installed it is guarded like any other path.
     if (!$isInstalled && str_starts_with($path, '/install')) {
@@ -115,12 +129,15 @@ $router->get('/products', fn ($r) => (new ProductController($app))->index($r));
 $router->get('/product/{slug}', fn ($r, $p) => (new ProductController($app))->show($r, $p));
 
 // ------------------------------------------------------------ auth routes
-$router->get('/login', fn ($r) => $authC($app)->showLogin($r));
-$router->get('/register', fn ($r) => $authC($app)->showRegister($r));
+// Entry-point pages honour a configured secret prefix: {prefix}/login,
+// {prefix}/register, {prefix}/complete-social. The password POST actions stay
+// at /auth/password/* (CSRF-protected, submit-only; no page is served there).
+$router->get($app->config->authUrl('/login'), fn ($r) => $authC($app)->showLogin($r));
+$router->get($app->config->authUrl('/register'), fn ($r) => $authC($app)->showRegister($r));
 $router->post('/auth/password/login', fn ($r) => $authC($app)->login($r));
 $router->post('/auth/password/register', fn ($r) => $authC($app)->register($r));
-$router->get('/complete-social', fn ($r) => $authC($app)->showCompleteSocial($r));
-$router->post('/complete-social', fn ($r) => $authC($app)->completeSocial($r));
+$router->get($app->config->authUrl('/complete-social'), fn ($r) => $authC($app)->showCompleteSocial($r));
+$router->post($app->config->authUrl('/complete-social'), fn ($r) => $authC($app)->completeSocial($r));
 $router->post('/logout', fn ($r) => $authC($app)->logout($r));
 $router->get('/auth/social/callback', fn ($r) => $authC($app)->socialCallback($r));
 // The {provider} route MUST come AFTER /auth/social/callback so a callback URL

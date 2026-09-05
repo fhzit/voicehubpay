@@ -11,7 +11,7 @@ $GLOBALS['__nav'] = 'home';
         <?php if ($__user !== null): ?>
           <a href="/account/cards" class="btn btn-outline btn-lg">我的凭证</a>
         <?php else: ?>
-          <a href="/register" class="btn btn-outline btn-lg">免费注册</a>
+          <a href="<?= \VoiceHubPay\Http\View::e($__site['auth_register']) ?>" class="btn btn-outline btn-lg">免费注册</a>
         <?php endif; ?>
       </div>
       <div class="flex" style="gap:20px;margin-top:26px;flex-wrap:wrap;">

@@ -20,7 +20,12 @@ $get = static fn (string $k, string $d = '') => (string) ($settings[$k] ?? $d);
     <div class="field">
       <label class="label">访客重定向地址（可选）</label>
       <input class="input" type="text" name="auth_redirect_url" value="<?= \VoiceHubPay\Http\View::e($get('AUTH_REDIRECT_URL')) ?>" placeholder="https://example.com">
-      <div class="hint">设置后，未登录访客访问本站任意页面（除 /login、/register 与回调外）将 302 跳转到该地址，用于淡化本站的商业属性；留空则关闭此功能</div>
+      <div class="hint">设置后，未登录访客访问本站任意页面（除登录/注册入口与回调外）将 302 跳转到该地址，用于淡化本站的商业属性；留空则关闭此功能</div>
+    </div>
+    <div class="field">
+      <label class="label">登录/注册访问安全路径（可选）</label>
+      <input class="input" type="text" name="auth_secret_prefix" maxlength="64" value="<?= \VoiceHubPay\Http\View::e($get('AUTH_SECRET_PREFIX')) ?>" placeholder="如：/g/82Kf">
+      <div class="hint">填写后，登录/注册入口迁移到该前缀下（如 /g/82Kf/login、/g/82Kf/register），固定的 /login、/register 不再作为入口、未登录访问将按访客重定向处理，避免被按固定路径探测到本服务。留空则使用标准 /login /register</div>
     </div>
     <div class="field">
       <label class="label">Logo URL（可选）</label>

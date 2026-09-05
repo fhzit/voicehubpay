@@ -79,7 +79,7 @@ final class AuthService
         if ($this->isLoggedIn()) {
             return null;
         }
-        return Response::redirect('/login?redirect=' . urlencode($request->path()));
+        return Response::redirect($this->app->config->authUrl('/login') . '?redirect=' . urlencode($request->path()));
     }
 
     public function requireAdmin(Request $request): ?Response

@@ -43,7 +43,7 @@ final class AuthController extends Controller
         $password = $request->string('password');
         $result = $this->auth->loginWithPassword($username, $password, $request);
         if (!$result['ok']) {
-            return $this->redirect('/login?redirect=' . urlencode($request->string('redirect', '/')))->withFlash($result['error'], 'error');
+            return $this->redirect($this->app->config->authUrl('/login') . '?redirect=' . urlencode($request->string('redirect', '/')))->withFlash($result['error'], 'error');
         }
         $this->auth->loginUser($result['user']);
         $redirect = $this->safeRedirect($request->string('redirect', '/'));
@@ -73,7 +73,7 @@ final class AuthController extends Controller
             $request->string('email'),
         );
         if (!$result['ok']) {
-            return $this->redirect('/register')->withFlash($result['error'], 'error');
+            return $this->redirect($this->app->config->authUrl('/register'))->withFlash($result['error'], 'error');
         }
         $this->auth->loginUser($result['user']);
         return $this->redirect('/account')->withFlash('注册成功，欢迎加入！');
@@ -89,7 +89,7 @@ final class AuthController extends Controller
     {
         $profile = $_SESSION['social_signup_pending'] ?? null;
         if (!is_array($profile) || ($profile['social_uid'] ?? '') === '') {
-            return $this->redirect('/login')->withFlash('请先使用 QQ / 微信登录后再完善账号。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('请先使用 QQ / 微信登录后再完善账号。', 'error');
         }
         $provider = in_array((string) ($profile['provider'] ?? ''), ['qq', 'wx'], true) ? (string) $profile['provider'] : 'qq';
         return $this->render('auth/complete-social', [
@@ -106,7 +106,7 @@ final class AuthController extends Controller
         }
         $profile = $_SESSION['social_signup_pending'] ?? null;
         if (!is_array($profile) || ($profile['social_uid'] ?? '') === '') {
-            return $this->redirect('/login')->withFlash('登录状态已失效，请重新使用 QQ / 微信登录。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('登录状态已失效，请重新使用 QQ / 微信登录。', 'error');
         }
         $result = $this->auth->completeSocialSignup(
             $profile,
@@ -139,11 +139,11 @@ final class AuthController extends Controller
         }
         $provider = (string) ($params['provider'] ?? '');
         if (!in_array($provider, ['qq', 'wx'], true)) {
-            return $this->redirect('/login')->withFlash('不支持的登录方式。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('不支持的登录方式。', 'error');
         }
         $enabledKey = strtoupper($provider) . '_LOGIN_ENABLED';
         if (!$this->app->config->bool($enabledKey, false)) {
-            return $this->redirect('/login')->withFlash('该登录方式未开启。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('该登录方式未开启。', 'error');
         }
         try {
             $social = new SocialAuth($this->app);
@@ -157,7 +157,7 @@ final class AuthController extends Controller
             return $this->redirect($social->authorizeUrl($provider, $request->string('redirect', '/account')));
         } catch (\Throwable $e) {
             error_log('[aggregate auth authorize] ' . $e->getMessage());
-            return $this->redirect('/login')->withFlash('聚合登录服务暂时不可用，请稍后重试或使用账号密码登录。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('聚合登录服务暂时不可用，请稍后重试或使用账号密码登录。', 'error');
         }
     }
 
@@ -168,14 +168,14 @@ final class AuthController extends Controller
         $state = (string) ($request->query['state'] ?? '');
         $expectedState = (string) ($_SESSION['social_state'] ?? '');
         if ($state === '' || !hash_equals($expectedState, $state)) {
-            return $this->redirect('/login')->withFlash('登录状态校验失败，请重试。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('登录状态校验失败，请重试。', 'error');
         }
         if (($_SESSION['social_provider'] ?? '') !== $provider) {
-            return $this->redirect('/login')->withFlash('登录方式不匹配，请重试。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('登录方式不匹配，请重试。', 'error');
         }
         $code = (string) ($request->query['code'] ?? '');
         if ($code === '') {
-            return $this->redirect('/login')->withFlash('未收到授权码，请重试。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('未收到授权码，请重试。', 'error');
         }
 
         $bindMode = (bool) ($_SESSION['social_bind_mode'] ?? false);
@@ -190,7 +190,7 @@ final class AuthController extends Controller
             if ($bindMode) {
                 if (!$this->auth->isLoggedIn()) {
                     unset($_SESSION['social_bind_mode']);
-                    return $this->redirect('/login')->withFlash('登录状态已失效，请重新登录后再绑定。', 'error');
+                    return $this->redirect($this->app->config->authUrl('/login'))->withFlash('登录状态已失效，请重新登录后再绑定。', 'error');
                 }
                 $result = $this->auth->bindToCurrentUser($provider, $profile);
                 unset($_SESSION['social_bind_mode']);
@@ -209,7 +209,7 @@ final class AuthController extends Controller
             }
             $result = $this->auth->loginWithSocial($provider, $profile);
             if (!$result['ok']) {
-                return $this->redirect('/login')->withFlash($result['error'], 'error');
+                return $this->redirect($this->app->config->authUrl('/login'))->withFlash($result['error'], 'error');
             }
             // First-time social login: force username + password before the
             // account exists. Stash the profile, go to the signup-completion
@@ -225,7 +225,7 @@ final class AuthController extends Controller
             error_log('[social auth] ' . $e->getMessage());
             // Keep provider responses, access-token errors and transport details
             // out of the browser; they may contain sensitive diagnostics.
-            return $this->redirect($bindMode ? $redirectAfter : '/login')->withFlash('第三方登录失败，请稍后重试或联系管理员。', 'error');
+            return $this->redirect($bindMode ? $redirectAfter : $this->app->config->authUrl('/login'))->withFlash('第三方登录失败，请稍后重试或联系管理员。', 'error');
         }
     }
 

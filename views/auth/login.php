@@ -41,4 +41,4 @@
   <button class="btn btn-primary btn-lg btn-block" style="margin-top:6px;">登 录</button>
 </form>
 
-<div class="text-center small muted" style="margin-top:22px;">还没有账号？<a href="/register">立即注册</a></div>
+<div class="text-center small muted" style="margin-top:22px;">还没有账号？<a href="<?= \VoiceHubPay\Http\View::e($__site['auth_register']) ?>">立即注册</a></div>

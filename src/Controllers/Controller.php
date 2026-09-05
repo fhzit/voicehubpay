@@ -37,6 +37,10 @@ abstract class Controller
             'name' => (string) $this->app->config->get('SITE_NAME', 'VoiceHubPay'),
             'url' => $this->app->config->appUrl(),
             'user' => $data['__user'],
+            // Effective auth entry paths (honour a configured secret prefix).
+            'auth_login' => $this->app->config->authUrl('/login'),
+            'auth_register' => $this->app->config->authUrl('/register'),
+            'auth_complete_social' => $this->app->config->authUrl('/complete-social'),
         ];
         $data['__flash'] = $_SESSION['flash'] ?? null;
         unset($_SESSION['flash']);
@@ -82,7 +86,7 @@ abstract class Controller
     protected function requireCsrf(Request $request): ?Response
     {
         if (!$request->csrfValid()) {
-            return $this->redirect('/login')->withFlash('会话已过期，请重新操作。', 'error');
+            return $this->redirect($this->app->config->authUrl('/login'))->withFlash('会话已过期，请重新操作。', 'error');
         }
         return null;
     }

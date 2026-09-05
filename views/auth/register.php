@@ -65,7 +65,7 @@
     </div>
     <button class="btn btn-primary btn-lg btn-block">注 册</button>
   </form>
-  <div class="text-center small muted" style="margin-top:22px;">已有账号？<a href="/login">直接登录</a></div>
+  <div class="text-center small muted" style="margin-top:22px;">已有账号？<a href="<?= \VoiceHubPay\Http\View::e($__site['auth_login']) ?>">直接登录</a></div>
 <?php endif; ?>
 
 <script>

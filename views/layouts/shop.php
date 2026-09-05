@@ -52,8 +52,8 @@ $nav = $__nav ?? ($GLOBALS['__nav'] ?? ''); ?>
           <button class="btn btn-ghost btn-sm" style="height:38px;">退出</button>
         </form>
       <?php else: ?>
-        <a href="/login" class="btn btn-ghost btn-sm user-chip">登录</a>
-        <a href="/register" class="btn btn-primary btn-sm">注册</a>
+        <a href="<?= \VoiceHubPay\Http\View::e($__site['auth_login']) ?>" class="btn btn-ghost btn-sm user-chip">登录</a>
+        <a href="<?= \VoiceHubPay\Http\View::e($__site['auth_register']) ?>" class="btn btn-primary btn-sm">注册</a>
       <?php endif; ?>
     </div>
   </div>

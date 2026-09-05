@@ -121,6 +121,40 @@ final class Config
         return rtrim((string) $this->get('SITE_URL', $this->get('APP_URL', '')), '/');
     }
 
+    /**
+     * Normalized secret auth-prefix path (e.g. "/g/s3cret"). Empty string when
+     * unconfigured, meaning the standard /login /register paths are used.
+     */
+    public function authSecretPrefix(): string
+    {
+        $prefix = trim((string) $this->get('AUTH_SECRET_PREFIX', ''));
+        if ($prefix === '' || $prefix === '/') {
+            return '';
+        }
+        // Normalize to canonical single-slash "/x" form, collapsing runs of '/'
+        // and stripping any trailing slash. '/' collapses fully to ''.
+        $normalized = trim(preg_replace('#/+#', '/', '/' . ltrim($prefix, '/')));
+        if ($normalized === '' || $normalized === '/') {
+            return '';
+        }
+        return rtrim($normalized, '/');
+    }
+
+    /**
+     * Resolve a login/register/complete-social route to its effective path,
+     * honouring the configured secret prefix when set.
+     *
+     * @param string $route e.g. '/login', '/register', '/complete-social'
+     */
+    public function authUrl(string $route): string
+    {
+        $prefix = $this->authSecretPrefix();
+        if ($prefix === '') {
+            return $route;
+        }
+        return $prefix . $route;
+    }
+
     public function timezone(): string
     {
         return (string) $this->get('APP_TIMEZONE', 'Asia/Shanghai');

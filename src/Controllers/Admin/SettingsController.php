@@ -19,6 +19,32 @@ final class SettingsController extends Controller
         parent::__construct($app);
     }
 
+    /**
+     * Normalize the configured secret auth prefix to canonical "/x" form.
+     * Returns null when invalid (must not be silently accepted). Empty input
+     * returns '' (standard /login /register paths). "//" / "/" collapse to ''.
+     */
+    private function normalizeAuthPrefix(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '' || $raw === '/' || $raw === '//') {
+            return '';
+        }
+        if (!str_starts_with($raw, '/')) {
+            return null;
+        }
+        if (preg_match('/[\s?#]/', $raw)) {
+            return null;
+        }
+        // Collapse it to canonical single-slash form and strip a trailing slash.
+        $normalized = rtrim(preg_replace('#/+#', '/', $raw), '/');
+        // A valid prefix must resolve to a non-empty path.
+        if ($normalized === '') {
+            return null;
+        }
+        return $normalized;
+    }
+
     // ------------------------------------------------------------- general
 
     public function general(Request $request): Response
@@ -59,6 +85,14 @@ final class SettingsController extends Controller
                 return $this->redirect('/admin/settings/general')->withFlash('访客重定向地址必须是无账号、查询参数和片段的 HTTP(S) 根地址，或留空。', 'error');
             }
         }
+        // 登录/注册访问安全路径: normalize to "/x" form; reject anything that
+        // is not a bare path (no protocol, query, hash, whitespace) and reject
+        // the bare root "/" which would disable secret-prefix mode by making
+        // authUrl return "/way" incorrectly.
+        $authSecretPrefix = $this->normalizeAuthPrefix($request->string('auth_secret_prefix'));
+        if ($authSecretPrefix === null) {
+            return $this->redirect('/admin/settings/general')->withFlash('登录/注册访问安全路径必须是形如 /secret 的路径，不能包含协议、查询参数、井号或空白字符。', 'error');
+        }
         $this->app->config->settings()->setMany([
             'SITE_NAME' => $siteName,
             'SITE_URL' => rtrim($siteUrl, '/'),
@@ -69,6 +103,7 @@ final class SettingsController extends Controller
             'ORDER_TTL_MINUTES' => (string) max(5, $request->int('order_ttl', 30)),
             'PAGE_SIZE' => (string) max(5, $request->int('page_size', 20)),
             'AUTH_REDIRECT_URL' => $authRedirectUrl,
+            'AUTH_SECRET_PREFIX' => $authSecretPrefix,
             'ICP_BEIAN_NO' => trim($request->string('icp_beian_no')),
             'SITE_STAT_CODE' => trim($request->string('site_stat_code')),
             'HOT_SERVICES_ENABLED' => $request->int('show_hot', 0) === 1 ? '1' : '0',
