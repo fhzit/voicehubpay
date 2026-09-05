@@ -49,7 +49,7 @@ final class Mailer
                 'port'       => (int) $this->config->get('SMTP_PORT', '587'),
                 'encryption' => trim((string) $this->config->get('SMTP_ENCRYPTION', 'tls')),
                 'username'   => trim((string) $this->config->get('SMTP_USERNAME', '')),
-                'password'   => trim((string) $this->config->get('SMTP_PASSWORD', '')),
+                'password'   => trim((string) $this->config->secretStore()->get('SMTP_PASSWORD', '')),
                 'from'       => trim((string) $this->config->get('SMTP_FROM', '')),
                 'from_name'  => trim((string) $this->config->get('SMTP_FROM_NAME', $this->config->get('SITE_NAME', ''))),
                 'timeout'    => 15,

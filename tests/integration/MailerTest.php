@@ -92,5 +92,13 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $t->assertFalse(str_contains($smtp, 'smtpRead(220);'), 'no bare-int smtpRead(220)');
     $t->assertFalse(str_contains($smtp, 'smtpRead(250);'), 'no bare-int smtpRead(250)');
 
+    // Root-cause guard: the mailer must read the SMTP password through the
+    // SecretStore (decrypt path), never the raw settings getter — the stored
+    // value is encrypted (v1:...), so a raw read would send the ciphertext as
+    // the password and get a 535 login failure.
+    $mailClass = (string) file_get_contents($t->basePath . '/src/Support/Mailer.php');
+    $t->assertContains("secretStore()->get('SMTP_PASSWORD', '')", $mailClass, 'Mailer decrypts SMTP_PASSWORD via SecretStore');
+    $t->assertFalse(str_contains($mailClass, "config->get('SMTP_PASSWORD'"), 'Mailer never reads SMTP_PASSWORD via raw settings getter');
+
     return ['assertions' => $t->assertions()];
 };
