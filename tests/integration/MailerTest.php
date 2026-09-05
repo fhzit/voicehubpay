@@ -82,5 +82,15 @@ return static function (\VoiceHubPay\Tests\TestCase $t): array {
     $profile = (string) file_get_contents($t->basePath . '/views/account/profile.php');
     $t->assertContains('name="email"', $profile, 'profile page has an email field');
 
+    // SmtpMailer bug guard: every smtpRead() call must pass an ARRAY of
+    // acceptable reply codes (the signature is array), never a bare int which
+    // would throw a TypeError at runtime on the live SMTP handshake.
+    $smtp = (string) file_get_contents($t->basePath . '/src/Support/SmtpMailer.php');
+    $t->assertContains('private function smtpRead(array $expect)', $smtp, 'smtpRead requires an array of expected codes');
+    $t->assertContains('smtpRead([220]); // greeting', $smtp, 'greeting read passes [220]');
+    $t->assertContains('$this->smtpRead([250]);', $smtp, 'end-of-data read passes [250]');
+    $t->assertFalse(str_contains($smtp, 'smtpRead(220);'), 'no bare-int smtpRead(220)');
+    $t->assertFalse(str_contains($smtp, 'smtpRead(250);'), 'no bare-int smtpRead(250)');
+
     return ['assertions' => $t->assertions()];
 };

@@ -89,7 +89,7 @@ final class SmtpMailer
 
             $message = $this->buildMime($to, $subject, $html, $text, $extra);
             $this->smtpRaw($message . self::CRLF . '.', null); // end-of-data marker; expect 250 next
-            $this->smtpRead(250);
+            $this->smtpRead([250]);
 
             $this->smtpCommand('QUIT', [221]);
             return true;
@@ -167,7 +167,7 @@ final class SmtpMailer
         }
         stream_set_timeout($this->socket, $this->timeout);
         try {
-            $this->smtpRead(220); // greeting
+            $this->smtpRead([220]); // greeting
         } catch (\Throwable $e) {
             $this->smtpClose();
             throw new \RuntimeException('SMTP 握手失败: ' . $e->getMessage());
