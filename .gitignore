@@ -8,7 +8,11 @@
 /vendor/
 .DS_Store
 
-skills/
+# TypeScript workspace artifacts
+node_modules/
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
 
 # local php test runtime (untracked, built on demand)
 .review-php/

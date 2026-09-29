@@ -1,0 +1,19 @@
+{
+  "name": "voicehubpay",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/server",
+    "apps/worker",
+    "apps/web",
+    "packages/contracts",
+    "packages/db",
+    "packages/domain"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @voicehubpay/web",
+    "build": "npm run build --workspace @voicehubpay/web",
+    "test": "npm run test --workspace @voicehubpay/server && npm run test --workspace @voicehubpay/web -- --run && npm run test --workspace @voicehubpay/worker && npm run test --workspace @voicehubpay/db",
+    "typecheck": "npm run typecheck --workspace @voicehubpay/server && npm run typecheck --workspace @voicehubpay/web && npm run typecheck --workspace @voicehubpay/db"
+  }
+}

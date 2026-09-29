@@ -1,0 +1,15 @@
+{
+  "name": "@voicehubpay/worker",
+  "private": true,
+  "type": "module",
+  "bin": "./src/entrypoint.ts",
+  "scripts": {
+    "start": "node --experimental-strip-types src/entrypoint.ts",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
+  }
+}
