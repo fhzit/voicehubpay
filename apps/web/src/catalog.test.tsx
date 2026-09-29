@@ -3,20 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { App } from './app';
 
 describe('product catalog demo', () => {
-  it('shows catalog cards, quantities, prices, cart, and explicit demo checkout', () => {
-    window.history.pushState({}, '', '/shop');
+  it('keeps demo checkout visibly non-transactional and unavailable', () => {
+    window.history.pushState({}, '', '/shop?view=cart');
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Studio Microphone' })).toBeTruthy();
-    expect(screen.getByText('$129.00')).toBeTruthy();
-    expect(screen.getByText(/No live purchases/i)).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Increase quantity' })[0]);
-    expect(screen.getAllByLabelText('Selected quantity')[0].textContent).toBe('2');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add to demo cart' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Cart/ }));
-    expect(screen.getAllByText('$258.00').length).toBe(2);
-    fireEvent.click(screen.getByRole('button', { name: /Continue to demo checkout/ }));
-    expect(screen.getByRole('heading', { name: 'Demo checkout' })).toBeTruthy();
-    expect(screen.getByText(/no purchase will be made/i)).toBeTruthy();
+    expect(screen.getByText(/checkout is unavailable/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /checkout|purchase|pay now|complete order/i })).toBeNull();
   });
   it('opens product details and presents loading, empty, and error controls', () => {
     window.history.pushState({}, '', '/shop?product=headphones');

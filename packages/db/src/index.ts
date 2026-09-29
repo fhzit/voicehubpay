@@ -1,5 +1,6 @@
 import BetterSqlite3 from 'better-sqlite3';
 import type { Pool, PoolClient, QueryResult as PgQueryResult } from 'pg';
+export { SqliteOrderRepository, type CreatedOrder, type OrderRequest } from './orders.js';
 
 export type Dialect = 'sqlite' | 'pgsql';
 export interface QueryResult<Row> { rows: Row[]; rowCount: number }

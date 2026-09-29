@@ -1,4 +1,4 @@
-import { runCli, main, parseRuntimeConfiguration } from "./cli.ts";
+import { runCli, main, parseRuntimeConfiguration, WORKER_HELP } from "./cli.ts";
 import type { WorkerPorts } from "./index.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -18,6 +18,14 @@ test("runtime config validates database URL and worker arguments", async () => {
 
 test("CLI rejects missing adapters with configuration exit code", async () => {
   assert.equal(await runCli({ argv: ["--once"], env }), 2);
+});
+
+test("CLI help is successful and documents scheduling and exit codes", async () => {
+  assert.equal(await runCli({ argv: ["--help"], env: {} }), 0);
+  assert.match(WORKER_HELP, /--once/);
+  assert.match(WORKER_HELP, /--interval-ms=N/);
+  assert.match(WORKER_HELP, /Exit codes/);
+  assert.equal(await main(ports, ["-h"], {}, undefined, env), true);
 });
 
 test("CLI returns nonzero when any job reports failure", async () => {

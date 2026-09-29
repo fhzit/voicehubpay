@@ -1,5 +1,21 @@
 import { createWorker, runScheduler, type StructuredLogger, type WorkerMetrics, type WorkerPorts, type RunSummary } from "./index.ts";
 
+export const WORKER_HELP = `Usage: worker [--once] [--batch-size=N] [--interval-ms=N]
+
+Options:
+  --once             Run one worker tick, then exit
+  --batch-size=N     Maximum items per job per tick (default: 50)
+  --interval-ms=N    Delay between scheduled ticks (default: 60000)
+  --help, -h         Show this help
+
+Exit codes:
+  0  Completed successfully (or shut down cleanly)
+  1  A job or runtime failure
+  2  Invalid configuration or unavailable real database adapters
+
+DATABASE_URL must be a PostgreSQL URL. The executable currently has no real
+payment/database adapters and fails closed; no fulfillment is simulated.`;
+
 function positiveInt(value: string | undefined, fallback: number, name: string): number {
   if (value === undefined) return fallback;
   if (!/^\d+$/.test(value)) throw new Error(`${name} must be a positive integer`);
@@ -10,6 +26,9 @@ function positiveInt(value: string | undefined, fallback: number, name: string):
 
 export interface RuntimeConfiguration { once: boolean; batchSize: number; intervalMs: number; databaseUrl: string }
 export function parseRuntimeConfiguration(argv: readonly string[], env: NodeJS.ProcessEnv = process.env): RuntimeConfiguration {
+  for (const arg of argv) {
+    if (arg === "--help" || arg === "-h") throw new Error(WORKER_HELP);
+  }
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required; worker cannot start without a database connection");
   let parsedUrl: URL;
@@ -20,6 +39,7 @@ export function parseRuntimeConfiguration(argv: readonly string[], env: NodeJS.P
   const values = new Map<string, string>();
   let once = false;
   for (const arg of argv) {
+    if (arg === "--help" || arg === "-h") continue;
     if (arg === "--once") {
       if (once) throw new Error("Duplicate argument: --once");
       once = true;
@@ -51,7 +71,12 @@ export interface CliOptions {
 export async function runCli(options: CliOptions = {}): Promise<number> {
   let config: RuntimeConfiguration;
   try { config = parseRuntimeConfiguration(options.argv ?? process.argv.slice(2), options.env ?? process.env); }
-  catch (error) { console.error(`Worker configuration error: ${error instanceof Error ? error.message : String(error)}`); return 2; }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === WORKER_HELP) { console.log(WORKER_HELP); return 0; }
+    console.error(`Worker configuration error: ${message}`);
+    return 2;
+  }
   if (!options.ports) {
     console.error("Worker configuration error: database adapters are unavailable; refusing to start without real DB integrations");
     return 2;
@@ -73,7 +98,9 @@ export async function main(
   signalHandlers: Pick<NodeJS.Process, "once" | "removeListener"> = process,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<boolean> {
-  const config = parseRuntimeConfiguration(argv, env);
+  let config: RuntimeConfiguration;
+  try { config = parseRuntimeConfiguration(argv, env); }
+  catch (error) { if (error instanceof Error && error.message === WORKER_HELP) return true; throw error; }
   const worker = createWorker(ports, { batchSize: config.batchSize, ...observability });
   if (config.once) { return hasJobErrors(await worker.runOnce()) ? false : true; }
   const controller = new AbortController();
