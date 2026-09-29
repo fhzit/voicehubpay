@@ -95,12 +95,16 @@ export async function runClaimedTask(store: TaskLeaseStore, delivery: SingleDeli
   return true;
 }
 export interface WorkerScheduler { runOnce(): Promise<RunSummary> }
-export async function runScheduler(worker: WorkerScheduler, options: { intervalMs: number; signal?: AbortSignal; onResult?: (result: RunSummary) => void }): Promise<void> {
+export async function runScheduler(worker: WorkerScheduler, options: { intervalMs: number; signal?: AbortSignal; maxTicks?: number; onResult?: (result: RunSummary) => void; onHeartbeat?: (tick: number, result: RunSummary) => void }): Promise<void> {
   if (!Number.isSafeInteger(options.intervalMs) || options.intervalMs < 1) throw new RangeError("intervalMs must be a positive safe integer");
-  while (!options.signal?.aborted) {
+  if (options.maxTicks !== undefined && (!Number.isSafeInteger(options.maxTicks) || options.maxTicks < 1)) throw new RangeError("maxTicks must be a positive safe integer");
+  let ticks = 0;
+  while (!options.signal?.aborted && (options.maxTicks === undefined || ticks < options.maxTicks)) {
     const result = await worker.runOnce();
+    ticks++;
     options.onResult?.(result);
-    if (options.signal?.aborted) break;
+    options.onHeartbeat?.(ticks, result);
+    if (options.signal?.aborted || (options.maxTicks !== undefined && ticks >= options.maxTicks)) break;
     await new Promise<void>((resolve) => {
       let timer: ReturnType<typeof setTimeout>;
       const finish = () => { clearTimeout(timer); options.signal?.removeEventListener("abort", finish); resolve(); };

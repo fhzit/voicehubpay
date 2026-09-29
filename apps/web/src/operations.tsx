@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { demoProducts } from './catalog';
+import type { Product } from './catalog';
+const demoProducts: Array<Product & { category: string }> = [
+  { id: 1, name: 'Studio Microphone', slug: 'studio-microphone', description: '', priceCents: 12900, status: 'active', category: 'Audio' },
+  { id: 2, name: 'Monitor Headphones', slug: 'monitor-headphones', description: '', priceCents: 8499, status: 'active', category: 'Audio' },
+  { id: 3, name: 'USB Audio Interface', slug: 'usb-audio-interface', description: '', priceCents: 15950, status: 'active', category: 'Recording' },
+];
 
 const note = 'DEMO ONLY · Changes are not saved and this screen is not connected to a live server.';
 const orders = [

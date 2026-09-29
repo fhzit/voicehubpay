@@ -1,20 +1,29 @@
 import { createWorker, runScheduler, type StructuredLogger, type WorkerMetrics, type WorkerPorts, type RunSummary } from "./index.ts";
 
-export const WORKER_HELP = `Usage: worker [--once] [--batch-size=N] [--interval-ms=N]
+export const WORKER_HELP = `Usage: worker [--once] [--batch-size=N] [--interval-ms=N] [--max-ticks=N]
 
 Options:
   --once             Run one worker tick, then exit
   --batch-size=N     Maximum items per job per tick (default: 50)
   --interval-ms=N    Delay between scheduled ticks (default: 60000)
+  --max-ticks=N      Stop after N scheduled ticks (default: unbounded)
   --help, -h         Show this help
+
+Environment:
+  DATABASE_URL       Required PostgreSQL URL with host and database name
+
+Heartbeat and health:
+  Emits structured worker.heartbeat logs after each completed tick; metrics and
+  logging can be injected by an adapter composition. SIGINT/SIGTERM stop after
+  the active tick and before another tick starts.
 
 Exit codes:
   0  Completed successfully (or shut down cleanly)
   1  A job or runtime failure
   2  Invalid configuration or unavailable real database adapters
 
-DATABASE_URL must be a PostgreSQL URL. The executable currently has no real
-payment/database adapters and fails closed; no fulfillment is simulated.`;
+The executable currently has no real payment/database adapter composition and
+fails closed; no fulfillment is simulated or claimed.`;
 
 function positiveInt(value: string | undefined, fallback: number, name: string): number {
   if (value === undefined) return fallback;
@@ -24,7 +33,7 @@ function positiveInt(value: string | undefined, fallback: number, name: string):
   return n;
 }
 
-export interface RuntimeConfiguration { once: boolean; batchSize: number; intervalMs: number; databaseUrl: string }
+export interface RuntimeConfiguration { once: boolean; batchSize: number; intervalMs: number; maxTicks?: number; databaseUrl: string }
 export function parseRuntimeConfiguration(argv: readonly string[], env: NodeJS.ProcessEnv = process.env): RuntimeConfiguration {
   for (const arg of argv) {
     if (arg === "--help" || arg === "-h") throw new Error(WORKER_HELP);
@@ -45,14 +54,15 @@ export function parseRuntimeConfiguration(argv: readonly string[], env: NodeJS.P
       once = true;
       continue;
     }
-    const match = /^(--batch-size|--interval-ms)=(.*)$/.exec(arg);
+    const match = /^(--batch-size|--interval-ms|--max-ticks)=(.*)$/.exec(arg);
     if (!match) throw new Error(`Unknown argument: ${arg}`);
     if (values.has(match[1])) throw new Error(`Duplicate argument: ${match[1]}`);
     values.set(match[1], match[2]);
   }
   const batchSize = positiveInt(values.get("--batch-size"), 50, "batch size");
   const intervalMs = positiveInt(values.get("--interval-ms"), 60_000, "interval");
-  return { once, batchSize, intervalMs, databaseUrl };
+  const maxTicks = values.has("--max-ticks") ? positiveInt(values.get("--max-ticks"), 0, "max ticks") : undefined;
+  return { once, batchSize, intervalMs, ...(maxTicks === undefined ? {} : { maxTicks }), databaseUrl };
 }
 
 function hasJobErrors(result: RunSummary): boolean {
@@ -108,7 +118,13 @@ export async function main(
   signalHandlers.once("SIGINT", shutdown);
   signalHandlers.once("SIGTERM", shutdown);
   try {
-    await runScheduler(worker, { intervalMs: config.intervalMs, signal: controller.signal });
+  await runScheduler(worker, {
+      intervalMs: config.intervalMs, maxTicks: config.maxTicks, signal: controller.signal,
+      onHeartbeat: (tick, result) => {
+        const fields = { tick, result, timestamp: new Date().toISOString() };
+        (observability.logger ?? { info: (event: string, values: Record<string, unknown>) => console.info(JSON.stringify({ level: "info", event, ...values })), error: () => undefined }).info("worker.heartbeat", fields);
+      },
+    });
     return true;
   } finally {
     signalHandlers.removeListener("SIGINT", shutdown);

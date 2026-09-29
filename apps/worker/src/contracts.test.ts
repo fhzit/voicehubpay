@@ -53,6 +53,16 @@ test("scheduler stops after abort during a tick and does not start another", asy
   assert.equal(calls, 1);
 });
 
+test("scheduler is bounded by maxTicks and emits heartbeat after each tick", async () => {
+  let calls = 0;
+  const beats: number[] = [];
+  await runScheduler({ runOnce: async () => { calls++; return {}; } }, {
+    intervalMs: 1, maxTicks: 2, onHeartbeat: (tick) => beats.push(tick),
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(beats, [1, 2]);
+});
+
 test("scheduler propagates unexpected tick errors", async () => {
   await assert.rejects(runScheduler({ runOnce: async () => { throw new Error("fatal"); } }, { intervalMs: 10 }), /fatal/);
 });

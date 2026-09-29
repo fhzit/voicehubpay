@@ -38,8 +38,8 @@ test("CLI succeeds for clean one-shot work with injected adapters", async () => 
 });
 
 test("runtime configuration validates values and duplicate flags", async () => {
-  assert.deepEqual(parseRuntimeConfiguration(["--batch-size=8", "--interval-ms=250", "--once"], env), {
-    once: true, batchSize: 8, intervalMs: 250, databaseUrl: env.DATABASE_URL,
+  assert.deepEqual(parseRuntimeConfiguration(["--batch-size=8", "--interval-ms=250", "--max-ticks=3", "--once"], env), {
+    once: true, batchSize: 8, intervalMs: 250, maxTicks: 3, databaseUrl: env.DATABASE_URL,
   });
   assert.throws(() => parseRuntimeConfiguration(["--batch-size=0"], env), /positive/);
   assert.throws(() => parseRuntimeConfiguration(["--interval-ms=1", "--interval-ms=2"], env), /Duplicate/);
