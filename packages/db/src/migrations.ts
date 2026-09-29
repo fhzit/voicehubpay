@@ -1,5 +1,8 @@
 export type DatabaseDialect = 'sqlite' | 'pgsql';
-export interface SqlExecutor { exec(sql: string): void | Promise<void> }
+export interface SqlExecutor {
+  exec(sql: string): void | Promise<void>;
+  query(sql: string): Promise<{ rows: Array<Record<string, unknown>> }>;
+}
 export interface Migration { readonly version: number; readonly filename: string }
 
 const migrationNames = [
@@ -29,9 +32,8 @@ export async function applyMigrations(
   await db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, filename TEXT NOT NULL)');
   for (const migration of [...migrations].sort((a, b) => a.version - b.version)) {
     if (!Number.isSafeInteger(migration.version) || migration.version < 1) throw new RangeError('Invalid migration version');
-    // Implementations may expose a row query API in addition to exec; keep this runner portable via optional query.
-    const query = (db as SqlExecutor & { query?: (sql: string) => Promise<{ rows: Array<{ version: number }> }> }).query;
-    if (query && (await query.call(db, `SELECT version FROM schema_migrations WHERE version = ${migration.version}`)).rows.length) continue;
+    const existing = await db.query(`SELECT version FROM schema_migrations WHERE version = ${migration.version}`);
+    if (existing.rows.length > 0) continue;
     await db.exec(migration.sql);
     await db.exec(`INSERT INTO schema_migrations (version, filename) VALUES (${migration.version}, '${migration.filename.replaceAll("'", "''")}')`);
   }

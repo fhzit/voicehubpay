@@ -60,3 +60,33 @@ test("main registers SIGINT/SIGTERM and removes both handlers on shutdown", asyn
   assert.equal(await pending, true);
   assert.deepEqual(removed.sort(), ["SIGINT", "SIGTERM"]);
 });
+
+test("SIGTERM wakes a long scheduler sleep and emits final clean status", async () => {
+  const handlers = new Map<string, (...args: any[]) => void>();
+  const events: Array<{ event: string; fields: Record<string, unknown> }> = [];
+  const fakeSignals = { once: (s: string, h: (...args: any[]) => void) => handlers.set(s, h), removeListener: (s: string) => { handlers.delete(s); return fakeSignals; } } as any;
+  const pending = main(ports, ["--interval-ms=60000"], { logger: { info: (event, fields) => events.push({ event, fields }), error: () => undefined } }, fakeSignals, env);
+  await new Promise((resolve) => setImmediate(resolve));
+  handlers.get("SIGTERM")?.();
+  assert.equal(await pending, true);
+  assert.deepEqual(events.find(({ event }) => event === "worker.shutdown")?.fields, { status: "clean", signal: "SIGTERM", ticks: 1 });
+  assert.equal(handlers.size, 0);
+});
+
+test("SIGTERM during active work waits for tick completion", async () => {
+  let finish!: () => void;
+  const active: WorkerPorts = { ...ports, fulfillment: { process: () => new Promise<number>((resolve) => { finish = () => resolve(0); }) } };
+  const handlers = new Map<string, (...args: any[]) => void>();
+  const events: Array<{ event: string; fields: Record<string, unknown> }> = [];
+  const fakeSignals = { once: (s: string, h: (...args: any[]) => void) => handlers.set(s, h), removeListener: (s: string) => { handlers.delete(s); return fakeSignals; } } as any;
+  const pending = main(active, ["--interval-ms=60000"], { logger: { info: (event, fields) => events.push({ event, fields }), error: () => undefined } }, fakeSignals, env);
+  await new Promise((resolve) => setImmediate(resolve));
+  handlers.get("SIGTERM")?.();
+  let settled = false;
+  void pending.then(() => { settled = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(settled, false);
+  finish();
+  assert.equal(await pending, true);
+  assert.deepEqual(events.find(({ event }) => event === "worker.shutdown")?.fields, { status: "clean", signal: "SIGTERM", ticks: 1 });
+});

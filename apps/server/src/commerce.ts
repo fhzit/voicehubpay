@@ -6,7 +6,7 @@ import type { AuthDependencies } from "./auth.js";
 export interface CommerceDependencies {
   auth: AuthDependencies;
   products: { listProducts(): Promise<Array<{ id: number; name: string; slug: string; description: string; priceCents: number; status: "draft" | "active" | "archived" }>>; getProduct(id: number): Promise<{ id: number; name: string; slug: string; description: string; priceCents: number; status: "draft" | "active" | "archived" } | null>; createProduct(input: { name: string; slug: string; description?: string; priceCents: number; status?: "draft" | "active" | "archived" }): Promise<number> };
-  orders?: { getForUser(id: number, userId: string): Promise<unknown | null> };
+  orders?: { getForUser(id: number | string, userId: string): Promise<unknown | null> };
   isAdmin?: (userId: string) => Promise<boolean>;
 }
 
@@ -45,10 +45,9 @@ export function configureCommerce(app: FastifyInstance, dependencies: CommerceDe
   app.get("/api/orders/:id", async (request, reply) => {
     const session = await authenticated(request, dependencies.auth);
     if (!session) return reply.code(401).send({ error: "UNAUTHENTICATED", message: "Authentication required" });
-    const params = productIdParamsSchema.safeParse(request.params);
-    if (!params.success) return reply.code(400).send({ error: "BAD_REQUEST", message: "Invalid order ID" });
-    if (!dependencies.orders) return reply.code(501).send({ error: "ORDER_STATUS_UNAVAILABLE", message: "Order status is not available" });
-    const order = await dependencies.orders.getForUser(params.data.id, session.userId);
+    const rawId = (request.params as { id?: unknown }).id;
+    if (typeof rawId !== "string" || rawId.length === 0 || rawId.length > 128) return reply.code(400).send({ error: "BAD_REQUEST", message: "Invalid order ID" });
+    const order = dependencies.orders ? await dependencies.orders.getForUser(rawId, session.userId) : null;
     return order ? reply.code(200).send(orderStatusResponseSchema.parse(order)) : reply.code(404).send({ error: "NOT_FOUND", message: "Order not found" });
   });
 }

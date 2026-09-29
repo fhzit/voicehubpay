@@ -14,8 +14,9 @@ Environment:
 
 Heartbeat and health:
   Emits structured worker.heartbeat logs after each completed tick; metrics and
-  logging can be injected by an adapter composition. SIGINT/SIGTERM stop after
-  the active tick and before another tick starts.
+  logging can be injected by an adapter composition. SIGINT/SIGTERM wake a sleeping scheduler immediately. An active job is not
+ cancellable: shutdown waits for the current tick to finish. There are no
+ per-job timeouts or AbortSignal propagation in the current adapter contract.
 
 Exit codes:
   0  Completed successfully (or shut down cleanly)
@@ -114,20 +115,34 @@ export async function main(
   const worker = createWorker(ports, { batchSize: config.batchSize, ...observability });
   if (config.once) { return hasJobErrors(await worker.runOnce()) ? false : true; }
   const controller = new AbortController();
+  let shutdownSignal: "SIGINT" | "SIGTERM" | "completed" = "completed";
+  let ticks = 0;
+  let failed = false;
   const shutdown = () => controller.abort();
-  signalHandlers.once("SIGINT", shutdown);
-  signalHandlers.once("SIGTERM", shutdown);
+  const onInterrupt = () => { shutdownSignal = "SIGINT"; shutdown(); };
+  const onTerminate = () => { shutdownSignal = "SIGTERM"; shutdown(); };
+  signalHandlers.once("SIGINT", onInterrupt);
+  signalHandlers.once("SIGTERM", onTerminate);
   try {
   await runScheduler(worker, {
       intervalMs: config.intervalMs, maxTicks: config.maxTicks, signal: controller.signal,
       onHeartbeat: (tick, result) => {
+        ticks = tick;
+        if (hasJobErrors(result)) failed = true;
         const fields = { tick, result, timestamp: new Date().toISOString() };
         (observability.logger ?? { info: (event: string, values: Record<string, unknown>) => console.info(JSON.stringify({ level: "info", event, ...values })), error: () => undefined }).info("worker.heartbeat", fields);
       },
     });
-    return true;
+    const status = failed ? "failed" : "clean";
+    const logger = observability.logger ?? { info: (event: string, values: Record<string, unknown>) => console.info(JSON.stringify({ level: "info", event, ...values })), error: () => undefined };
+    logger.info("worker.shutdown", { status, signal: shutdownSignal, ticks });
+    return !failed;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    (observability.logger ?? { info: () => undefined, error: (event: string, values: Record<string, unknown>) => console.error(JSON.stringify({ level: "error", event, ...values })) }).error("worker.shutdown", { status: "failed", signal: shutdownSignal, ticks, error: message });
+    return false;
   } finally {
-    signalHandlers.removeListener("SIGINT", shutdown);
-    signalHandlers.removeListener("SIGTERM", shutdown);
+    signalHandlers.removeListener("SIGINT", onInterrupt);
+    signalHandlers.removeListener("SIGTERM", onTerminate);
   }
 }
