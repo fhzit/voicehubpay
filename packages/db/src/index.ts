@@ -82,3 +82,42 @@ export function createPostgresDatabase(pool: Pool): Database {
   });
   return makeDb();
 }
+export {
+  createLegacyRepositories,
+  UserRepository,
+  SocialIdentityRepository,
+  CategoryRepository,
+  ProductRepository,
+  InventoryRepository,
+  OrderRepository,
+  FulfillmentUnitRepository,
+  VoiceHubDeliveryRepository,
+  PaymentTransactionRepository,
+  AfdianOrderRepository,
+  AuditLogRepository,
+  AuthThrottleRepository,
+  SettingsRepository,
+  CryptoService,
+  toCents,
+  format,
+  nowIso,
+} from './legacy/index.js';
+export type { LegacyRepositories, Row as LegacyRow, Paginated as LegacyPaginated } from './legacy/index.js';
+export {
+  LegacySchemaDetector,
+  LegacyMigrationService,
+  LegacyV1Adapter,
+  LegacyV2Adapter,
+  UnknownLegacyAdapter,
+  detectAdapter,
+  openSqliteReader,
+  LEGACY_CONFIG_PATH,
+} from './legacy-migration/index.js';
+export type {
+  LegacyDetectionReport,
+  DataDbInfo,
+  LegacyReader,
+  DryRunReport,
+  MigrationResult,
+  MigrationVerification,
+} from './legacy-migration/index.js';

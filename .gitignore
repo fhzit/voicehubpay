@@ -5,6 +5,7 @@
 /storage/install.lock
 /storage/logs/*.log
 /storage/backups/
+packages/db/storage/
 /vendor/
 .DS_Store
 
