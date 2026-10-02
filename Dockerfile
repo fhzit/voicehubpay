@@ -6,6 +6,11 @@
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY apps/server/package.json apps/server/
+COPY apps/worker/package.json apps/worker/
+COPY apps/web/package.json apps/web/
+COPY packages/contracts/package.json packages/contracts/
+COPY packages/db/package.json packages/db/
 # Install the full workspace once (server deps include native builds).
 RUN npm ci
 
