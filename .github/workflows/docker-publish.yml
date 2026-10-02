@@ -2,7 +2,7 @@ name: Build and publish container images
 
 on:
   push:
-    branches: [main]
+    branches: [main, "refactor/typescript-fullstack-migration"]
     tags: ["v*"]
   workflow_dispatch:
 
