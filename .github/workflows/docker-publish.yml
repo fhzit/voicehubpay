@@ -41,11 +41,10 @@ jobs:
             type=sha
 
       - name: Typecheck & test (server)
-        working-directory: apps/server
         run: |
-          npm ci
-          npm run typecheck
-          npm test
+          npm ci --workspace @voicehubpay/server --workspace @voicehubpay/contracts --workspace @voicehubpay/db --include-workspace-root
+          npm run typecheck --workspace @voicehubpay/server
+          npm test --workspace @voicehubpay/server
 
       - name: Build and push
         uses: docker/build-push-action@v6
