@@ -27,14 +27,16 @@ docker run -d --name voicehubpay \
 
 ## 数据卷 `/data`
 
-- `/data/database/voicehubpay.sqlite` — SQLite 数据库(首次启动自动建表,含 legacy shop/payment schema)
+- SQLite 模式:`/data/database/voicehubpay.sqlite`(首次启动自动建表,含 legacy shop/payment schema)
+- PostgreSQL 模式:数据存外部数据库;`/data` 仍用于 masterkey
 - `/data/storage/.masterkey` — 卡密加密主密钥(0600,首次启动自动生成;**务必备份**,丢失后已售卡密无法解密)
 
 ## 环境变量
 
 | 变量 | 说明 |
 | --- | --- |
-| `DATABASE_PATH` | SQLite 路径(默认 `/data/database/voicehubpay.sqlite`) |
+| `DATABASE_URL` | PostgreSQL 连接串(设置后优先生效,例如 `postgres://user:pass@pg:5432/voicehubpay`) |
+| `DATABASE_PATH` | SQLite 路径(默认 `/data/database/voicehubpay.sqlite`;与 `DATABASE_URL` 二选一) |
 | `APP_BASE_PATH` | masterkey 根目录(默认 `/data`) |
 | `SHOP_LEGACY_ENABLED` | `1` 启用 legacy 店铺/SG65 支付路由 |
 | `SG65_ENABLED` | SG65 网关总开关 |

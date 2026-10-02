@@ -25,7 +25,7 @@ export async function migrateAuthSchema(db: Database): Promise<void> {
 }
 
 export function createSqliteAuthRepositories(db: Database): AuthDependencies {
-  if (db.dialect !== "sqlite") throw new Error("SQLite auth repositories require a SQLite database");
+  if (db.dialect !== "sqlite" && db.dialect !== "pgsql") throw new Error("Unsupported database dialect");
   return {
     users: { async findByEmail(email: string): Promise<AuthUser | null> {
       const result = await db.query<{ id: string; password_hash: string }>("SELECT id, password_hash FROM server_auth_users WHERE lower(email) = ? LIMIT 1", [email.toLowerCase()]);

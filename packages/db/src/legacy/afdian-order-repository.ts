@@ -1,5 +1,5 @@
 import type { Database } from '../index.js';
-import { like, nowIso, type Paginated, type Row } from './shared.js';
+import { insertReturningId, like, nowIso, type Paginated, type Row } from './shared.js';
 
 export interface AfdianStats extends Record<string, number> {
   pending: number;
@@ -51,9 +51,11 @@ export class AfdianOrderRepository {
 
     const now = nowIso();
     const paidAt = data.paid_at ?? (['paid', '2'].includes(String(data.status ?? 'paid')) ? now : null);
+    let id = 0;
     try {
-      await this.db.query(
-        'INSERT INTO afdian_orders (out_trade_no, trade_no, user_id, buyer_name, remark, plan_id, sku_detail, amount_cents, status, raw_payload, voicehub_status, voicehub_attempts, voicehub_last_error, created_at, paid_at, processed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, NULL, ?)',
+      id = await insertReturningId(
+        this.db,
+        'INSERT INTO afdian_orders (out_trade_no, trade_no, user_id, buyer_name, remark, plan_id, sku_detail, amount_cents, status, raw_payload, voicehub_status, voicehub_attempts, voicehub_last_error, created_at, paid_at, processed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, NULL, ?)', 
         [
           data.out_trade_no,
           String(data.trade_no ?? ''),
@@ -78,7 +80,6 @@ export class AfdianOrderRepository {
       if (raced !== null) return { created: false, order: raced };
       throw error;
     }
-    const id = Number((await this.db.query('SELECT last_insert_rowid() AS id')).rows[0]?.id ?? 0);
     return { created: true, order: await this.findById(id) };
   }
 

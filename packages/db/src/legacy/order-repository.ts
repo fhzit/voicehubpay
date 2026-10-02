@@ -1,5 +1,5 @@
 import type { Database } from '../index.js';
-import { buildUpdate, first, lastInsertId, like, nowIso, type Paginated, type Row } from './shared.js';
+import { buildUpdate, first, insertReturningId, like, nowIso, type Paginated, type Row } from './shared.js';
 
 /** Port of VoiceHubPay\Repositories\OrderRepository. */
 export class OrderRepository {
@@ -15,8 +15,9 @@ export class OrderRepository {
 
   async create(data: Row & { order_no: string; user_id: number }): Promise<Row | null> {
     const now = nowIso();
-    await this.db.query(
-      'INSERT INTO orders (order_no, user_id, source, amount_due_cents, amount_paid_cents, currency, order_status, payment_status, fulfillment_status, payment_gateway, payment_confirmation_source, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    const id = await insertReturningId(
+      this.db,
+      'INSERT INTO orders (order_no, user_id, source, amount_due_cents, amount_paid_cents, currency, order_status, payment_status, fulfillment_status, payment_gateway, payment_confirmation_source, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
       [
         data.order_no,
         data.user_id,
@@ -34,7 +35,7 @@ export class OrderRepository {
         (data.expires_at as string | null | undefined) ?? null,
       ],
     );
-    return this.findById(await lastInsertId(this.db));
+    return this.findById(id);
   }
 
   async update(id: number, fields: Row): Promise<void> {
@@ -61,8 +62,9 @@ export class OrderRepository {
   }
 
   async addItem(data: Row & { order_id: number; product_id: number; product_name_snapshot: string }): Promise<number> {
-    await this.db.query(
-      'INSERT INTO order_items (order_id, product_id, product_name_snapshot, product_price_cents_snapshot, quantity, delivery_mode_snapshot, voicehub_code_source_snapshot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    return insertReturningId(
+      this.db,
+      'INSERT INTO order_items (order_id, product_id, product_name_snapshot, product_price_cents_snapshot, quantity, delivery_mode_snapshot, voicehub_code_source_snapshot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
       [
         data.order_id,
         data.product_id,
@@ -74,12 +76,12 @@ export class OrderRepository {
         nowIso(),
       ],
     );
-    return lastInsertId(this.db);
   }
 
   async addUnit(data: Row & { order_id: number; order_item_id: number; unit_index: number; unit_no: string }): Promise<number> {
     const now = nowIso();
-    await this.db.query(
+    return insertReturningId(
+      this.db,
       'INSERT INTO fulfillment_units (order_id, order_item_id, unit_index, unit_no, inventory_card_id, delivery_code_ciphertext, delivery_code_hash, voicehub_code_ciphertext, voicehub_code_hash, status, voicehub_status, voicehub_attempts, voicehub_last_error, manual_note, created_at, updated_at, fulfilled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, ?, ?, NULL)',
       [
         data.order_id,
@@ -97,7 +99,6 @@ export class OrderRepository {
         now,
       ],
     );
-    return lastInsertId(this.db);
   }
 
   async units(orderId: number): Promise<Row[]> {

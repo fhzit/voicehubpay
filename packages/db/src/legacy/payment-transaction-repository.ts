@@ -1,5 +1,5 @@
 import type { Database } from '../index.js';
-import { first, like, nowIso, type Paginated, type Row } from './shared.js';
+import { first, insertReturningId, like, nowIso, type Paginated, type Row } from './shared.js';
 
 /** Port of VoiceHubPay\Repositories\PaymentTransactionRepository. */
 export class PaymentTransactionRepository {
@@ -44,8 +44,9 @@ export class PaymentTransactionRepository {
       return this.findById(Number(existing.id));
     }
 
-    await this.db.query(
-      'INSERT INTO payment_transactions (order_id, gateway, merchant_order_no, gateway_trade_no, api_trade_no, amount_cents, status, pay_type, pay_url, confirmation_source, raw_notify_payload, created_at, updated_at, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    const id = await insertReturningId(
+      this.db,
+      'INSERT INTO payment_transactions (order_id, gateway, merchant_order_no, gateway_trade_no, api_trade_no, amount_cents, status, pay_type, pay_url, confirmation_source, raw_notify_payload, created_at, updated_at, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
       [
         data.order_id,
         String(data.gateway ?? 'sg65'),
@@ -63,7 +64,6 @@ export class PaymentTransactionRepository {
         String(data.status ?? '') === 'paid' ? now : null,
       ],
     );
-    const id = Number((await this.db.query('SELECT last_insert_rowid() AS id')).rows[0]?.id ?? 0);
     return this.findById(id);
   }
 

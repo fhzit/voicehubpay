@@ -37,8 +37,29 @@ export async function scalarExists(db: Database, sql: string, parameters: readon
 
 /** Last autoincrement id for the current connection (SQLite `lastInsertId`). */
 export async function lastInsertId(db: Database): Promise<number> {
+  if (db.dialect === 'pgsql') {
+    // PostgreSQL: LASTVAL() returns the most recent sequence value on this
+    // session. Only safe inside a transaction or single-client usage.
+    const result = await db.query<{ id: number }>('SELECT LASTVAL() AS id');
+    return Number(result.rows[0]?.id ?? 0);
+  }
   const result = await db.query<{ id: number }>('SELECT last_insert_rowid() AS id');
   return Number(result.rows[0]?.id ?? 0);
+}
+
+/**
+ * Run an INSERT and return the new row's id, portable across dialects:
+ * SQLite uses last_insert_rowid(); PostgreSQL appends RETURNING id to the
+ * same statement so the id is atomic even on a pool connection.
+ */
+export async function insertReturningId(db: Database, sql: string, parameters: readonly unknown[] = []): Promise<number> {
+  if (db.dialect === 'pgsql') {
+    if (/Returning\s+id/i.test(sql)) throw new RangeError('Statement already has RETURNING');
+    const result = await db.query<{ id: number }>(`${sql.replace(/;\s*$/, '')} RETURNING id`, parameters);
+    return Number(result.rows[0]?.id ?? 0);
+  }
+  await db.query(sql, parameters);
+  return lastInsertId(db);
 }
 
 /**

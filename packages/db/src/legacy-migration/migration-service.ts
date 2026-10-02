@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { basename, join } from 'node:path';
 import type { Database } from '../index.js';
 import { CryptoService } from '../legacy/crypto.js';
-import type { Row } from '../legacy/shared.js';
+import { insertReturningId, type Row } from '../legacy/shared.js';
 import { LegacyV2Adapter, UnknownLegacyAdapter } from './adapters.js';
 import { detectAdapter } from './adapter-registry.js';
 import { LegacySchemaDetector, openSqliteReader, type DataDbInfo, type LegacyDetectionReport, type LegacyReader } from './schema-detector.js';
@@ -212,7 +212,8 @@ export class LegacyMigrationService {
               alreadyImported += 1;
               continue;
             }
-            await tx.query(
+            const newId = await insertReturningId(
+              tx,
               'INSERT INTO afdian_orders (out_trade_no, trade_no, user_id, plan_id, sku_detail, amount_cents, status, raw_payload, voicehub_status, voicehub_attempts, voicehub_last_error, created_at, paid_at, processed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [
                 outTradeNo,
@@ -232,7 +233,6 @@ export class LegacyMigrationService {
                 mapped.updated_at,
               ],
             );
-            const newId = Number((await tx.query<{ id: number }>('SELECT last_insert_rowid() AS id')).rows[0]?.id ?? 0);
             migratedOrders += 1;
 
             // Historical VoiceHub delivery (idempotency-key guarded).
@@ -245,7 +245,8 @@ export class LegacyMigrationService {
             const status = mapped.voicehub_status === 'success' ? 'success' : mapped.voicehub_status === 'failed' ? 'failed' : 'pending';
             if (status === 'pending') continue; // only materialize historical success/failed deliveries
             const created = String(mapped.created_at);
-            await tx.query(
+            await insertReturningId(
+              tx,
               "INSERT INTO voicehub_deliveries (source_type, source_id, source_order_no, fulfillment_unit_id, code_ciphertext, code_hash, code_source, idempotency_key, status, attempts, last_error, request_payload, response_payload, created_at, updated_at, success_at) VALUES ('afdian', ?, ?, NULL, ?, ?, 'afdian_order_no', ?, ?, ?, ?, NULL, NULL, ?, ?, ?)",
               [
                 newId,

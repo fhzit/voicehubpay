@@ -1,5 +1,5 @@
 import type { Database } from '../index.js';
-import { like, nowIso, type Paginated, type Row } from './shared.js';
+import { insertReturningId, like, nowIso, type Paginated, type Row } from './shared.js';
 
 /** Port of VoiceHubPay\Repositories\VoiceHubDeliveryRepository. */
 export class VoiceHubDeliveryRepository {
@@ -36,9 +36,11 @@ export class VoiceHubDeliveryRepository {
     const existing = await this.findByIdempotencyKey(String(data.idempotency_key));
     if (existing !== null) return { created: false, delivery: existing };
     const now = nowIso();
+    let id = 0;
     try {
-      await this.db.query(
-        'INSERT INTO voicehub_deliveries (source_type, source_id, source_order_no, fulfillment_unit_id, code_ciphertext, code_hash, code_source, idempotency_key, status, attempts, last_error, request_payload, response_payload, created_at, updated_at, success_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, ?, ?, NULL)',
+      id = await insertReturningId(
+        this.db,
+        'INSERT INTO voicehub_deliveries (source_type, source_id, source_order_no, fulfillment_unit_id, code_ciphertext, code_hash, code_source, idempotency_key, status, attempts, last_error, request_payload, response_payload, created_at, updated_at, success_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, ?, ?, NULL)', 
         [
           data.source_type,
           (data.source_id as number | null | undefined) ?? null,
@@ -60,7 +62,6 @@ export class VoiceHubDeliveryRepository {
       if (raced !== null) return { created: false, delivery: raced };
       throw error;
     }
-    const id = Number((await this.db.query('SELECT last_insert_rowid() AS id')).rows[0]?.id ?? 0);
     return { created: true, delivery: await this.findById(id) };
   }
 

@@ -1,5 +1,6 @@
 import type { Database } from "../../../../packages/db/src/index.js";
 import { AuthThrottleRepository } from "../../../../packages/db/src/legacy/auth-throttle-repository.js";
+import { insertReturningId } from "../../../../packages/db/src/legacy/shared.js";
 import { CryptoService } from "../../../../packages/db/src/legacy/crypto.js";
 import type { Paginated, Row } from "./types.js";
 import type { AuditPort, Clock, ConfigPort, CryptoPort, LegacyAuthDependencies, OrdersPort, SessionData, SessionStore, SocialIdentityRepositoryPort, SocialAuthProvider, UnitsPort, UserRepositoryPort } from "./types.js";
@@ -22,7 +23,8 @@ export class SqliteUserRepository implements UserRepositoryPort {
 
   async create(data: Row): Promise<Row | null> {
     const now = nowIso();
-    await this.db.query(
+    const id = await insertReturningId(
+      this.db,
       "INSERT INTO users (username, password_hash, display_name, avatar_url, email, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         String(data["username"] ?? ""),
@@ -36,7 +38,7 @@ export class SqliteUserRepository implements UserRepositoryPort {
         now,
       ],
     );
-    return this.findById(await lastInsertId(this.db));
+    return this.findById(id);
   }
 
   async update(id: number, fields: Row): Promise<void> {
@@ -348,7 +350,3 @@ function first(rows: Row[]): Row | null {
   return rows.length > 0 ? rows[0]! : null;
 }
 
-async function lastInsertId(db: Database): Promise<number> {
-  const result = await db.query<{ id: number }>("SELECT last_insert_rowid() AS id");
-  return Number(result.rows[0]?.id ?? 0);
-}
