@@ -3,10 +3,18 @@ import { randomUUID } from "node:crypto";
 import { healthResponseSchema } from "../../../packages/contracts/src/index.js";
 import { configureAuth, type AuthDependencies } from "./auth.js";
 import { configureCommerce, type CommerceDependencies } from "./commerce.js";
+import { configurePaymentRoutes, configureShopRoutes } from "./shop-legacy/routes.js";
+import type { ShopLegacyDependencies } from "./shop-legacy/types.js";
 
 const requestIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
 
-export function buildApp(options: { auth?: AuthDependencies; commerce?: CommerceDependencies; secureCookies?: boolean } = {}): FastifyInstance {
+export function buildApp(options: {
+  auth?: AuthDependencies;
+  commerce?: CommerceDependencies;
+  /** Legacy shop/payment pipeline (order create, SG65 pay/notify, status/reveal). */
+  shop?: ShopLegacyDependencies;
+  secureCookies?: boolean;
+} = {}): FastifyInstance {
   const app = Fastify({ logger: false, genReqId: (request) => {
     const supplied = request.headers["x-request-id"];
     return typeof supplied === "string" && requestIdPattern.test(supplied) ? supplied : randomUUID();
@@ -40,6 +48,12 @@ export function buildApp(options: { auth?: AuthDependencies; commerce?: Commerce
     app.get("/api/products/:id", async (_request, reply) => reply.code(503).send({ error: "COMMERCE_NOT_CONFIGURED", message: "Product storage is not configured" }));
     app.get("/api/orders/:id", async (_request, reply) => reply.code(501).send({ error: "PURCHASING_NOT_IMPLEMENTED", message: "Order status is not available" }));
     app.post("/api/orders", async (_request, reply) => reply.code(501).send({ error: "PURCHASING_NOT_IMPLEMENTED", message: "Purchasing is not implemented" }));
+  }
+  if (options.shop) {
+    // Legacy-parity shop + SG65 payment routes. The notify endpoint must be
+    // registered even when the gateway is disabled: PHP answers "disabled".
+    configureShopRoutes(app, options.shop);
+    configurePaymentRoutes(app, options.shop);
   }
 
   return app;

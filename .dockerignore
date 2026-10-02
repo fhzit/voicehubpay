@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.git
+.github
+storage
+database/*.sqlite
+database/*.sqlite-*
+apps/web/dist
+apps/*/dist
+*.log
+tests
+docs
+.phpunit.result.cache
+vendor
