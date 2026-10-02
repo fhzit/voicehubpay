@@ -228,6 +228,27 @@ export class ShopService {
     });
   }
 
+  /**
+   * Auto-cancel expired unpaid orders (port of scripts/release-reservations.php
+   * step 2). Each candidate is cancelled via cancelUnpaidOrder(), which also
+   * releases its reserved cards; per-row failures are logged and skipped so
+   * one bad order never blocks the sweep. Returns the cancelled count.
+   */
+  async expireUnpaidOrders(limit = 100): Promise<number> {
+    const nowIsoValue = new Date(this.clock.now() * 1000).toISOString();
+    const expired = await this.orders.findExpiredUnpaid(nowIsoValue, limit);
+    let cancelled = 0;
+    for (const row of expired) {
+      try {
+        await this.cancelUnpaidOrder(Number(row["id"]), "auto_expire");
+        cancelled += 1;
+      } catch (error) {
+        console.error(`[expire-orders] order ${row["id"]}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return cancelled;
+  }
+
   private async uniqueOrderNo(): Promise<string> {
     for (;;) {
       const orderNo = OrderNumberService.generate(this.clock);

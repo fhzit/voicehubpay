@@ -38,6 +38,7 @@ RUN npm ci --omit=dev --workspace @voicehubpay/server --workspace @voicehubpay/c
 
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 COPY apps/server ./apps/server
+COPY apps/worker ./apps/worker
 COPY packages ./packages
 
 # Legacy PHP-parity layout: master key lives at /data/storage/.masterkey,
@@ -50,5 +51,8 @@ VOLUME ["/data"]
 EXPOSE 8080
 
 USER node
+
+# Default: API server. Override for the background worker:
+#   docker run ... ghcr.io/fhzit/voicehubpay:main npx tsx apps/worker/src/entrypoint.ts
 WORKDIR /app/apps/server
 CMD ["npx", "tsx", "src/index.ts"]

@@ -45,6 +45,7 @@ export interface OrdersPort {
   findUnit(unitId: number): Promise<Row | null>;
   countUnitsByStatus(orderId: number): Promise<Record<string, number>>;
   orderWithItems(orderNo: string): Promise<(Row & { items: Row[]; units: Row[] }) | null>;
+  findExpiredUnpaid(nowIsoValue: string, limit?: number): Promise<Row[]>;
 }
 
 /** Port of InventoryRepository surface used by ShopService. */

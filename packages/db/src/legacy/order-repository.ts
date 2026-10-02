@@ -57,6 +57,14 @@ export class OrderRepository {
     });
   }
 
+  /** Orders that expired unpaid: candidates for auto-cancel (PHP release-reservations sweep). */
+  async findExpiredUnpaid(nowIsoValue: string, limit = 100): Promise<Row[]> {
+    return (await this.db.query(
+      "SELECT * FROM orders WHERE payment_status IN ('unpaid', 'pending') AND order_status = 'active' AND expires_at IS NOT NULL AND expires_at <= ? ORDER BY id LIMIT ?",
+      [nowIsoValue, limit],
+    )).rows;
+  }
+
   async items(orderId: number): Promise<Row[]> {
     return (await this.db.query('SELECT * FROM order_items WHERE order_id = ? ORDER BY id', [orderId])).rows;
   }
