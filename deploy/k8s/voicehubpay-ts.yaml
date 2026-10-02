@@ -1,13 +1,12 @@
 # VoiceHubPay — TS 全栈 K8s 部署清单（Rancher asia-k3s / ns idoknow）
 #
-# 形态：单镜像双角色
-#   - voicehubpay-server : API + 静态 web（镜像默认 CMD）
-#   - voicehubpay-worker : 后台调度（过期订单取消 + 卡密释放 + reservations）
+# 形态：单镜像双容器（server + worker），数据库用集群现有 PostgreSQL
+# （deploy voicehub-postgres，库 voicehubpay —— 已含完整 legacy schema 与
+# 生产数据：products/orders/order_items/inventory_cards/payment_transactions/users 等）。
 #
-# 数据：沿用 PHP 时代 hostPath（/opt/k8s-idoknow/panel/www），APP_BASE_PATH 指向
-# 旧站点目录以复用 storage/.masterkey（卡密密文解密必须同一把 key）。
-# SHOP_LEGACY_ENABLED=1 + 不设 DATABASE_URL → SQLite 落在旧库文件上，
-# migrateShopSchema 幂等建缺失表（现有 voicehubpay.sqlite 结构兼容）。
+# TS 侧 DATABASE_URL 直连该库；首次启动 migrateAuthSchema/migrateShopSchema
+# 幂等补齐缺失表（如 sessions）。masterkey 仍从 PHP 时代站点目录只读挂载读取
+# （storage/.masterkey，卡密解密必须同一把 key）。
 #
 # 切流：把 ingress 后端从 service voicehubpay(8080) 改为 voicehubpay-ts:8080。
 ---
@@ -32,7 +31,6 @@ metadata:
   labels: {app: voicehubpay-ts}
 spec:
   replicas: 1
-  strategy: {type: Recreate}   # SQLite 单文件,禁双写
   selector:
     matchLabels: {app: voicehubpay-ts}
   template:
@@ -50,9 +48,10 @@ spec:
           env:
             - {name: SHOP_LEGACY_ENABLED, value: "1"}
             - {name: APP_BASE_PATH, value: /legacy/vhpay/index}
-            - {name: DATABASE_PATH, value: /legacy/vhpay/index/storage/voicehubpay.sqlite}
             - {name: APP_URL, value: https://vhpay.idoknow.top}
             - {name: ORDER_TTL_MINUTES, value: "30"}
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: voicehubpay-ts-env, key: DATABASE_URL}}
             - name: SG65_PID
               valueFrom: {secretKeyRef: {name: voicehubpay-ts-env, key: SG65_PID}}
             - name: SG65_MERCHANT_PRIVATE_KEY
@@ -67,7 +66,7 @@ spec:
             requests: {cpu: 50m, memory: 128Mi}
             limits: {cpu: "1", memory: 512Mi}
           volumeMounts:
-            - {name: legacy-www, mountPath: /legacy/vhpay}
+            - {name: legacy-www, mountPath: /legacy/vhpay, readOnly: true}
         - name: worker
           image: ghcr.io/fhzit/voicehubpay:refactor-typescript-fullstack-migration
           imagePullPolicy: Always
@@ -76,8 +75,9 @@ spec:
           env:
             - {name: SHOP_LEGACY_ENABLED, value: "1"}
             - {name: APP_BASE_PATH, value: /legacy/vhpay/index}
-            - {name: DATABASE_PATH, value: /legacy/vhpay/index/storage/voicehubpay.sqlite}
             - {name: ORDER_TTL_MINUTES, value: "30"}
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: voicehubpay-ts-env, key: DATABASE_URL}}
           resources:
             requests: {cpu: 25m, memory: 96Mi}
             limits: {cpu: 500m, memory: 256Mi}
@@ -89,7 +89,7 @@ spec:
             path: /opt/k8s-idoknow/panel/www
             type: Directory
 ---
-# SG65 密钥 + 应用配置。先填值再 apply（见 README 步骤）。
+# DATABASE_URL + SG65 密钥。先填值再 apply（见 README 步骤）。
 apiVersion: v1
 kind: Secret
 metadata:
@@ -97,6 +97,8 @@ metadata:
   namespace: idoknow
 type: Opaque
 stringData:
+  # postgres://<user>:<password>@voicehub-postgres.idoknow.svc:5432/voicehubpay
+  DATABASE_URL: ""
   SG65_PID: ""
   SG65_MERCHANT_PRIVATE_KEY: ""
   SG65_PLATFORM_PUBLIC_KEY: ""
