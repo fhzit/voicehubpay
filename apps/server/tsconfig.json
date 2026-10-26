@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "../../packages/contracts/src/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "../../packages/contracts/src/**/*.ts", "../../packages/db/src/sodium-native.d.ts"]
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPublicKey, generateKeyPairSync } from "node:crypto";
+import { createPublicKey, createHash, generateKeyPairSync } from "node:crypto";
 import Fastify from "fastify";
 import { createSqliteDatabase, type Database } from "../../../packages/db/src/index.js";
 import {
@@ -1087,6 +1087,35 @@ test("PaymentService.confirmPaid: fulfillment/mailer failures never break the pa
 // ----------------------------------------------------------------------------------
 // HTTP routes: order create/status/reveal + notify callback (Fastify inject)
 // ----------------------------------------------------------------------------------
+
+test("commerce: POST /api/orders authenticates, enforces CSRF, creates priced order and reuses payment route", async () => {
+  const { harness, product, userId } = await routeHarness();
+  const app = Fastify({ logger: false });
+  const hashSessionToken = (token: string) => createHash("sha256").update(token).digest("hex");
+  const token = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+  await harness.db.query("INSERT INTO sessions (session_id,data,created_at,updated_at) VALUES (?,?,?,?)", [hashSessionToken(token), JSON.stringify({ userId: String(userId), csrfToken: "commerce-csrf" }), "2026-01-01", "2026-01-01"]);
+  const { configureCommerce } = await import("../src/commerce.js");
+  configureCommerce(app, {
+    auth: { sessions: { find: async (hash: string) => {
+      const row = (await harness.db.query("SELECT data FROM sessions WHERE session_id=?", [hash])).rows[0];
+      return row ? JSON.parse(String(row["data"])) : null;
+    } } as never },
+    products: { listProducts: async () => [], getProduct: async (id: number) => id === Number(product["id"]) ? { id, name: String(product["name"]), slug: String(product["slug"]), description: "", priceCents: Number(product["price_cents"]), status: "active" } : null, createProduct: async () => 1 },
+    orders: { getForUser: async () => null },
+    shop: harness.deps,
+  } as never);
+  const unauthorized = await app.inject({ method: "POST", url: "/api/orders", payload: { productId: Number(product["id"]), quantity: 1 } });
+  assert.equal(unauthorized.statusCode, 401);
+  const response = await app.inject({ method: "POST", url: "/api/orders", headers: { cookie: `vh_session=${token}`, "x-csrf-token": "commerce-csrf" }, payload: { productId: Number(product["id"]), quantity: 2 } });
+  assert.equal(response.statusCode, 201);
+  const body = response.json();
+  assert.equal(body.amountDueCents, 3980);
+  assert.ok(body.orderNo);
+  const order = await harness.repos.orders.findByOrderNo(body.orderNo);
+  assert.equal(Number(order!["user_id"]), userId);
+  assert.equal(Number(order!["amount_due_cents"]), 3980);
+  app.close();
+});
 
 async function routeHarness() {
   const harness = await buildHarness();

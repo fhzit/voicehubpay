@@ -29,6 +29,6 @@ test("SQLite startup repositories serve product list/detail and user-owned order
     assert.equal(own.statusCode, 200, own.body);
     assert.equal(own.json().orderNo, "ORD-A");
     assert.equal((await app.inject({ method: "GET", url: "/api/orders/2", headers: { cookie } })).statusCode, 404);
-    assert.equal((await app.inject({ method: "POST", url: "/api/orders", payload: { productId: 1, quantity: 1 } })).statusCode, 501);
+    assert.equal((await app.inject({ method: "POST", url: "/api/orders", payload: { productId: 1, quantity: 1 } })).statusCode, 401);
   } finally { await app.close(); await db.close(); await rm(dir, { recursive: true, force: true }); }
 });

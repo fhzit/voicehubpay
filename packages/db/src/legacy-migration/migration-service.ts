@@ -50,7 +50,7 @@ export interface MigrationResult {
  *  - 'old_db': an explicit legacy data-DB descriptor;
  *  - null: nothing usable found -> migration aborts.
  */
-type Source = { rows: Row[]; columns: string[]; reader: LegacyReader | null };
+type Source = { rows: Row[]; columns: string[]; reader: LegacyReader | null; fetchRows?: () => Promise<Row[]> };
 
 /**
  * Port of LegacyMigrationService: executes the legacy VoiceHubPay data
@@ -72,13 +72,13 @@ export class LegacyMigrationService {
     this.detector = new LegacySchemaDetector(basePath);
   }
 
-  detect(): LegacyDetectionReport {
+  async detect(): Promise<LegacyDetectionReport> {
     return this.detector.detect();
   }
 
   /** Dry-run report — reads only, writes nothing. */
-  dryRun(): DryRunReport {
-    const detected = this.detector.detect();
+  async dryRun(): Promise<DryRunReport> {
+    const detected = await this.detector.detect();
     if (!detected.legacy || !detected.table_present) {
       return {
         detected: false,
@@ -117,7 +117,7 @@ export class LegacyMigrationService {
    * (copies only; the originals are never deleted or modified). Returns the
    * backup directory path.
    */
-  backup(suffix = ''): string {
+  async backup(suffix = ''): Promise<string> {
     const dir = join(this.basePath, 'storage', 'backups');
     mkdirSync(dir, { recursive: true, mode: 0o775 });
     const stamp = `${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}-${randomBytes(3).toString('hex').slice(0, 6)}${suffix !== '' ? `-${suffix}` : ''}`;
@@ -129,8 +129,8 @@ export class LegacyMigrationService {
       copyFileSync(settingsPath, join(backupDir, 'settings.sqlite'));
     }
 
-    const info = this.detector.detect().data_db_info;
-    if (info !== null && (info.connection ?? 'sqlite') === 'sqlite') {
+    const info = (await this.detector.detect()).data_db_info;
+    if (info && ['sqlite', undefined].includes(info.connection)) {
       let dbPath = info.database ?? 'storage/voicehubpay.sqlite';
       if (!dbPath.startsWith('/')) dbPath = join(this.basePath, dbPath);
       if (existsSync(dbPath)) {
@@ -156,16 +156,16 @@ export class LegacyMigrationService {
    * Throws on failure (migration FAILED); returns a verification report.
    */
   async migrate(targetDb: Database, oldDbInfo: DataDbInfo | null = null): Promise<MigrationResult> {
-    const backupDir = this.backup();
+    const backupDir = await this.backup();
 
     const targetHasLegacy = await this.tableExists(targetDb, 'afdian_orders_legacy');
-    const detected = this.detector.detect();
+    const detected = await this.detector.detect();
     let oldDbHasLegacy = false;
     if (oldDbInfo !== null) {
       try {
         const oldReader = this.detector.openDataDb(oldDbInfo);
         try {
-          oldDbHasLegacy = this.readerColumns(oldReader, 'afdian_orders').length > 0;
+          oldDbHasLegacy = (await this.readerColumns(oldReader, 'afdian_orders', oldDbInfo)).length > 0;
         } finally {
           oldReader.close();
         }
@@ -181,14 +181,17 @@ export class LegacyMigrationService {
     const source = await this.openSource(targetDb, oldDbInfo, detected.columns);
     if (source === null) throw new Error('无法定位旧数据库中的 afdian_orders 数据。');
 
+    const legacyRows = source.fetchRows ? await source.fetchRows() : source.rows;
+    const legacyColumns = source.columns;
+    const resolvedSource = { ...source, rows: legacyRows, columns: legacyColumns };
     try {
-      const adapterStatic = detectAdapter(source.columns);
+      const adapterStatic = detectAdapter(resolvedSource.columns);
       if (adapterStatic.name() === UnknownLegacyAdapter.metadata.name()) {
         throw new Error('无法识别的旧数据库结构，迁移已中止。');
       }
-      if (adapterStatic.name() === 'LegacyV2') LegacyV2Adapter.setColumns(source.columns);
+      if (adapterStatic.name() === 'LegacyV2') LegacyV2Adapter.setColumns(resolvedSource.columns);
       const adapter = adapterStatic.create();
-      const expectedCount = source.rows.length;
+      const expectedCount = resolvedSource.rows.length;
 
       let migratedOrders = 0;
       let deliveriesCreated = 0;
@@ -199,7 +202,7 @@ export class LegacyMigrationService {
 
       try {
         await targetDb.transaction(async (tx: Database) => {
-          for (const legacy of source.rows) {
+          for (const legacy of resolvedSource.rows) {
             const mapped = adapter.mapRow(legacy, this.crypto);
             const outTradeNo = String(mapped.out_trade_no);
             if (outTradeNo === '') {
@@ -296,7 +299,7 @@ export class LegacyMigrationService {
 
       return { migrated: true, backup: backupDir, verification, ok };
     } finally {
-      source.reader?.close();
+      await source.reader?.close();
     }
   }
 
@@ -313,7 +316,7 @@ export class LegacyMigrationService {
     try {
       const reader = openSqliteReader(settingsPath);
       try {
-        rows = reader.query<{ key: string; value: string }>('SELECT key, value FROM app_settings').rows;
+        rows = (reader.query<{ key: string; value: string }>('SELECT key, value FROM app_settings') as { rows: Array<{ key: string; value: string }> }).rows;
       } finally {
         reader.close();
       }
@@ -355,12 +358,21 @@ export class LegacyMigrationService {
     if (oldDbInfo !== null) {
       try {
         const oldReader = this.detector.openDataDb(oldDbInfo);
-        const columns = this.readerColumns(oldReader, 'afdian_orders');
+        const columns = await this.readerColumns(oldReader, 'afdian_orders', oldDbInfo);
         if (columns.length > 0) {
-          const rows = oldReader.query<Row>('SELECT * FROM afdian_orders').rows;
-          return { rows, columns, reader: oldReader };
+          return {
+            rows: [], columns, reader: oldReader,
+            fetchRows: async () => {
+              if (oldReader.connect) {
+                const client = await oldReader.connect();
+                try { return (await client.query<Row>('SELECT * FROM afdian_orders')).rows; }
+                finally { await client.release(); }
+              }
+              return (await oldReader.query<Row>('SELECT * FROM afdian_orders')).rows;
+            },
+          };
         }
-        oldReader.close();
+        await oldReader.close();
       } catch {
         return null;
       }
@@ -379,6 +391,7 @@ export class LegacyMigrationService {
 
   private async tableExists(db: Database, table: string): Promise<boolean> {
     try {
+      if (db.dialect === 'pgsql') return (await db.query("SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?", [table])).rows.length > 0;
       return (await db.query("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?", [table])).rows.length > 0;
     } catch {
       return false;
@@ -387,15 +400,17 @@ export class LegacyMigrationService {
 
   private async targetColumns(db: Database, table: string): Promise<string[]> {
     try {
+      if (db.dialect === 'pgsql') return (await db.query<Record<string, unknown>>('SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?', [table])).rows.map(row => String(row.column_name));
       return (await db.query<Record<string, unknown>>(`PRAGMA table_info(${table})`)).rows.map((row) => String(row.name));
     } catch {
       return [];
     }
   }
 
-  private readerColumns(reader: { query(sql: string, parameters?: readonly unknown[]): { rows: Array<Record<string, unknown>> } }, table: string): string[] {
+  private async readerColumns(reader: LegacyReader, table: string, info: DataDbInfo): Promise<string[]> {
     try {
-      return reader.query(`PRAGMA table_info(${table})`).rows.map((row) => String(row.name));
+      if (['pgsql', 'postgres', 'postgresql'].includes(info.connection)) return (await reader.query<{ column_name: string }>('SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?', [table])).rows.map(row => String(row.column_name));
+      return (await reader.query(`PRAGMA table_info(${table})`)).rows.map((row) => String(row.name));
     } catch {
       return [];
     }

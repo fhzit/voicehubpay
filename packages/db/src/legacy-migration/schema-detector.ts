@@ -1,6 +1,8 @@
 import BetterSqlite3 from 'better-sqlite3';
+import { Pool } from 'pg';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Database } from '../index.js';
 import { detectAdapter } from './adapter-registry.js';
 
 export const LEGACY_CONFIG_PATH = 'storage/settings.sqlite';
@@ -12,6 +14,7 @@ export interface DataDbInfo {
   port: string;
   username: string;
   password: string;
+  schema?: string;
 }
 
 export interface VoicehubCounts {
@@ -36,8 +39,10 @@ export interface LegacyDetectionReport {
 
 /** Minimal read-only handle used for detection and migration reads. */
 export interface LegacyReader {
-  query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, parameters?: readonly unknown[]): { rows: Row[] };
-  close(): void;
+  query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, parameters?: readonly unknown[]): { rows: Row[] } | Promise<{ rows: Row[] }>;
+  close(): void | Promise<void> | Database;
+  connect?(): Promise<{ query<Row extends Record<string, unknown>>(sql: string, parameters?: readonly unknown[]): Promise<{ rows: Row[] }>; release(): Promise<void> | void }>;
+  rows?: never;
 }
 
 /** Open a read-only connection to a legacy SQLite file. */
@@ -54,7 +59,7 @@ export function openSqliteReader(path: string): LegacyReader {
       statement.run(...parameters);
       return { rows: [] };
     },
-    close: () => connection.close(),
+    close: () => { connection.close(); },
   };
 }
 
@@ -67,7 +72,7 @@ export function openSqliteReader(path: string): LegacyReader {
 export class LegacySchemaDetector {
   constructor(private readonly basePath: string) {}
 
-  detect(): LegacyDetectionReport {
+  async detect(): Promise<LegacyDetectionReport> {
     const configPath = join(this.basePath, LEGACY_CONFIG_PATH);
     const configExists = existsSync(configPath);
     let configured = false;
@@ -77,11 +82,11 @@ export class LegacySchemaDetector {
       try {
         const configReader = openSqliteReader(configPath);
         try {
-          const flag = configReader.query<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', ['APP_CONFIGURED']).rows[0];
+          const flag = (configReader.query<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', ['APP_CONFIGURED']) as { rows: { value: string }[] }).rows[0];
           configured = flag?.value === '1';
           if (configured) {
             const map = new Map<string, string>();
-            for (const row of configReader.query<{ key: string; value: string }>("SELECT key, value FROM app_settings WHERE key IN ('DATA_DB_CONNECTION','DATA_DB_DATABASE','DATA_DB_HOST','DATA_DB_PORT','DATA_DB_USERNAME','DATA_DB_PASSWORD')").rows) {
+            for (const row of (configReader.query<{ key: string; value: string }>("SELECT key, value FROM app_settings WHERE key IN ('DATA_DB_CONNECTION','DATA_DB_DATABASE','DATA_DB_HOST','DATA_DB_PORT','DATA_DB_USERNAME','DATA_DB_PASSWORD')") as { rows: { key: string; value: string }[] }).rows) {
               map.set(row.key, row.value);
             }
             const connection = map.get('DATA_DB_CONNECTION') ?? 'sqlite';
@@ -117,7 +122,8 @@ export class LegacySchemaDetector {
     };
     if (!configured) return result;
 
-    // Locate the legacy data DB (read-only; failures keep legacy=false).
+    // PostgreSQL is detected without establishing a connection: use pg's
+    // read-only connection for discovery below.
     let dataReader: LegacyReader;
     try {
       dataReader = this.openDataDb(dataDbInfo);
@@ -127,16 +133,16 @@ export class LegacySchemaDetector {
     result.data_db = this.dataDbIdentifier(dataDbInfo);
 
     try {
-      const columns = this.tableColumns(dataReader, 'afdian_orders');
+      const columns = await this.tableColumns(dataReader, 'afdian_orders', dataDbInfo);
       if (columns.length === 0) return result;
       result.table_present = true;
       result.columns = columns;
       result.adapter = detectAdapter(columns).name();
 
-      result.count = Number(dataReader.query('SELECT COUNT(*) AS n FROM afdian_orders').rows[0]?.n ?? 0);
-      result.amount_cents = Number(dataReader.query(`SELECT COALESCE(SUM(${detectAdapter(columns).amountColumn()}), 0) AS n FROM afdian_orders`).rows[0]?.n ?? 0);
+      result.count = Number((await dataReader.query('SELECT COUNT(*) AS n FROM afdian_orders')).rows[0]?.n ?? 0);
+      result.amount_cents = Number((await dataReader.query(`SELECT COALESCE(SUM(${detectAdapter(columns).amountColumn()}), 0) AS n FROM afdian_orders`)).rows[0]?.n ?? 0);
       const voicehubColumn = detectAdapter(columns).voicehubColumn();
-      for (const row of dataReader.query<{ v: unknown; c: number }>(`SELECT ${voicehubColumn} AS v, COUNT(*) AS c FROM afdian_orders GROUP BY ${voicehubColumn}`).rows) {
+      for (const row of (await dataReader.query<{ v: unknown; c: number }>(`SELECT ${voicehubColumn} AS v, COUNT(*) AS c FROM afdian_orders GROUP BY ${voicehubColumn}`)).rows) {
         const key = String(row.v).toLowerCase();
         if (key === 'created' || key === 'success') result.voicehub.success += Number(row.c);
         else if (key === 'failed') result.voicehub.failed += Number(row.c);
@@ -165,17 +171,49 @@ export class LegacySchemaDetector {
       }
       return openSqliteReader(path);
     }
+    if (['pgsql', 'postgres', 'postgresql'].includes(info.connection)) return this.openPostgresReader(info);
     throw new Error(`Legacy data DB connection '${connection}' requires a driver; only sqlite is supported by the Node migration runtime`);
   }
 
   private dataDbIdentifier(info: DataDbInfo | null): string {
-    if ((info?.connection ?? 'sqlite') === 'pgsql') return `pgsql:${info?.database ?? 'voicehubpay'}`;
+    if (['pgsql', 'postgres', 'postgresql'].includes(info?.connection ?? '')) return `pgsql:${info?.database ?? 'voicehubpay'}`;
     return `sqlite:${info?.database ?? 'storage/voicehubpay.sqlite'}`;
   }
 
-  private tableColumns(reader: LegacyReader, table: string): string[] {
+  private openPostgresReader(info: DataDbInfo): LegacyReader {
+    const pool = new Pool({ host: info.host || '127.0.0.1', port: Number(info.port || 5432), user: info.username || undefined, password: info.password || undefined, database: info.database || undefined, max: 1, application_name: 'voicehubpay-legacy-migration', options: info.schema ? `-c search_path=${info.schema}` : undefined });
+    let closed = false;
+    const withReadOnly = async <T>(work: (client: import('pg').PoolClient) => Promise<T>): Promise<T> => {
+      const client = await pool.connect();
+      try { await client.query('BEGIN READ ONLY'); const result = await work(client); await client.query('COMMIT'); return result; }
+      catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
+    };
+    return {
+      async query<Row extends Record<string, unknown>>(sql: string, parameters: readonly unknown[] = []): Promise<{ rows: Row[] }> {
+        let index = 0;
+        const statement = sql.replace(/\?/g, () => `$${++index}`);
+        return withReadOnly(async client => ({ rows: (await client.query(statement, [...parameters])).rows as Row[] }));
+      },
+      connect: async () => {
+        const client = await pool.connect();
+        await client.query('BEGIN READ ONLY');
+        return { query: async <Row extends Record<string, unknown>>(sql: string, parameters: readonly unknown[] = []) => {
+          let index = 0;
+          const statement = sql.replace(/\?/g, () => `$${++index}`);
+          return { rows: (await client.query(statement, [...parameters])).rows as Row[] };
+        }, release: async () => { try { await client.query('COMMIT'); } finally { client.release(); } } };
+      },
+      close: async () => { if (!closed) { closed = true; await pool.end(); } },
+    };
+  }
+
+  private async tableColumns(reader: LegacyReader, table: string, info: DataDbInfo | null): Promise<string[]> {
     try {
-      return reader.query<{ name: string }>(`PRAGMA table_info(${table})`).rows.map((row) => row.name);
+      if (['pgsql', 'postgres', 'postgresql'].includes(info?.connection ?? '')) {
+        return (await reader.query<{ column_name: string }>('SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?', [table])).rows.map(row => String(row.column_name));
+      }
+      return (await reader.query<{ name: string }>(`PRAGMA table_info(${table})`)).rows.map((row) => String(row.name));
     } catch {
       return [];
     }

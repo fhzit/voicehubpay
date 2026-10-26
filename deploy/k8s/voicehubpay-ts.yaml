@@ -39,10 +39,17 @@ spec:
     spec:
       nodeSelector: {kubernetes.io/hostname: cn-sh-tencent-01}
       tolerations:
-        - {effect: NoSchedule, operator: Exists}
+        - key: migration.rockchin.top/hold
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+        - key: workload.rockchin.top/langbot-cloud-excluded
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
       containers:
         - name: server
-          image: ghcr.io/fhzit/voicehubpay:refactor-typescript-fullstack-migration
+          image: ghcr.nju.edu.cn/fhzit/voicehubpay:refactor-typescript-fullstack-migration
           imagePullPolicy: Always
           ports: [{containerPort: 8080}]
           env:
@@ -66,9 +73,9 @@ spec:
             requests: {cpu: 50m, memory: 128Mi}
             limits: {cpu: "1", memory: 512Mi}
           volumeMounts:
-            - {name: legacy-www, mountPath: /legacy/vhpay, readOnly: true}
+            - {name: legacy-www, subPath: sites/vhpay/index, mountPath: /legacy/vhpay, readOnly: true}
         - name: worker
-          image: ghcr.io/fhzit/voicehubpay:refactor-typescript-fullstack-migration
+          image: ghcr.nju.edu.cn/fhzit/voicehubpay:refactor-typescript-fullstack-migration
           imagePullPolicy: Always
           command: ["npx", "tsx", "apps/worker/src/entrypoint.ts"]
           args: ["--interval-ms=60000"]
@@ -82,7 +89,7 @@ spec:
             requests: {cpu: 25m, memory: 96Mi}
             limits: {cpu: 500m, memory: 256Mi}
           volumeMounts:
-            - {name: legacy-www, mountPath: /legacy/vhpay, readOnly: true}
+            - {name: legacy-www, subPath: sites/vhpay/index, mountPath: /legacy/vhpay, readOnly: true}
       volumes:
         - name: legacy-www
           hostPath:

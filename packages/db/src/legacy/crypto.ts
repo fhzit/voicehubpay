@@ -1,17 +1,16 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+/// <reference path="../sodium-native.d.ts" />
+import { createHash, randomBytes } from 'node:crypto';
+import sodium from 'sodium-native';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /**
  * Port of VoiceHubPay\Security\CryptoService.
  *
- * Divergence from the PHP baseline: PHP uses libsodium secretbox; the Node
- * runtime has no sodium, so the sealed payload uses AES-256-GCM instead.
+ * Uses the PHP-compatible libsodium secretbox primitive and key derivation.
  * The wire format, `v1:` prefix, master-key file (storage/.masterkey, 0600,
  * hex key >= 32 chars) and the one-way SHA-256 `hash()` used for card dedup /
- * lookup are all preserved. Ciphertexts are therefore NOT cross-port
- * decryptable with the PHP implementation — migrate-and-decrypt must happen
- * on the same runtime.
+ * lookup are preserved.
  *
  * Card codes are stored as ciphertext + a plaintext SHA-256 hash (for
  * lookup/dedup only; the hash is one-way and cannot reveal the code).
@@ -48,16 +47,19 @@ export class CryptoService {
     return readFileSync(file, 'utf8').trim().length >= 32;
   }
 
-  private derivedKey(): Buffer {
-    // Same derivation idea as PHP: hash the master key down to key length.
-    return createHash('sha256').update(this.masterKey()).digest();
+  private derivedKey(): Uint8Array {
+    // PHP sodium_crypto_generichash($masterKey, '', KEYBYTES): unkeyed BLAKE2b.
+    const hash = Buffer.alloc(sodium.crypto_secretbox_KEYBYTES);
+    sodium.crypto_generichash(hash, Buffer.from(this.masterKey(), 'utf8'));
+    return hash;
   }
 
   encrypt(plain: string): string {
-    const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.derivedKey(), iv);
-    const sealed = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final(), cipher.getAuthTag()]);
-    return `${CryptoService.PREFIX}${Buffer.concat([iv, sealed]).toString('base64')}`;
+    const nonce = randomBytes(sodium.crypto_secretbox_NONCEBYTES);
+    const message = Buffer.from(plain, 'utf8');
+    const sealed = Buffer.alloc(message.length + sodium.crypto_secretbox_MACBYTES);
+    sodium.crypto_secretbox_easy(sealed, message, nonce, this.derivedKey());
+    return `${CryptoService.PREFIX}${Buffer.concat([nonce, Buffer.from(sealed)]).toString('base64')}`;
   }
 
   decrypt(cipher: string): string {
@@ -65,15 +67,18 @@ export class CryptoService {
       // Legacy plaintext value — return as-is (caller may re-encrypt).
       return cipher;
     }
-    const raw = Buffer.from(cipher.slice(CryptoService.PREFIX.length), 'base64');
-    if (raw.length < 12 + 16) throw new Error('Invalid ciphertext payload');
-    const iv = raw.subarray(0, 12);
-    const body = raw.subarray(12, raw.length - 16);
-    const tag = raw.subarray(raw.length - 16);
-    const decipher = createDecipheriv('aes-256-gcm', this.derivedKey(), iv);
-    decipher.setAuthTag(tag);
-    const plain = Buffer.concat([decipher.update(body), decipher.final()]);
-    return plain.toString('utf8');
+    const encoded = cipher.slice(CryptoService.PREFIX.length);
+    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw new Error('Invalid ciphertext payload');
+    const raw = Buffer.from(encoded, 'base64');
+    const nonceBytes = sodium.crypto_secretbox_NONCEBYTES;
+    if (raw.length < nonceBytes + sodium.crypto_secretbox_MACBYTES) throw new Error('Invalid ciphertext payload');
+    const nonce = raw.subarray(0, nonceBytes);
+    const sealed = raw.subarray(nonceBytes);
+    const plain = Buffer.alloc(sealed.length - sodium.crypto_secretbox_MACBYTES);
+    if (!sodium.crypto_secretbox_open_easy(plain, sealed, nonce, this.derivedKey())) {
+      throw new Error('Invalid ciphertext payload');
+    }
+    return Buffer.from(plain).toString('utf8');
   }
 
   isEncrypted(value: string): boolean {

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Pool } from 'pg';
 import { createSqliteDatabase, type Database } from '../src/index.js';
 import { CryptoService } from '../src/legacy/crypto.js';
 import {
@@ -24,10 +25,10 @@ import {
 const MIGRATIONS_DIR = join(import.meta.dirname, '..', '..', '..', 'database', 'migrations', 'sqlite');
 const MIGRATION_FILES = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith('.sql')).sort();
 
-function createTarget(): Database {
+async function createTarget(): Promise<Database> {
   const db = createSqliteDatabase(':memory:');
   for (const name of MIGRATION_FILES) {
-    db.query(readFileSync(join(MIGRATIONS_DIR, name), 'utf8'));
+    await db.query(readFileSync(join(MIGRATIONS_DIR, name), 'utf8'));
   }
   return db;
 }
@@ -129,21 +130,21 @@ describe('adapter registry', () => {
 });
 
 describe('legacy schema detector', () => {
-  it('reports no legacy install when settings are missing', () => {
+  it('reports no legacy install when settings are missing', async () => {
     const basePath = mkdtempSync(join(tmpdir(), 'voicehubpay-empty-'));
     tempPaths.push(basePath);
-    const report = new LegacySchemaDetector(basePath).detect();
+    const report = await new LegacySchemaDetector(basePath).detect();
     expect(report.legacy).toBe(false);
     expect(report.config_exists).toBe(false);
     expect(report.config_configured).toBe(false);
     expect(report.table_present).toBe(false);
   });
 
-  it('detects a configured legacy install with read-only stats', () => {
+  it('detects a configured legacy install with read-only stats', async () => {
     const fixture = createLegacyFixture(V1_ROWS);
     tempPaths.push(fixture.basePath);
     const dataBefore = readFileSync(fixture.dataDbPath);
-    const report = new LegacySchemaDetector(fixture.basePath).detect();
+    const report = await new LegacySchemaDetector(fixture.basePath).detect();
     expect(report.legacy).toBe(true);
     expect(report.config_configured).toBe(true);
     expect(report.table_present).toBe(true);
@@ -157,24 +158,24 @@ describe('legacy schema detector', () => {
     expect(readFileSync(fixture.dataDbPath).equals(dataBefore)).toBe(true); // read-only detection
   });
 
-  it('stays inert when APP_CONFIGURED is not 1', () => {
+  it('stays inert when APP_CONFIGURED is not 1', async () => {
     const fixture = createLegacyFixture(V1_ROWS);
     tempPaths.push(fixture.basePath);
     const settings = new BetterSqlite3(fixture.settingsDbPath);
     settings.prepare('UPDATE app_settings SET value = ? WHERE key = ?').run('0', 'APP_CONFIGURED');
     settings.close();
-    const report = new LegacySchemaDetector(fixture.basePath).detect();
+    const report = await new LegacySchemaDetector(fixture.basePath).detect();
     expect(report.legacy).toBe(false);
     expect(report.config_configured).toBe(false);
   });
 });
 
 describe('legacy migration dry run', () => {
-  it('returns a full expected report for a detectable legacy install', () => {
+  it('returns a full expected report for a detectable legacy install', async () => {
     const fixture = createLegacyFixture(V1_ROWS);
     tempPaths.push(fixture.basePath);
     const service = new LegacyMigrationService(fixture.basePath, new CryptoService(fixture.basePath));
-    const report = service.dryRun();
+    const report = await service.dryRun();
     expect(report.detected).toBe(true);
     expect(report.adapter).toBe('LegacyV1');
     expect(report.count).toBe(3);
@@ -190,11 +191,33 @@ describe('legacy migration dry run', () => {
     expect(report.warnings).toEqual([]);
   });
 
-  it('reports nothing to migrate when no legacy install exists', () => {
+  it('reads PostgreSQL legacy schemas using read-only source connections', async () => {
+    const databaseUrl = process.env.LEGACY_PG_TEST_URL;
+    if (!databaseUrl) return;
+    const pool = new Pool({ connectionString: databaseUrl });
+    const schema = `legacy_test_${Date.now()}`;
+    const basePath = mkdtempSync(join(tmpdir(), 'vh-pg-migration-'));
+    tempPaths.push(basePath);
+    try {
+      await pool.query(`CREATE SCHEMA ${schema}`);
+      const descriptor = { connection: 'pgsql', database: new URL(databaseUrl).pathname.slice(1), host: new URL(databaseUrl).hostname, port: new URL(databaseUrl).port || '5432', username: decodeURIComponent(new URL(databaseUrl).username), password: decodeURIComponent(new URL(databaseUrl).password), schema };
+      await pool.query(`SET search_path TO ${schema}`);
+      await pool.query('CREATE TABLE afdian_orders (order_no TEXT, amount NUMERIC(12,2), status TEXT, voicehub_status TEXT, last_error TEXT, created_at TEXT, updated_at TEXT)');
+      await pool.query("INSERT INTO afdian_orders VALUES ('PG-ORDER-001', 12.34, 'paid', 'created', NULL, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')");
+      const reader = new LegacySchemaDetector(basePath).openDataDb(descriptor);
+      expect((await reader.query('SELECT order_no FROM afdian_orders')).rows[0]?.order_no).toBe('PG-ORDER-001');
+      await reader.close();
+    } finally {
+      rmSync(basePath, { recursive: true, force: true });
+      await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await pool.end();
+    }
+  });
+  it('reports nothing to migrate when no legacy install exists', async () => {
     const basePath = mkdtempSync(join(tmpdir(), 'voicehubpay-empty2-'));
     tempPaths.push(basePath);
     const service = new LegacyMigrationService(basePath, new CryptoService(basePath));
-    const report = service.dryRun();
+    const report = await service.dryRun();
     expect(report.detected).toBe(false);
     expect(report.adapter).toBe('none');
     expect(report.count).toBe(0);
@@ -205,10 +228,10 @@ describe('legacy migration dry run', () => {
     const fixture = createLegacyFixture([{ weird_column: 'x' }]);
     tempPaths.push(fixture.basePath);
     const service = new LegacyMigrationService(fixture.basePath, new CryptoService(fixture.basePath));
-    const dry = service.dryRun();
+    const dry = await service.dryRun();
     expect(dry.report.adapter).toBe('UnknownLegacy');
     expect(dry.warnings).toEqual(['无法识别的旧数据库结构，拒绝迁移。']);
-    await expect(service.migrate(createTarget(), fixture.dataDbInfo)).rejects.toThrow('无法识别的旧数据库结构');
+    await expect(service.migrate(await createTarget(), fixture.dataDbInfo)).rejects.toThrow('无法识别的旧数据库结构');
   });
 });
 
@@ -216,10 +239,10 @@ describe('legacy migration execute', () => {
   let fixture: Fixture;
   let target: Database;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     fixture = createLegacyFixture(V1_ROWS);
     tempPaths.push(fixture.basePath);
-    target = createTarget();
+    target = await createTarget();
   });
 
   afterEach(async () => {
@@ -363,7 +386,7 @@ describe('legacy migration execute', () => {
   it('returns migrated=false with a reason when there is nothing to migrate', async () => {
     const basePath = mkdtempSync(join(tmpdir(), 'voicehubpay-empty3-'));
     tempPaths.push(basePath);
-    const emptyTarget = createTarget();
+    const emptyTarget = await createTarget();
     const service = new LegacyMigrationService(basePath, new CryptoService(basePath));
     const result = await service.migrate(emptyTarget, null);
     expect(result).toMatchObject({ migrated: false, reason: 'no legacy installation detected' });
