@@ -22,14 +22,14 @@ import {
 } from "../../../packages/db/src/legacy/index.js";
 import type { Database } from "../../../packages/db/src/index.js";
 import type { Clock, SessionStore } from "./auth-legacy/types.js";
-import type { PageConfig } from "./page-config.js";
+import type { AdminConfigPort } from "./admin/types.js";
 import type { AdminDependencies } from "./admin/types.js";
 import {
   type InventoryGenerateDependencies,
 } from "./admin-inventory-generate.js";
 
 export interface AdminWiringOptions {
-  config: PageConfig;
+  config: AdminConfigPort;
   sessions: SessionStore;
   crypto: CryptoService;
   clock?: Clock;

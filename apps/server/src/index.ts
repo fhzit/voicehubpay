@@ -26,7 +26,7 @@ import { configureErrorPages } from "./error-pages.js";
 import { AggregateOAuthProvider } from "./aggregate-oauth.js";
 import { PageConfig } from "./page-config.js";
 import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
-import { registerAdminRoutes } from "./admin/index.js";
+import { FileAdminConfig, registerAdminRoutes } from "./admin/index.js";
 import { ensureAdminSchema } from "./admin/index.js";
 import { registerInventoryGenerateRoutes } from "./admin-inventory-generate.js";
 import { createAdminWiring } from "./admin-wiring.js";
@@ -143,8 +143,11 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
 
   // Admin panel (PHP parity) + card-code generation.
   await ensureAdminSchema(db);
+  // Admin settings persist to a writable dir (env/Secret supplies the defaults,
+  // so SG65 / Afdian / VoiceHub values are visible and editable without SQLite).
+  const adminConfig = new FileAdminConfig(process.env.ADMIN_DATA_DIR ?? "/data");
   const wiring = createAdminWiring(db, {
-    config: shopConfig,
+    config: adminConfig,
     sessions: legacyAuth.sessions,
     crypto: new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
     secureCookies,
