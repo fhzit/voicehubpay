@@ -1,4 +1,4 @@
-import type { Database } from "../../../packages/db/src/index.js";
+import { placeholders, type Database } from "../../../packages/db/src/index.js";
 import type { AuthDependencies, AuthUser, SessionRecord } from "./auth.js";
 import type { OrderStatusResponse } from "../../../packages/contracts/src/commerce.js";
 
@@ -7,9 +7,12 @@ export interface SqliteOrderStatus {
 }
 
 export function createSqliteOrderStatusRepository(db: Database): SqliteOrderStatus {
-  if (db.dialect !== "sqlite") throw new Error("SQLite order status repository requires a SQLite database");
+  // Works on both dialects: PostgreSQL uses $1/$2 placeholders, SQLite uses ?.
+  const marks = placeholders(db.dialect, 2);
+  const [idMark, userMark] = marks.split(", ");
+  const sql = `SELECT id, order_no, order_status, payment_status, fulfillment_status, amount_due_cents, amount_paid_cents, created_at FROM orders WHERE CAST(id AS TEXT) = CAST(${idMark} AS TEXT) AND CAST(user_id AS TEXT) = CAST(${userMark} AS TEXT) LIMIT 1`;
   return { async getForUser(id, userId) {
-    const result = await db.query<{ id: number | string; order_no: string; order_status: string; payment_status: string; fulfillment_status: string; amount_due_cents: number; amount_paid_cents: number; created_at: string }>("SELECT id, order_no, order_status, payment_status, fulfillment_status, amount_due_cents, amount_paid_cents, created_at FROM orders WHERE CAST(id AS TEXT) = CAST(? AS TEXT) AND CAST(user_id AS TEXT) = CAST(? AS TEXT) LIMIT 1", [id, userId]);
+    const result = await db.query<{ id: number | string; order_no: string; order_status: string; payment_status: string; fulfillment_status: string; amount_due_cents: number; amount_paid_cents: number; created_at: string }>(sql, [id, userId]);
     const row = result.rows[0];
     if (!row) return null;
     const numericId = Number(row.id);
