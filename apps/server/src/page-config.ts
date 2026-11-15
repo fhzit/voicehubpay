@@ -9,8 +9,22 @@
 
 import type { ConfigPort } from "./auth-legacy/types.js";
 import { EnvShopConfig } from "./shop-legacy/shop-config.js";
+import { CryptoService } from "../../../packages/db/src/index.js";
 
 export class PageConfig extends EnvShopConfig implements ConfigPort {
+  /** Secrets migrated from PHP are stored as `v1:` ciphertext — decrypt on read. */
+  private readonly crypto = new CryptoService(process.env.APP_BASE_PATH ?? process.cwd());
+
+  get(key: string, fallback = ""): string {
+    const raw = super.get(key, fallback);
+    if (typeof raw !== "string" || !raw.startsWith("v1:")) return raw;
+    try {
+      return this.crypto.decrypt(raw);
+    } catch {
+      return raw;
+    }
+  }
+
   int(key: string, fallback: number): number {
     const raw = this.get(key, "");
     if (raw === "") return fallback;
