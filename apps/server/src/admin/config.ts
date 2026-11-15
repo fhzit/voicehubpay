@@ -86,16 +86,34 @@ export class FileAdminConfig implements AdminConfigPort {
   }
 
   private read(): Record<string, string> {
-    try {
-      const parsed = JSON.parse(readFileSync(this.file, "utf8")) as unknown;
+    const parse = (raw: string): Record<string, string> => {
+      const parsed = JSON.parse(raw) as unknown;
       if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
       const output: Record<string, string> = {};
       for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
         if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") output[key] = String(value);
       }
       return output;
+    };
+    try {
+      return parse(readFileSync(this.file, "utf8"));
     } catch {
-      return {};
+      // First boot on a fresh volume: fall back to a mounted seed (the migrated
+      // PHP settings) so SMTP / Afdian / SG65 configuration is never lost.
+      const seed = this.env.ADMIN_SETTINGS_SEED;
+      if (seed === undefined || seed === "") return {};
+      try {
+        const values = parse(readFileSync(seed, "utf8"));
+        try {
+          mkdirSync(path.dirname(this.file), { recursive: true });
+          writeFileSync(this.file, JSON.stringify(values, null, 2), "utf8");
+        } catch {
+          /* read-only volume: keep values in memory */
+        }
+        return values;
+      } catch {
+        return {};
+      }
     }
   }
 
