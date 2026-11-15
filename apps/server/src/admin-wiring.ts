@@ -15,6 +15,7 @@ import {
   OrderRepository,
   PaymentTransactionRepository,
   ProductRepository,
+  SocialIdentityRepository,
   UserRepository,
   VoiceHubDeliveryRepository,
   AfdianOrderRepository,
@@ -52,6 +53,7 @@ export function createAdminWiring(db: Database, options: AdminWiringOptions): Ad
   const voicehubDeliveries = new VoiceHubDeliveryRepository(db);
   const afdianOrders = new AfdianOrderRepository(db);
   const units = new FulfillmentUnitRepository(db);
+  const socialIdentity = new SocialIdentityRepository(db);
 
   const admin: AdminDependencies = {
     products,
@@ -64,6 +66,10 @@ export function createAdminWiring(db: Database, options: AdminWiringOptions): Ad
     voicehubDeliveries,
     afdianOrders,
     units,
+    social: socialIdentity,
+    // The dashboard KPI/health queries run through this handle; without it every
+    // card silently reports zero (dashboard.ts falls back to an empty result).
+    db,
     config: options.config,
     sessions: options.sessions,
     crypto: options.crypto,
