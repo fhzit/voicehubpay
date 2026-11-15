@@ -84,7 +84,13 @@ export async function createLegacyWorkerPorts(env: NodeJS.ProcessEnv = process.e
       let fetched = 0; let processed = 0; let page = 1; let totalPages = 1;
       do {
         const params = { page, per_page: perPage };
-        const response = await fetch(endpoint, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(makePayload(params)), signal: AbortSignal.timeout(20_000), redirect: "manual" });
+        // 集群出口到 afdian 的链路抖动，单次连接失败不应记整轮失败。
+        let response: Response | undefined; let lastError: unknown;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          try { response = await fetch(endpoint, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(makePayload(params)), signal: AbortSignal.timeout(20_000), redirect: "manual" }); break; }
+          catch (error) { lastError = error; if (attempt === 3) throw lastError; await new Promise((resolve) => { setTimeout(resolve, 400 * attempt); }); }
+        }
+        if (response === undefined) throw lastError;
         if (!response.ok) throw new Error(`Afdian polling failed with HTTP ${response.status}`);
         const envelope = await response.json() as Record<string, unknown>;
         if (Number(envelope.ec) !== 200) throw new Error(`Afdian polling failed: ${String(envelope.em ?? "unknown error")}`);

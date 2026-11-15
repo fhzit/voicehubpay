@@ -108,3 +108,37 @@ export function formEncode(params: Record<string, string>): string {
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
     .join("&");
 }
+
+/**
+ * Default HTTP transport for SG65. The cluster's egress to the gateway is
+ * high-latency and occasionally drops the TCP connect, which surfaced to users
+ * as "网络错误" on 立即支付. Retrying the same signed body is safe (identical
+ * out_trade_no), so we retry twice with backoff before failing.
+ */
+export async function sg65HttpPost(path: string, body: string): Promise<{ status: number; text: string }> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(`${Sg65Client.BASE_URL}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+        body,
+        signal: AbortSignal.timeout(20_000),
+      });
+      const text = await response.text();
+      if (response.status >= 500 && attempt < 3) {
+        lastError = new Error(`SG65 HTTP ${response.status}`);
+        await new Promise((resolve) => { setTimeout(resolve, 300 * attempt); });
+        continue;
+      }
+      return { status: response.status, text };
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) break;
+      await new Promise((resolve) => { setTimeout(resolve, 300 * attempt); });
+    }
+  }
+  const cause = (lastError as { cause?: { code?: string } } | undefined)?.cause;
+  const reason = cause?.code ?? (lastError instanceof Error ? lastError.message : String(lastError));
+  throw new Error(`支付网关连接失败（${reason}）`);
+}

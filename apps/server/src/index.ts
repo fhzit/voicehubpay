@@ -29,6 +29,7 @@ import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
 import { FileAdminConfig, registerAdminRoutes } from "./admin/index.js";
 import { SmtpMailer } from "./mailer.js";
 import { EmailCodeService } from "./email-code.js";
+import { Sg65Client, sg65HttpPost } from "./shop-legacy/sg65-client.js";
 import { ensureAdminSchema } from "./admin/index.js";
 import { registerInventoryGenerateRoutes } from "./admin-inventory-generate.js";
 import { createAdminWiring } from "./admin-wiring.js";
@@ -158,6 +159,8 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
     config: adminConfig,
     mailer: new SmtpMailer(adminConfig, process.env.APP_BASE_PATH ?? "/legacy/vhpay"),
     // HEAD/GET probe used by 后台 → 设置 → VoiceHub「连通性测试」.
+    // 后台「支付设置 → 测试连接」用同一套凭据与传输（含重试）。
+    sg65Probe: new Sg65Client(adminConfig, { now: () => Math.floor(Date.now() / 1000) }, sg65HttpPost),
     voicehubProbe: async (baseUrl, token) => {
       const base = baseUrl.replace(/\/+$/, "");
       try {

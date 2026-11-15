@@ -5,7 +5,7 @@ import type { LegacySessionContext } from "../auth-legacy/types.js";
 import { renderError, renderPage } from "../render.js";
 import { buildSite } from "../site.js";
 import { configureErrorPages } from "../error-pages.js";
-import { Sg65Client } from "./sg65-client.js";
+import { Sg65Client, sg65HttpPost } from "./sg65-client.js";
 import { configureShopPageRoutes } from "./shop-pages.js";
 import { PaymentService, ShopService, PaymentError, ShopError } from "./shop-service.js";
 import type { Row, ShopLegacyDependencies } from "./types.js";
@@ -133,7 +133,7 @@ function paymentService(deps: MutableDeps): PaymentService {
     sg65: new Sg65Client(
       deps.config,
       deps.clock ?? { now: () => Math.floor(Date.now() / 1000) },
-      deps.sg65Post ?? defaultPost,
+      deps.sg65Post ?? sg65HttpPost,
     ),
     orders: deps.orders,
     transactions: deps.transactions,
@@ -144,15 +144,6 @@ function paymentService(deps: MutableDeps): PaymentService {
   });
 }
 
-async function defaultPost(path: string, body: string): Promise<{ status: number; text: string }> {
-  const response = await fetch(`${Sg65Client.BASE_URL}${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-    body,
-    signal: AbortSignal.timeout(20_000),
-  });
-  return { status: response.status, text: await response.text() };
-}
 
 /** Redirect-style login guard for JSON API endpoints (PHP requireLogin redirect). */
 async function apiLoginGuard(ctx: Ctx, request: FastifyRequest, reply: FastifyReply): Promise<LegacySessionContext | null> {
@@ -272,7 +263,11 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
       // jump method: redirect to pay_info.
       return ctx.redirectTo(reply, result.pay_info);
     } catch (error) {
-      const message = error instanceof ShopError || error instanceof PaymentError ? error.message : "订单创建失败，请稍后重试。";
+      const message = error instanceof ShopError || error instanceof PaymentError
+        ? error.message
+        : error instanceof Error && /支付网关连接失败/.test(error.message)
+          ? "支付网关暂时无法连接，请稍后重试。"
+          : "订单创建失败，请稍后重试。";
       return ctx.redirectWithFlash(reply, context, `/checkout/${orderNo}`, message, "error");
     }
   });
