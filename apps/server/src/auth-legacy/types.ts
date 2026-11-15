@@ -132,6 +132,18 @@ export interface SessionStore {
 }
 
 /** Everything the route configurators need. Account-only members optional. */
+/** Verification-code service (see ../../email-code.ts). */
+export interface EmailCodesPort {
+  cooldownRemaining(email: string, purpose: "register" | "bind"): Promise<number>;
+  issue(email: string, purpose: "register" | "bind", userId: number | null, ip?: string): Promise<string>;
+  verify(email: string, purpose: "register" | "bind", code: string): Promise<boolean>;
+}
+
+/** Minimal mail seam — SmtpMailer satisfies it. */
+export interface MailSenderPort {
+  send(message: { to: string; subject: string; html: string; text?: string }): Promise<unknown>;
+}
+
 export interface LegacyAuthDependencies {
   users: UserRepositoryPort;
   social: SocialIdentityRepositoryPort;
@@ -145,6 +157,8 @@ export interface LegacyAuthDependencies {
   units?: UnitsPort;
   audit?: AuditPort;
   crypto?: CryptoPort;
+  emailCodes?: EmailCodesPort;
+  mailer?: MailSenderPort;
 }
 
 declare module "fastify" {

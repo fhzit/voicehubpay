@@ -1717,3 +1717,9 @@ body.has-mobile-buybar { padding-bottom: 72px; }
     scroll-behavior: auto !important;
   }
 }
+
+/* 邮箱验证码输入行 */
+.input-row { display: flex; gap: 8px; align-items: stretch; }
+.input-row .input { flex: 1 1 auto; min-width: 0; }
+.input-row .btn { flex: 0 0 auto; white-space: nowrap; }
+.label .req { color: var(--destructive, #dc2626); margin-left: 2px; }

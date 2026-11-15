@@ -28,6 +28,7 @@ import { PageConfig } from "./page-config.js";
 import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
 import { FileAdminConfig, registerAdminRoutes } from "./admin/index.js";
 import { SmtpMailer } from "./mailer.js";
+import { EmailCodeService } from "./email-code.js";
 import { ensureAdminSchema } from "./admin/index.js";
 import { registerInventoryGenerateRoutes } from "./admin-inventory-generate.js";
 import { createAdminWiring } from "./admin-wiring.js";
@@ -136,6 +137,12 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
     secureCookies,
     basePath: process.env.APP_BASE_PATH ?? process.cwd(),
   });
+  // 注册/绑定邮箱需要验证码与发信能力（SmtpMailer 读取后台 SMTP 设置）。
+  const authConfig = new FileAdminConfig(process.env.ADMIN_DATA_DIR ?? "/data");
+  const emailCodes = new EmailCodeService(db);
+  await emailCodes.ensureSchema();
+  legacyAuth.emailCodes = emailCodes;
+  legacyAuth.mailer = new SmtpMailer(authConfig, process.env.APP_BASE_PATH ?? "/legacy/vhpay");
   configureAuthRoutes(app, legacyAuth);
   configureAccountRoutes(app, legacyAuth);
 

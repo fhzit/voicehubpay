@@ -36,8 +36,17 @@
   <form method="post" action="/auth/password/register" id="reg-form">
     <input type="hidden" name="_csrf" value="<%= e(csrfToken) %>">
     <div class="field">
-      <label class="label" for="reg-email">邮箱（可选，用于接收支付/发货通知）</label>
-      <input class="input" type="email" id="reg-email" name="email" maxlength="254" autocomplete="email">
+      <label class="label" for="reg-email">邮箱<span class="req">*</span></label>
+      <input class="input" type="email" id="reg-email" name="email" maxlength="254" autocomplete="email" required placeholder="用于登录凭证找回与支付通知">
+      <div class="hint">注册必须绑定邮箱，注册后会收到验证码。</div>
+    </div>
+    <div class="field">
+      <label class="label" for="reg-code">邮箱验证码<span class="req">*</span></label>
+      <div class="input-row">
+        <input class="input" type="text" id="reg-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required placeholder="6 位数字">
+        <button type="button" class="btn btn-secondary" id="reg-send-code" data-purpose="register">获取验证码</button>
+      </div>
+      <div class="hint" id="reg-code-hint"></div>
     </div>
     <div class="form-grid">
       <div class="field">
@@ -89,4 +98,37 @@ document.addEventListener('DOMContentLoaded', function () {
   pw.addEventListener('input', check);
   check();
 });
+</script>
+<script>
+(function () {
+  var btn = document.getElementById('reg-send-code');
+  var hint = document.getElementById('reg-code-hint');
+  if (!btn) return;
+  var timer = null;
+  function setText(text) { if (hint) hint.textContent = text; }
+  btn.addEventListener('click', async function () {
+    var email = (document.getElementById('reg-email').value || '').trim();
+    if (!email || email.indexOf('@') < 1) { setText('请先填写有效邮箱。'); return; }
+    btn.disabled = true; setText('正在发送…');
+    try {
+      var res = await fetch('/auth/email/code', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, purpose: 'register' })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (res.ok && data.ok) {
+        setText(data.message || '验证码已发送。');
+        var left = 60;
+        timer = setInterval(function () {
+          left -= 1;
+          if (left <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '重新获取'; }
+          else { btn.textContent = left + 's'; }
+        }, 1000);
+        return;
+      }
+      setText(data.error || '发送失败，请稍后再试。');
+    } catch (e) { setText('网络异常，请稍后再试。'); }
+    btn.disabled = false;
+  });
+})();
 </script>

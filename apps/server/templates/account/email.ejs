@@ -1,0 +1,79 @@
+<%
+  const currentEmail = locals.current_email || '';
+  const bound = locals.email_bound === true;
+  const mailReady = locals.mail_ready !== false;
+  const flash = locals.flash || null;
+%>
+<div class="page-head">
+  <h1 class="page-title" style="font-size:26px;"><%= bound ? '修改邮箱' : '绑定邮箱' %></h1>
+  <p class="page-sub"><%= bound ? '更换接收支付与发货通知的邮箱' : '注册必须绑定邮箱，请先完成绑定后继续使用' %></p>
+</div>
+
+<% if (flash && flash.message) { %>
+  <div class="alert alert-<%= flash.type === 'error' ? 'error' : 'success' %>" style="max-width:640px;margin-bottom:16px;">
+    <%= e(flash.message) %>
+  </div>
+<% } %>
+
+<div class="card" style="max-width:640px;padding:24px;">
+  <% if (!mailReady) { %>
+    <div class="alert alert-error" style="margin-bottom:16px;">邮件服务未配置，暂时无法发送验证码，请联系管理员。</div>
+  <% } %>
+
+  <form method="post" action="/account/email" id="email-form">
+    <input type="hidden" name="_csrf" value="<%= e(locals.csrf || '') %>">
+
+    <div class="field">
+      <label class="label" for="bind-email">邮箱地址</label>
+      <input class="input" type="email" id="bind-email" name="email" maxlength="254" required
+             autocomplete="email" value="<%= e(currentEmail) %>" placeholder="you@example.com">
+      <% if (bound) { %><div class="hint">当前绑定：<%= e(currentEmail) %></div><% } %>
+    </div>
+
+    <div class="field">
+      <label class="label" for="bind-code">邮箱验证码</label>
+      <div class="input-row">
+        <input class="input" type="text" id="bind-code" name="code" inputmode="numeric" pattern="[0-9]{6}"
+               maxlength="6" autocomplete="one-time-code" required placeholder="6 位数字">
+        <button type="button" class="btn btn-secondary" id="bind-send-code" <%= mailReady ? '' : 'disabled' %>>获取验证码</button>
+      </div>
+      <div class="hint" id="bind-code-hint">验证码 10 分钟内有效</div>
+    </div>
+
+    <div class="sec-actions" style="margin-top:8px;">
+      <button class="btn btn-primary" <%= mailReady ? '' : 'disabled' %>>保存邮箱</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('bind-send-code');
+  var hint = document.getElementById('bind-code-hint');
+  if (!btn) return;
+  btn.addEventListener('click', async function () {
+    var email = (document.getElementById('bind-email').value || '').trim();
+    if (!email || email.indexOf('@') < 1) { hint.textContent = '请先填写有效邮箱。'; return; }
+    btn.disabled = true; hint.textContent = '正在发送…';
+    try {
+      var res = await fetch('/auth/email/code', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, purpose: 'bind' })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (res.ok && data.ok) {
+        hint.textContent = data.message || '验证码已发送。';
+        var left = 60;
+        var timer = setInterval(function () {
+          left -= 1;
+          if (left <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '重新获取'; }
+          else { btn.textContent = left + 's'; }
+        }, 1000);
+        return;
+      }
+      hint.textContent = data.error || '发送失败，请稍后再试。';
+    } catch (e) { hint.textContent = '网络异常，请稍后再试。'; }
+    btn.disabled = false;
+  });
+})();
+</script>

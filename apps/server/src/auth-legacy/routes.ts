@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AuthService, codePoints } from "./auth-service.js";
 import { Csrf } from "./csrf.js";
+import { isValidEmail, normalizeEmail } from "../email-code.js";
 import { PasswordHasher } from "./password-hasher.js";
 import { SESSION_COOKIE, SessionManager } from "./session-manager.js";
 import { renderPage } from "../render.js";
@@ -23,6 +24,41 @@ import type { LegacyAuthDependencies, LegacySessionContext, Row } from "./types.
  */
 export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDependencies): void {
   const service = new AuthService(deps.users, deps.social, deps.config, deps.clock ?? { now: () => Math.floor(Date.now() / 1000) });
+
+  // 注册必须绑定邮箱：已登录但账号没有邮箱的用户，一律先跳到绑定页。
+  const EMAIL_EXEMPT = [
+    /^\/account\/email/,
+    /^\/logout/,
+    /^\/login/,
+    /^\/register/,
+    /^\/auth\//,
+    /^\/admin/,
+    /^\/assets\//,
+    /^\/payments\//,
+    /^\/webhooks?\//,
+    /^\/health/,
+    /^\/ready/,
+    /^\/favicon\.ico/,
+  ];
+  if (deps.emailCodes !== undefined) {
+    app.addHook("preHandler", async (request, reply) => {
+      if (request.method !== "GET") return;
+      const path = (request.url.split("?")[0] ?? "/");
+      if (EMAIL_EXEMPT.some((pattern) => pattern.test(path))) return;
+      const cookieHeader = request.headers.cookie ?? "";
+      const match = /(?:^|;\s*)vhpay_session=([^;]+)/.exec(cookieHeader);
+      if (match === null) return;
+      const context = await sessions.start(match[1]);
+      if (context.isNew) return;
+      const user = await service.user(context.data);
+      if (user === null) return;
+      const email = String(user["email"] ?? "").trim();
+      if (email !== "") return;
+      await sessions.persist(context);
+      reply.code(303).header("location", authUrl("/account/email")).send();
+      return reply;
+    });
+  }
   const sessions = new SessionManager(deps.sessions, deps.clock ?? { now: () => Math.floor(Date.now() / 1000) });
   const secure = deps.secureCookies ?? false;
   const site = buildSite(deps.config);
@@ -162,6 +198,37 @@ export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDepend
     return redirectWithFlash(reply, safeRedirect(formString(body["redirect"]) || "/"), `欢迎回来，${String(user["display_name"] || user["username"])}`);
   });
 
+  // -- POST /auth/email/code : 发送邮箱验证码 --------------------------------
+  app.post("/auth/email/code", async (request, reply) => {
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const email = normalizeEmail(formString(body["email"]));
+    const purpose: "register" | "bind" = formString(body["purpose"]) === "bind" ? "bind" : "register";
+    if (!isValidEmail(email)) return reply.code(400).send({ ok: false, error: "请输入有效的邮箱地址。" });
+    if (deps.emailCodes === undefined || deps.mailer === undefined) {
+      return reply.code(400).send({ ok: false, error: "邮件服务未配置，请联系管理员。" });
+    }
+    if (purpose === "bind") {
+      const context = await startSession(request, reply);
+      const loggedIn = await service.user(context.data);
+      if (loggedIn === null) return reply.code(401).send({ ok: false, error: "请先登录。" });
+    }
+    const wait = await deps.emailCodes.cooldownRemaining(email, purpose);
+    if (wait > 0) return reply.code(429).send({ ok: false, error: `请 ${wait} 秒后再获取验证码。`, retry_after: wait });
+    const code = await deps.emailCodes.issue(email, purpose, null, request.ip);
+    const siteName = deps.config.get("SITE_NAME", "");
+    try {
+      await deps.mailer.send({
+        to: email,
+        subject: `【${siteName}】邮箱验证码`,
+        html: `<p>你正在${purpose === "bind" ? "绑定" : "注册"}账号，验证码：</p><p style="font-size:24px;letter-spacing:4px"><b>${code}</b></p><p>10 分钟内有效。如非本人操作请忽略。</p>`,
+        text: `验证码：${code}（10 分钟内有效）`,
+      });
+    } catch {
+      return reply.code(500).send({ ok: false, error: "验证码发送失败，请稍后再试。" });
+    }
+    return reply.send({ ok: true, message: "验证码已发送，请查收邮件（也看看垃圾箱）。" });
+  });
+
   // -- POST /auth/password/register -----------------------------------------
   app.post("/auth/password/register", async (request, reply) => {
     const context = await startSession(request, reply);
@@ -173,13 +240,41 @@ export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDepend
       return redirectWithFlash(reply, "/account?complete=1", "您已登录，请直接在账号信息中为当前账号设置用户名和密码，无需重新注册。");
     }
     const body = (request.body ?? {}) as Record<string, unknown>;
+    const email = normalizeEmail(formString(body["email"]));
+    const codeInput = formString(body["code"]);
+    // 注册必须绑定邮箱：邮箱格式 + 一次性验证码双重校验。
+    if (deps.emailCodes !== undefined) {
+      const requireEmail = deps.config.bool("REGISTER_REQUIRE_EMAIL", true);
+      if (requireEmail || email !== "") {
+        if (!isValidEmail(email)) {
+          const message = "请填写有效的邮箱地址并获取验证码。";
+          sessions.flash(context, message, "error");
+          await sessions.persist(context);
+          return redirectWithFlash(reply, authUrl("/register"), message, "error");
+        }
+        const emailTaken = await deps.users.findByUsername(email);
+        if (emailTaken !== null && String(emailTaken["email"] ?? "").toLowerCase() === email) {
+          const message = "该邮箱已被其他账号使用。";
+          sessions.flash(context, message, "error");
+          await sessions.persist(context);
+          return redirectWithFlash(reply, authUrl("/register"), message, "error");
+        }
+        const verified = await deps.emailCodes.verify(email, "register", codeInput);
+        if (!verified) {
+          const message = "邮箱验证码不正确或已过期，请重新获取。";
+          sessions.flash(context, message, "error");
+          await sessions.persist(context);
+          return redirectWithFlash(reply, authUrl("/register"), message, "error");
+        }
+      }
+    }
     const result = await service.register(
       formString(body["username"]),
       formString(body["password"]),
       formString(body["password_confirm"]),
       formString(body["display_name"]),
       formInt(body["agreed"]) !== 0,
-      formString(body["email"]),
+      email,
     );
     if (!result.ok) {
       sessions.flash(context, result.error, "error");
@@ -637,6 +732,66 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
   });
 
   // -- POST /account/security/password : change password ----------------------------
+  // -- GET /account/email : 绑定 / 修改邮箱 ----------------------------------
+  app.get("/account/email", async (request, reply) => {
+    const context = await startSession(request, reply);
+    if (!(await requireLogin(request, reply, context))) return reply;
+    const user = (await currentUser(context))!;
+    const flash = sessions.takeFlash(context);
+    const csrfToken = Csrf.token(context.data);
+    await sessions.persist(context);
+    return renderPage(
+      reply,
+      "account/email",
+      {
+        current_email: String(user["email"] ?? ""),
+        email_bound: String(user["email"] ?? "").trim() !== "",
+        mail_ready: deps.emailCodes !== undefined && deps.mailer !== undefined,
+        flash,
+        csrf: csrfToken,
+        site,
+        nav: "account",
+        pageTitle: "绑定邮箱",
+      },
+      { layout: "auth" },
+    );
+  });
+
+  app.post("/account/email", async (request, reply) => {
+    const context = await startSession(request, reply);
+    if (!(await requireLogin(request, reply, context))) return reply;
+    if (!(await requireCsrf(request, reply, context))) return reply;
+    const user = (await currentUser(context))!;
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const email = normalizeEmail(formString(body["email"]));
+    const code = formString(body["code"]);
+    if (deps.emailCodes === undefined) {
+      const message = "邮件服务未配置，暂时无法绑定邮箱。";
+      sessions.flash(context, message, "error");
+      await sessions.persist(context);
+      return redirectWithFlash(reply, "/account/email", message, "error");
+    }
+    if (!isValidEmail(email)) {
+      const message = "请输入有效的邮箱地址。";
+      sessions.flash(context, message, "error");
+      await sessions.persist(context);
+      return redirectWithFlash(reply, "/account/email", message, "error");
+    }
+    const verified = await deps.emailCodes.verify(email, "bind", code);
+    if (!verified) {
+      const message = "验证码不正确或已过期，请重新获取。";
+      sessions.flash(context, message, "error");
+      await sessions.persist(context);
+      return redirectWithFlash(reply, "/account/email", message, "error");
+    }
+    await deps.users.update(Number(user["id"]), { email });
+    await deps.audit?.log(Number(user["id"]), "account.email_bind", "user", String(user["id"]), {}, request.ip, request.headers["user-agent"] ?? null);
+    const message = "邮箱绑定成功。";
+    sessions.flash(context, message);
+    await sessions.persist(context);
+    return redirectWithFlash(reply, "/account", message);
+  });
+
   app.post("/account/security/password", async (request, reply) => {
     const context = await startSession(request, reply);
     if (!(await requireLogin(request, reply, context))) return reply;
