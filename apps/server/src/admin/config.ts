@@ -7,6 +7,7 @@
  */
 
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { CryptoService } from "../../../../packages/db/src/index.js";
 import path from "node:path";
 import type { AdminConfigPort, AdminSettingsPort } from "./types.js";
 
@@ -21,6 +22,7 @@ const SECRET_KEYS = new Set([
 ]);
 
 export class FileAdminConfig implements AdminConfigPort {
+  private crypto: CryptoService | undefined;
   readonly settings: AdminSettingsPort;
   private values: Record<string, string>;
   private readonly file: string;
@@ -44,8 +46,19 @@ export class FileAdminConfig implements AdminConfigPort {
   }
 
   get(key: string, fallback = ""): string {
-    const value = this.values[key] ?? this.env[key];
-    return value === undefined || value === "" ? fallback : value;
+    const stored = this.values[key];
+    const value = stored !== undefined ? stored : this.env[key];
+    if (value === undefined || value === "") return fallback;
+    // Secrets migrated from PHP are `v1:` ciphertext; callers need plaintext.
+    if (value.startsWith("v1:")) {
+      if (this.crypto === undefined) this.crypto = new CryptoService(this.basePath);
+      try {
+        return this.crypto.decrypt(value);
+      } catch {
+        return value;
+      }
+    }
+    return value;
   }
 
   bool(key: string, fallback: boolean): boolean {
