@@ -23,7 +23,7 @@ import {
   createSqliteLegacyAuthDependencies,
 } from "./auth-legacy/index.js";
 import { configureErrorPages } from "./error-pages.js";
-import { EnvSocialProvider } from "./social-provider.js";
+import { AggregateOAuthProvider } from "./aggregate-oauth.js";
 import { PageConfig } from "./page-config.js";
 import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
 import { registerAdminRoutes } from "./admin/index.js";
@@ -131,7 +131,7 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
   const shopConfig = new PageConfig();
   const legacyAuth = await createSqliteLegacyAuthDependencies(db, {
     config: shopConfig,
-    socialProvider: new EnvSocialProvider(shopConfig, () => process.env.APP_URL ?? ""),
+    socialProvider: new AggregateOAuthProvider(shopConfig, undefined, () => process.env.APP_URL ?? ""),
     secureCookies,
     basePath: process.env.APP_BASE_PATH ?? process.cwd(),
   });
