@@ -4,6 +4,7 @@ import {
   OrderRepository,
   PaymentTransactionRepository,
   ProductRepository,
+  UserRepository,
   CryptoService,
 } from "../../../../packages/db/src/legacy/index.js";
 import type { ConfigPort, ShopLegacyDependencies } from "./types.js";
@@ -54,6 +55,9 @@ export function createShopLegacyDependencies(
     orders: new OrderRepository(db),
     inventory: new InventoryRepository(db),
     transactions: new PaymentTransactionRepository(db),
+    // Storefront pages resolve the logged-in user (and their units) through
+    // these ports; without them every page 500s as soon as a session exists.
+    users: new UserRepository(db),
   };
 }
 

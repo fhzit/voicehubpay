@@ -1,0 +1,100 @@
+<%
+  const u = locals.user || null;
+  const product = locals.product || {};
+  const modeLabels = {
+    card: '库存卡密',
+    voicehub: 'VoiceHub 自动发券',
+    card_and_voicehub: '库存卡密 + VoiceHub 发券',
+    manual: '人工发货',
+  };
+  const mode = modeLabels[product.delivery_mode] || '自动发货';
+  const stockEnabled = Number(product.stock_enabled) === 1;
+  const stockAvailable = Number(product.stock_available ?? 0);
+  const outOfStock = stockEnabled && stockAvailable === 0;
+  const priceCents = Number(product.price_cents ?? 0);
+  const minQ = Math.max(1, Number(product.min_quantity ?? 1));
+  const maxQ = Math.max(minQ, Number(product.max_quantity ?? 99));
+  const step = Math.max(1, Number(product.quantity_step ?? 1));
+  const initial = Array.from(String(product.name ?? ''))[0] || '';
+%>
+<div class="container" style="padding-top:24px;">
+  <nav class="small muted mb-3" style="display:flex;gap:6px;align-items:center;">
+    <a href="/">首页</a><span>›</span><a href="/products">商城</a><span>›</span><span style="color:var(--muted-foreground);"><%= e(product.name) %></span>
+  </nav>
+
+  <div class="pdp-grid">
+    <!-- 左：产品视觉 -->
+    <div style="min-width:0;">
+      <% if (product.cover_image) { %>
+        <div class="pdp-visual"><img src="<%= e(product.cover_image) %>" alt="<%= e(product.name) %>" loading="lazy"></div>
+      <% } else { %>
+        <div class="pdp-visual placeholder"><%= e(initial) %></div>
+      <% } %>
+    </div>
+
+    <!-- 右：购买面板 -->
+    <div>
+      <h1 class="pdp-title"><%= e(product.name) %></h1>
+      <div class="pdp-tags">
+        <span class="badge badge-blue"><%= e(mode) %></span>
+        <% if (stockEnabled) { %>
+          <% if (stockAvailable > 0) { %><span class="badge badge-green">库存 <%= stockAvailable %> 件</span><% } else { %><span class="badge badge-red">暂时缺货</span><% } %>
+        <% } else { %><span class="badge badge-blue">不限量 · 即时发券</span><% } %>
+      </div>
+
+      <div class="buy-panel">
+        <div class="price-row">
+          <span class="price-label">价格</span>
+          <span class="price-big">¥<%= money(priceCents) %></span>
+        </div>
+
+        <% if (outOfStock) { %>
+          <div class="notice notice-red">该商品暂时缺货，请稍后再来。</div>
+        <% } else { %>
+          <form method="post" action="/orders" id="buy-form">
+            <input type="hidden" name="_csrf" value="<%= e(locals.csrf || '') %>">
+            <input type="hidden" name="product_id" value="<%= Number(product.id) %>">
+            <input type="hidden" name="slug" value="<%= e(product.slug) %>">
+            <div class="field">
+              <label class="label">获取数量</label>
+              <div class="flex" style="gap:14px;flex-wrap:wrap;">
+                <div class="stepper" data-stepper data-price-cents="<%= priceCents %>">
+                  <button type="button" data-step="-1" aria-label="减少数量">−</button>
+                  <input type="number" name="quantity" id="qty" value="<%= minQ %>" min="<%= minQ %>" max="<%= maxQ %>" step="<%= step %>" inputmode="numeric">
+                  <button type="button" data-step="1" aria-label="增加数量">＋</button>
+                </div>
+                <div class="hint" style="margin:0;align-self:center;">单次获取 <%= minQ %> – <%= maxQ %> 份<%= step > 1 ? '，单步 ' + step + ' 份' : '' %></div>
+              </div>
+            </div>
+            <div class="total-row">
+              <span class="tl">合计</span>
+              <span class="tv" data-total-cents>¥<%= money(priceCents * minQ) %></span>
+            </div>
+            <button class="btn btn-primary btn-lg btn-block buy-cta-desktop" type="submit">
+              <%= u !== null ? '立即获取' : '登录后获取' %>
+            </button>
+            <% if (u === null) { %>
+              <div class="info-box">登录后可永久查看历史获取记录与权益，重要信息加密保存，随时找回。</div>
+            <% } %>
+          </form>
+        <% } %>
+      </div>
+
+      <div class="card" style="margin-top:24px;">
+        <h3 class="card-title mb-2">服务说明</h3>
+        <% if (product.description) { %>
+          <div style="white-space:pre-wrap;color:var(--foreground-secondary);font-size:14px;line-height:1.8;"><%= e(product.description) %></div>
+        <% } else { %>
+          <p class="muted" style="margin:0;">暂无详细说明，获取后即时生效。</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (!outOfStock) { %>
+<div class="mobile-buybar">
+  <span class="mb-price"><span data-total-cents style="font-size:20px;">¥<%= money(priceCents * minQ) %></span></span>
+  <button class="btn btn-primary mb-cta" style="height:44px;" type="submit" form="buy-form"><%= u !== null ? '立即获取' : '登录后获取' %></button>
+</div>
+<% } %>

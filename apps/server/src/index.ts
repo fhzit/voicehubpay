@@ -1,3 +1,4 @@
+import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import {
   createSqliteDatabase,
@@ -16,6 +17,27 @@ import {
 import { AfdianOrderRepository, VoiceHubDeliveryRepository, CryptoService, type Database } from "../../../packages/db/src/index.js";
 import { configureAfdianWebhook } from "./afdian-webhook.js";
 import { createAfdianWebhookProcessor } from "./afdian-webhook-processor.js";
+import {
+  configureAccountRoutes,
+  configureAuthRoutes,
+  createSqliteLegacyAuthDependencies,
+} from "./auth-legacy/index.js";
+import { configureErrorPages } from "./error-pages.js";
+import { EnvSocialProvider } from "./social-provider.js";
+import { PageConfig } from "./page-config.js";
+import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
+import { registerAdminRoutes } from "./admin/index.js";
+import { ensureAdminSchema } from "./admin/index.js";
+import { registerInventoryGenerateRoutes } from "./admin-inventory-generate.js";
+import { createAdminWiring } from "./admin-wiring.js";
+import { ensureLegacySchema } from "./schema-bootstrap.js";
+
+const deployment = checkDeploymentEnv();
+console.log(formatDeploymentReport(deployment));
+if (!deployment.ok) {
+  console.error("启动中止：缺少必要环境变量。设置 ALLOW_EMPTY_DB=1 可在无数据库时启动用于探活。");
+  process.exit(1);
+}
 
 const config = loadConfig();
 const databaseUrl = process.env.DATABASE_URL;
@@ -44,6 +66,7 @@ try {
       });
     }
     const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production" });
+    await wirePageRoutes(app, db, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {
       enabled: () => afdianConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
@@ -75,6 +98,7 @@ try {
       });
     }
     const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production" });
+    await wirePageRoutes(app, db, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {
       enabled: () => afdianConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
@@ -96,6 +120,40 @@ try {
 } catch (error) {
   console.error(error);
   process.exitCode = 1;
+}
+
+/**
+ * Register the PHP-parity HTML surfaces that the API layer does not cover:
+ * `/login`, `/register`, `/auth/password/*`, `/account/*` (auth-legacy routes)
+ * and the 404/500 error pages. Storefront pages are wired by `shop`.
+ */
+async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies: boolean, withErrorPages: boolean): Promise<void> {
+  const shopConfig = new PageConfig();
+  const legacyAuth = await createSqliteLegacyAuthDependencies(db, {
+    config: shopConfig,
+    socialProvider: new EnvSocialProvider(shopConfig, () => process.env.APP_URL ?? ""),
+    secureCookies,
+    basePath: process.env.APP_BASE_PATH ?? process.cwd(),
+  });
+  configureAuthRoutes(app, legacyAuth);
+  configureAccountRoutes(app, legacyAuth);
+
+  // PHP-parity tables the incremental schemas miss (social_identities, audit_logs, analytics_daily).
+  await ensureLegacySchema(db);
+
+  // Admin panel (PHP parity) + card-code generation.
+  await ensureAdminSchema(db);
+  const wiring = createAdminWiring(db, {
+    config: shopConfig,
+    sessions: legacyAuth.sessions,
+    crypto: new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
+    secureCookies,
+  });
+  registerAdminRoutes(app, wiring.admin);
+  registerInventoryGenerateRoutes(app, wiring.inventoryGenerate);
+  // configureShopRoutes already registers the shared 404/500 pages when the
+  // legacy shop is enabled; only add them for API-only deployments.
+  if (withErrorPages) configureErrorPages(app, { config: shopConfig });
 }
 
 async function configureAfdianTables(db: Database): Promise<void> {

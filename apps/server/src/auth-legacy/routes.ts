@@ -3,6 +3,8 @@ import { AuthService, codePoints } from "./auth-service.js";
 import { Csrf } from "./csrf.js";
 import { PasswordHasher } from "./password-hasher.js";
 import { SESSION_COOKIE, SessionManager } from "./session-manager.js";
+import { renderPage } from "../render.js";
+import { buildSite } from "../site.js";
 import type { LegacyAuthDependencies, LegacySessionContext, Row } from "./types.js";
 
 /**
@@ -23,6 +25,7 @@ export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDepend
   const service = new AuthService(deps.users, deps.social, deps.config, deps.clock ?? { now: () => Math.floor(Date.now() / 1000) });
   const sessions = new SessionManager(deps.sessions, deps.clock ?? { now: () => Math.floor(Date.now() / 1000) });
   const secure = deps.secureCookies ?? false;
+  const site = buildSite(deps.config);
 
   const cookie = (id: string): string => `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`;
   const clearedCookie = (): string => `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`;
@@ -97,16 +100,21 @@ export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDepend
     const flash = sessions.takeFlash(context);
     const csrfToken = Csrf.token(context.data);
     await sessions.persist(context);
-    return reply.code(200).send({
-      template: "auth/login",
-      data: {
+    return renderPage(
+      reply,
+      "auth/login",
+      {
         redirect: queryParam(request, "redirect", "/"),
         qq_enabled: deps.config.bool("QQ_LOGIN_ENABLED", false),
         wx_enabled: deps.config.bool("WX_LOGIN_ENABLED", false),
         flash,
-        csrf_token: csrfToken,
+        csrf: csrfToken,
+        site,
+        nav: "",
+        pageTitle: "登录",
       },
-    });
+      { layout: "auth" },
+    );
   });
 
   // -- GET {authUrl}/register : show register -------------------------------
@@ -116,16 +124,21 @@ export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDepend
     const flash = sessions.takeFlash(context);
     const csrfToken = Csrf.token(context.data);
     await sessions.persist(context);
-    return reply.code(200).send({
-      template: "auth/register",
-      data: {
+    return renderPage(
+      reply,
+      "auth/register",
+      {
         registration_enabled: deps.config.bool("REGISTRATION_ENABLED", true),
         qq_enabled: deps.config.bool("QQ_LOGIN_ENABLED", false),
         wx_enabled: deps.config.bool("WX_LOGIN_ENABLED", false),
         flash,
-        csrf_token: csrfToken,
+        csrf: csrfToken,
+        site,
+        nav: "",
+        pageTitle: "注册",
       },
-    });
+      { layout: "auth" },
+    );
   });
 
   // -- POST /auth/password/login --------------------------------------------
@@ -192,11 +205,23 @@ export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDepend
     const rawProvider = String(profile["provider"] ?? "");
     const provider = ["qq", "wx"].includes(rawProvider) ? rawProvider : "qq";
     const csrfToken = Csrf.token(context.data);
+    const flash = sessions.takeFlash(context);
     await sessions.persist(context);
-    return reply.code(200).send({
-      template: "auth/complete-social",
-      data: { provider, nickname: String(profile["nickname"] ?? ""), avatar: String(profile["avatar_url"] ?? ""), csrf_token: csrfToken },
-    });
+    return renderPage(
+      reply,
+      "auth/complete-social",
+      {
+        provider,
+        nickname: String(profile["nickname"] ?? ""),
+        avatar: String(profile["avatar_url"] ?? ""),
+        flash,
+        csrf: csrfToken,
+        site,
+        nav: "",
+        pageTitle: "完善账号",
+      },
+      { layout: "auth" },
+    );
   });
 
   // -- POST {authUrl}/complete-social ---------------------------------------
@@ -370,6 +395,7 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
   const service = new AuthService(deps.users, deps.social, deps.config, deps.clock ?? { now: () => Math.floor(Date.now() / 1000) });
   const sessions = new SessionManager(deps.sessions, deps.clock ?? { now: () => Math.floor(Date.now() / 1000) });
   const secure = deps.secureCookies ?? false;
+  const site = buildSite(deps.config);
 
   const cookie = (id: string): string => `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`;
   const readSessionCookie = (request: FastifyRequest): string | null => {
@@ -429,16 +455,26 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
     const orderCount = orders ? (await orders.listForUser(Number(user["id"]), "", "", 1, 1)).total : 0;
     const cardCount = deps.units ? await deps.units.countDeliveredForUser(Number(user["id"])) : 0;
     const connections = await deps.social.listForUser(Number(user["id"]));
-    return reply.code(200).send({
-      template: "account/overview",
-      data: {
+    const flash = sessions.takeFlash(context);
+    await sessions.persist(context);
+    return renderPage(
+      reply,
+      "account/overview",
+      {
         recent_orders: recentOrders,
         order_count: orderCount,
         card_count: cardCount,
         connections,
         has_password: isNonEmptyString(user["password_hash"]),
+        user,
+        site,
+        flash,
+        csrf: Csrf.token(context.data),
+        nav: "account",
+        pageTitle: "账户概览",
       },
-    });
+      { layout: "account" },
+    );
   });
 
   // -- GET /account/orders ----------------------------------------------------
@@ -452,17 +488,27 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
     const result = deps.orders
       ? await deps.orders.listForUser(Number(user["id"]), status, q, page, 10)
       : { items: [], total: 0, page, perPage: 10 };
-    return reply.code(200).send({
-      template: "account/orders",
-      data: {
+    const flash = sessions.takeFlash(context);
+    await sessions.persist(context);
+    return renderPage(
+      reply,
+      "account/orders",
+      {
         orders: result.items,
         total: result.total,
         page: result.page,
         pages: Math.ceil(result.total / Math.max(1, result.perPage)),
         status,
         q,
+        user,
+        site,
+        flash,
+        csrf: Csrf.token(context.data),
+        nav: "orders",
+        pageTitle: "我的服务",
       },
-    });
+      { layout: "account" },
+    );
   });
 
   // -- GET /account/cards ------------------------------------------------------
@@ -484,10 +530,27 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
         code_source_label: sourceLabel(item),
       };
     });
-    return reply.code(200).send({
-      template: "account/cards",
-      data: { cards, total: result.total, page: result.page, pages: Math.ceil(result.total / Math.max(1, result.perPage)), status, q },
-    });
+    const flash = sessions.takeFlash(context);
+    await sessions.persist(context);
+    return renderPage(
+      reply,
+      "account/cards",
+      {
+        cards,
+        total: result.total,
+        page: result.page,
+        pages: Math.ceil(result.total / Math.max(1, result.perPage)),
+        status,
+        q,
+        user,
+        site,
+        flash,
+        csrf: Csrf.token(context.data),
+        nav: "cards",
+        pageTitle: "我的权益",
+      },
+      { layout: "account" },
+    );
   });
 
   // -- GET /account/connections -------------------------------------------------
@@ -496,15 +559,25 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
     if (!(await requireLogin(request, reply, context))) return reply;
     const user = (await currentUser(context))!;
     const connections = await deps.social.listForUser(Number(user["id"]));
-    return reply.code(200).send({
-      template: "account/connections",
-      data: {
+    const flash = sessions.takeFlash(context);
+    await sessions.persist(context);
+    return renderPage(
+      reply,
+      "account/connections",
+      {
         connections,
         has_password: isNonEmptyString(user["password_hash"]),
         qq_enabled: deps.config.bool("QQ_LOGIN_ENABLED", false),
         wx_enabled: deps.config.bool("WX_LOGIN_ENABLED", false),
+        user,
+        site,
+        flash,
+        csrf: Csrf.token(context.data),
+        nav: "connections",
+        pageTitle: "账号绑定",
       },
-    });
+      { layout: "account" },
+    );
   });
 
   // -- POST /account/connections/unbind ------------------------------------------
@@ -544,15 +617,23 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
     if (!(await requireLogin(request, reply, context))) return reply;
     const user = (await currentUser(context))!;
     const csrfToken = Csrf.token(context.data);
+    const flash = sessions.takeFlash(context);
     await sessions.persist(context);
-    return reply.code(200).send({
-      template: "account/security",
-      data: {
+    return renderPage(
+      reply,
+      "account/security",
+      {
         has_password: isNonEmptyString(user["password_hash"]),
         session_created: context.data["created_at"] ?? null,
-        csrf_token: csrfToken,
+        user,
+        site,
+        flash,
+        csrf: csrfToken,
+        nav: "security",
+        pageTitle: "安全设置",
       },
-    });
+      { layout: "account" },
+    );
   });
 
   // -- POST /account/security/password : change password ----------------------------
@@ -594,8 +675,22 @@ export function configureAccountRoutes(app: FastifyInstance, deps: LegacyAuthDep
     if (!(await requireLogin(request, reply, context))) return reply;
     const user = (await currentUser(context))!;
     const csrfToken = Csrf.token(context.data);
+    const flash = sessions.takeFlash(context);
     await sessions.persist(context);
-    return reply.code(200).send({ template: "account/profile", data: { has_password: isNonEmptyString(user["password_hash"]), csrf_token: csrfToken } });
+    return renderPage(
+      reply,
+      "account/profile",
+      {
+        has_password: isNonEmptyString(user["password_hash"]),
+        user,
+        site,
+        flash,
+        csrf: csrfToken,
+        nav: "profile",
+        pageTitle: "账号资料",
+      },
+      { layout: "account" },
+    );
   });
 
   // -- POST /account/profile : update profile --------------------------------------------

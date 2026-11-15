@@ -1,0 +1,46 @@
+<%
+  const sourceLabels = { inventory: '库存卡密', shop_order_no: '商城订单号', afdian_order_no: '爱发电订单号' };
+  const pageHref = (i) => `/admin/voicehub/failures?page=${i}`;
+%>
+<div class="page-head flex-between flex-wrap">
+  <div><h1 class="page-title">失败中心</h1><p class="page-sub">共 <%= total %> 条失败推送，可逐条重试或批量处理</p></div>
+  <form method="post" action="/admin/voicehub/retry-all">
+    <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+    <button class="btn btn-primary">批量重试全部失败</button>
+  </form>
+</div>
+
+<div class="notice notice-red" style="margin-bottom:18px;">共 <strong><%= total %></strong> 条推送失败。重试会复用原券码逐个重新调用 VoiceHub，每个 code 一次请求，不会产生重复卡券。</div>
+
+<div class="card card-pad-0">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>ID</th><th>来源单号</th><th>来源</th><th>尝试</th><th>错误</th><th>最后时间</th><th></th></tr></thead>
+    <tbody>
+    <% if (deliveries.length === 0) { %>
+      <tr><td colspan="7" class="text-center muted">暂无失败记录</td></tr>
+    <% } %>
+    <% deliveries.forEach((d) => { %>
+      <tr>
+        <td class="small mono faint">#<%= Number(d.id) %></td>
+        <td class="mono small"><%= e(d.source_order_no) %></td>
+        <td class="small"><%= e(sourceLabels[d.code_source] || d.code_source) %></td>
+        <td class="small" style="color:<%= Number(d.attempts || 0) > 3 ? 'var(--warning)' : 'var(--foreground-secondary)' %>;font-weight:600;"><%= Number(d.attempts || 0) %></td>
+        <td class="small" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= e(d.last_error || '') %>"><%= e(d.last_error || '') %></td>
+        <td class="small muted"><%= datetime(d.updated_at) %></td>
+        <td>
+          <form method="post" action="/admin/voicehub/retry" style="display:inline;">
+            <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+            <input type="hidden" name="delivery_id" value="<%= Number(d.id) %>">
+            <button class="btn btn-secondary btn-sm">重试</button>
+          </form>
+          <% if (d.fulfillment_unit_id !== null && d.fulfillment_unit_id !== undefined) { %>
+            <a href="/admin/orders/<%= e(d.shop_order_no || '') %>" class="btn-link small">订单</a>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+</div>
+
+<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>

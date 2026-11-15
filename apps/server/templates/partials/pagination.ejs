@@ -1,0 +1,7 @@
+<% if (pages > 1) { %>
+  <div class="pagination">
+    <% for (let i = 1; i <= pages; i++) { %>
+      <% if (i === page) { %><span class="current"><%= i %></span><% } else { %><a href="<%= href(i) %>"><%= i %></a><% } %>
+    <% } %>
+  </div>
+<% } %>

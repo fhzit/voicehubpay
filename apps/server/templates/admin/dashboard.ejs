@@ -1,0 +1,243 @@
+<%
+  const k = kpis.current;
+  const d = kpis.deltas || {};
+  const rows = trends.income || [];
+  const showShop = channel === 'all' || channel === 'shop';
+  const showAfdian = channel === 'all' || channel === 'afdian';
+  const maxIncome = Math.max(1, ...rows.map((r) => r.total));
+  const W = 640, H = 185, PL = 10, PR = 10, PT = 12, PB = 26;
+  const plotW = W - PL - PR, plotH = H - PT - PB;
+  const n = rows.length;
+  const xAt = (i) => (n === 1 ? PL + plotW / 2 : PL + (plotW * i) / (n - 1));
+  const yAt = (v) => PT + plotH - (v / maxIncome) * plotH;
+  const pts = (key) => rows.map((r, i) => `${xAt(i).toFixed(1)},${yAt(r[key]).toFixed(1)}`).join(' ');
+  const delta = (val) => {
+    const v = Number(val || 0);
+    if (v > 0) return `<span class="stat-delta up">▲ ${v.toFixed(1)}%</span>`;
+    if (v < 0) return `<span class="stat-delta down">▼ ${Math.abs(v).toFixed(1)}%</span>`;
+    return '<span class="stat-delta flat">与上期持平</span>';
+  };
+  const sourceLabels = { inventory: '库存卡密', shop_order_no: '商城订单号', afdian_order_no: '爱发电订单号' };
+%>
+<div class="filters dash-filters" style="margin-bottom:20px;">
+  <div class="filter-group">
+    <span class="small muted fg-label">统计范围</span>
+    <% [['today', '今日'], ['week', '本周'], ['month', '本月']].forEach(([rk, rl]) => { %>
+      <a href="/admin?range=<%= rk %>&channel=<%= e(channel) %>" class="btn btn-sm <%= range === rk ? 'btn-primary' : 'btn-secondary' %>"><%= rl %></a>
+    <% }) %>
+  </div>
+  <div class="filter-group">
+    <span class="small muted fg-label">渠道</span>
+    <% [['all', '全部'], ['shop', '商城'], ['afdian', '爱发电']].forEach(([ck, cl]) => { %>
+      <a href="/admin?range=<%= e(range) %>&channel=<%= ck %>" class="btn btn-sm <%= channel === ck ? 'btn-primary' : 'btn-secondary' %>"><%= cl %></a>
+    <% }) %>
+  </div>
+  <form method="get" action="/admin" class="flex dash-date-form" style="gap:8px;margin-left:auto;">
+    <input type="hidden" name="range" value="custom">
+    <input type="hidden" name="channel" value="<%= e(channel) %>">
+    <input type="date" name="from" class="input" value="<%= e(custom_from) %>">
+    <input type="date" name="to" class="input" value="<%= e(custom_to) %>">
+    <button class="btn btn-secondary btn-sm">自定义</button>
+  </form>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">总营收</div>
+    <div class="stat-value">¥<%= money(k.total_revenue) %></div>
+    <%- delta(d.total_revenue) %>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">商城收入</div>
+    <div class="stat-value">¥<%= money(k.shop_revenue) %></div>
+    <%- delta(d.shop_revenue) %>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">爱发电收入</div>
+    <div class="stat-value">¥<%= money(k.afdian_revenue) %></div>
+    <%- delta(d.afdian_revenue) %>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">客单价</div>
+    <div class="stat-value">¥<%= money(k.avg_order_value) %></div>
+    <div class="stat-delta flat">支付总额 / 订单数</div>
+  </div>
+</div>
+
+<div class="stat-grid stat-grid-sm" style="margin-top:16px;">
+  <div class="stat-card">
+    <div class="stat-label">已支付订单</div>
+    <div class="stat-value"><%= k.paid_orders %></div>
+    <div class="stat-delta flat">商城 <%= k.shop_orders %> · 爱发电 <%= k.afdian_orders %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">售出件数</div>
+    <div class="stat-value"><%= k.sold_units %></div>
+    <%- delta(d.sold_units) %>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">实际收入</div>
+    <div class="stat-value">¥<%= money(k.actual_revenue) %></div>
+    <%- delta(d.actual_revenue) %>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">VoiceHub 成功率</div>
+    <div class="stat-value" style="color:<%= k.voicehub_success_rate >= 90 ? 'var(--success)' : 'var(--destructive)' %>"><%= k.voicehub_success_rate %><small>%</small></div>
+    <div class="stat-delta flat">成功 <%= k.voicehub_success %> · 失败 <%= k.voicehub_failed %></div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 1fr; gap:20px; margin-top:20px;">
+  <div class="grid dash-grid-2" style="gap:20px; align-items:start;">
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:18px;">
+        <h3 class="card-title">交易趋势</h3>
+        <span class="legend">
+          <% if (showShop) { %><span class="lg"><span class="sw" style="background:var(--chart-2);"></span>商城</span><% } %>
+          <% if (showAfdian) { %><span class="lg"><span class="sw" style="background:var(--chart-5);"></span>爱发电</span><% } %>
+        </span>
+      </div>
+      <% if (rows.length === 0) { %>
+        <div class="muted small text-center" style="padding:40px 0;">所选范围内暂无收入数据</div>
+      <% } else { %>
+        <div class="line-chart-wrap">
+          <svg class="line-chart" viewBox="0 0 <%= W %> <%= H %>" role="img" aria-label="交易趋势折线图">
+            <% for (let g = 0; g <= 4; g++) { const gy = PT + (plotH * g) / 4; const yuan = (maxIncome * (4 - g)) / 4 / 100; %>
+              <line x1="<%= PL %>" y1="<%= gy.toFixed(1) %>" x2="<%= W - PR %>" y2="<%= gy.toFixed(1) %>" class="lc-grid"/>
+              <text x="<%= PL + 2 %>" y="<%= (gy - 4).toFixed(1) %>" class="lc-axis-val"><%= yuan > 0 ? yuan.toFixed(2) : 0 %></text>
+            <% } %>
+            <% if (showShop) { %>
+              <path d="M<%= pts('shop') %> L<%= xAt(n - 1).toFixed(1) %>,<%= yAt(0).toFixed(1) %> L<%= xAt(0).toFixed(1) %>,<%= yAt(0).toFixed(1) %> Z" class="lc-fill lc-fill-shop"></path>
+              <polyline class="lc-line lc-line-shop" points="<%= pts('shop') %>" fill="none"/>
+            <% } %>
+            <% if (showAfdian) { %>
+              <path d="M<%= pts('afdian') %> L<%= xAt(n - 1).toFixed(1) %>,<%= yAt(0).toFixed(1) %> L<%= xAt(0).toFixed(1) %>,<%= yAt(0).toFixed(1) %> Z" class="lc-fill lc-fill-afdian"></path>
+              <polyline class="lc-line lc-line-afdian" points="<%= pts('afdian') %>" fill="none"/>
+            <% } %>
+            <% rows.forEach((r, i) => { %>
+              <circle cx="<%= xAt(i).toFixed(1) %>" cy="<%= yAt(r.total).toFixed(1) %>" r="3" class="lc-dot"></circle>
+            <% }) %>
+            <% const step = Math.max(1, Math.ceil(n / 8)); rows.forEach((r, i) => { if (i % step !== 0 && i !== n - 1) return; %>
+              <text x="<%= xAt(i).toFixed(1) %>" y="<%= H - 8 %>" class="lc-axis" text-anchor="middle"><%= e(r.label) %></text>
+            <% }) %>
+          </svg>
+          <div class="lc-tooltip" id="lc-tooltip" hidden></div>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom:16px;">渠道收入</h3>
+      <div class="summary-row" style="font-size:14px;"><span>商城</span><span style="font-weight:700;">¥<%= money(k.shop_revenue) %></span></div>
+      <div class="chart-row-item">
+        <span class="cr-label">占比</span>
+        <div class="cr-bar"><div class="progress-track" style="height:6px;"><div class="progress-fill is-success" style="width:<%= trends.source_pct.shop %>%;"></div></div></div>
+        <span class="cr-value"><%= trends.source_pct.shop %>%</span>
+      </div>
+      <div class="summary-row" style="font-size:14px;margin-top:12px;"><span>爱发电</span><span style="font-weight:700;">¥<%= money(k.afdian_revenue) %></span></div>
+      <div class="chart-row-item">
+        <span class="cr-label">占比</span>
+        <div class="cr-bar"><div class="progress-track" style="height:6px;"><div class="progress-fill" style="width:<%= trends.source_pct.afdian %>%;background:var(--chart-5);"></div></div></div>
+        <span class="cr-value"><%= trends.source_pct.afdian %>%</span>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:16px 0 12px;"></div>
+      <div class="summary-row"><span class="muted">今日爱发电</span><span><%= afdian_stats.today_orders %> 单 · ¥<%= money(afdian_stats.today_revenue) %></span></div>
+      <div class="summary-row"><span class="muted">最近 Webhook</span><span class="small"><%= datetime(afdian_stats.last_webhook) %></span></div>
+      <div class="summary-row"><span class="muted">最近轮询</span><span class="small"><%= datetime(afdian_stats.last_poll) %></span></div>
+      <a href="/admin/afdian" class="btn btn-ghost btn-sm" style="margin-top:10px;">爱发电订单</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flex-between flex-wrap" style="margin-bottom:14px;">
+      <div class="flex" style="gap:14px;">
+        <h3 class="card-title">VoiceHub 发券状态</h3>
+        <span class="status-dot <%= k.voicehub_success_rate >= 90 ? 'status-dot-success' : 'status-dot-warning' %>"><%= k.voicehub_success_rate >= 90 ? '正常' : '需关注' %></span>
+      </div>
+      <div class="flex" style="gap:18px;">
+        <span class="small muted">成功率 <b style="color:var(--foreground);font-size:15px;"><%= k.voicehub_success_rate %>%</b></span>
+        <span class="small muted">失败 <b style="color:var(--destructive);font-size:15px;"><%= k.voicehub_failed %></b></span>
+        <a href="/admin/voicehub/failures" class="btn btn-ghost btn-sm">失败中心</a>
+      </div>
+    </div>
+    <div class="chart-row-item">
+      <span class="cr-label">来源</span>
+      <div class="cr-bar"></div>
+      <span class="cr-value" style="width:120px;text-align:right;">成功 / 失败</span>
+    </div>
+    <% if (vh_sources.length === 0) { %>
+      <div class="muted small" style="padding:10px 0;">暂无推送记录</div>
+    <% } %>
+    <% vh_sources.forEach((s) => { const pct = s.total > 0 ? Math.round((s.success / s.total) * 100) : 100; %>
+      <div class="chart-row-item">
+        <span class="cr-label"><%= e(sourceLabels[s.key] || s.key) %></span>
+        <div class="cr-bar">
+          <div class="progress-track"><div class="progress-fill <%= pct >= 100 ? 'is-success' : '' %>" style="width:<%= pct %>%;<%= pct >= 100 ? '' : 'background:var(--warning);' %>"></div></div>
+        </div>
+        <span class="cr-value" style="width:120px;text-align:right;"><%= s.success %> / <%= s.failed %></span>
+      </div>
+    <% }) %>
+
+    <% if (recent_failures.length > 0) { %>
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:12px;">
+        <div class="small muted" style="font-weight:600;margin-bottom:6px;">最近失败</div>
+        <% recent_failures.slice(0, 5).forEach((f) => { %>
+          <div class="flex-between" style="gap:12px;padding:6px 0;">
+            <span class="small mono" style="color:var(--foreground-secondary);"><%= e(f.source_order_no) %></span>
+            <span class="small" style="color:var(--muted-foreground);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= e(f.last_error || '') %></span>
+            <span class="badge badge-red">×<%= Number(f.attempts || 0) %></span>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<div class="section-head"><h2>经营明细</h2></div>
+<div class="grid dash-grid-2" style="gap:20px;align-items:start;">
+  <div class="card card-pad-0">
+    <div class="card-header"><h3 class="card-title">商品销量排行</h3></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>商品</th><th class="num">售价</th><th class="num">销量</th><th class="num">销售额</th><th class="num">库存</th></tr></thead>
+      <tbody>
+      <% if (ranking.length === 0) { %><tr><td colspan="5" class="text-center muted">暂无数据</td></tr><% } %>
+      <% ranking.forEach((r) => { %>
+        <tr>
+          <td><%= e(r.name) %></td>
+          <td class="num">¥<%= money(Number(r.price_cents || 0)) %></td>
+          <td class="num"><%= Number(r.sold_units || 0) %></td>
+          <td class="num">¥<%= money(Number(r.revenue_cents || 0)) %></td>
+          <td class="num"><%= Number(r.stock_available || 0) %></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h3 class="card-title mb-3">库存概览</h3>
+      <% const invTotal = inventory.available + inventory.reserved + inventory.sold + inventory.disabled; %>
+      <div class="metric-seg" style="margin-bottom:14px;">
+        <div><div class="m-label">可售</div><div class="m-value" style="color:var(--success);"><%= inventory.available %></div></div>
+        <div><div class="m-label">占用</div><div class="m-value" style="color:var(--accent);"><%= inventory.reserved %></div></div>
+        <div><div class="m-label">已售</div><div class="m-value"><%= inventory.sold %></div></div>
+        <div><div class="m-label">停用</div><div class="m-value" style="color:var(--muted-foreground);"><%= inventory.disabled %></div></div>
+      </div>
+      <% if (invTotal > 0) { %>
+        <div class="progress-track" style="height:8px;margin-bottom:14px;">
+          <div class="progress-fill is-success" style="width:<%= Math.round((inventory.available / invTotal) * 100) %>%;"></div>
+        </div>
+      <% } %>
+      <a href="/admin/inventory" class="btn btn-ghost btn-sm">管理库存</a>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <h3 class="card-title mb-3">运营状态</h3>
+      <div class="summary-row"><span class="muted">人工完成</span><span style="color:var(--manual);font-weight:700;"><%= k.manual_completed %></span></div>
+      <div class="summary-row"><span class="muted">异常订单</span><span style="color:<%= k.abnormal_orders > 0 ? 'var(--destructive)' : 'var(--success)' %>;font-weight:700;"><%= k.abnormal_orders %></span></div>
+      <% if (k.abnormal_orders > 0) { %>
+        <a href="/admin/orders?abnormal=1" class="btn btn-warning btn-sm" style="margin-top:10px;">处理异常订单</a>
+      <% } %>
+    </div>
+  </div>
+</div>

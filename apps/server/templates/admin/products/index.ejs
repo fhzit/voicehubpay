@@ -1,0 +1,71 @@
+<%
+  const modeLabels = { card: '库存卡密', voicehub: 'VoiceHub 发券', card_and_voicehub: '卡密+发券', manual: '人工发货' };
+  const pageHref = (i) => `/admin/products?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&category=${category_id || ''}&page=${i}`;
+%>
+<div class="filters">
+  <form method="get" action="/admin/products" class="flex" style="gap:10px;flex-wrap:wrap;flex:1;">
+    <input type="text" name="q" class="input search" placeholder="搜索商品…" value="<%= e(q) %>">
+    <select name="status" class="select">
+      <option value="">全部状态</option>
+      <% [['active', '上架'], ['draft', '草稿'], ['disabled', '下架']].forEach(([sk, sl]) => { %>
+        <option value="<%= sk %>" <%= status === sk ? 'selected' : '' %>><%= sl %></option>
+      <% }) %>
+    </select>
+    <select name="category" class="select">
+      <option value="">全部分类</option>
+      <% categories.forEach((c) => { %>
+        <option value="<%= Number(c.id) %>" <%= Number(category_id) === Number(c.id) ? 'selected' : '' %>><%= e(c.name) %></option>
+      <% }) %>
+    </select>
+    <button class="btn btn-secondary">筛选</button>
+  </form>
+  <a href="/admin/products/create" class="btn btn-primary">＋ 新建商品</a>
+</div>
+
+<div class="card card-pad-0">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>商品</th><th>分类</th><th>售价</th><th>发货方式</th><th>销量</th><th>营收</th><th>库存</th><th>状态</th><th class="text-right">操作</th></tr></thead>
+    <tbody>
+    <% if (products.length === 0) { %>
+      <tr><td colspan="9" class="text-center muted">暂无商品，点击右上角“新建商品”创建</td></tr>
+    <% } %>
+    <% products.forEach((p) => { %>
+      <tr>
+        <td style="min-width:200px;">
+          <div class="flex" style="gap:10px;align-items:center;">
+            <span class="prod-thumb">
+              <% if (p.cover_image) { %><img src="<%= e(p.cover_image) %>" alt=""><% } else { %><%= e(String(p.name || '').slice(0, 1)) %><% } %>
+            </span>
+            <div>
+              <div style="font-weight:600;"><%= e(p.name) %></div>
+              <div class="small mono faint">/product/<%= e(p.slug) %></div>
+            </div>
+          </div>
+        </td>
+        <td class="small"><%= e(p.category_name || '—') %></td>
+        <td class="num">¥<%= money(Number(p.price_cents || 0)) %></td>
+        <td><span class="badge badge-blue"><%= e(modeLabels[p.delivery_mode] || p.delivery_mode) %></span></td>
+        <td class="num"><%= Number(p.sold_units || 0) %></td>
+        <td class="num">¥<%= money(Number(p.revenue_cents || 0)) %></td>
+        <td class="num"><%= Number(p.stock_available || 0) %></td>
+        <td><%- include('../../partials/status-badge', { kind: 'status', status: p.status }) %></td>
+        <td class="text-right">
+          <div class="flex" style="justify-content:flex-end;gap:6px;">
+            <a href="/admin/products/edit/<%= Number(p.id) %>" class="btn btn-secondary btn-sm">编辑</a>
+            <form method="post" action="/admin/products/<%= Number(p.id) %>/status" style="display:inline;">
+              <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+              <button class="btn btn-ghost btn-sm"><%= p.status === 'active' ? '下架' : '上架' %></button>
+            </form>
+            <form method="post" action="/admin/products/<%= Number(p.id) %>/delete" style="display:inline;">
+              <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+              <button class="btn btn-danger btn-sm">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+</div>
+
+<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>

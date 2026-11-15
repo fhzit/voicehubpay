@@ -1,0 +1,53 @@
+<%
+  const f = filters || {};
+  const pageHref = (i) => {
+    const params = new URLSearchParams();
+    Object.entries(f).forEach(([key, value]) => { if (value !== '' && value !== undefined && value !== null) params.set(key, String(value)); });
+    params.set('page', String(i));
+    return `/admin/audit?${params.toString()}`;
+  };
+%>
+<div class="filters">
+  <form method="get" action="/admin/audit" class="flex" style="gap:10px;flex-wrap:wrap;flex:1;">
+    <input type="text" name="q" class="input search" placeholder="对象 ID / 关键字" value="<%= e(f.q || '') %>">
+    <select name="action" class="select">
+      <option value="">全部操作</option>
+      <% actions.forEach((a) => { %>
+        <option value="<%= e(a) %>" <%= (f.action || '') === a ? 'selected' : '' %>><%= e(a) %></option>
+      <% }) %>
+    </select>
+    <input type="date" name="from" class="input" value="<%= e(f.from || '') %>">
+    <input type="date" name="to" class="input" value="<%= e(f.to || '') %>">
+    <button class="btn btn-secondary">筛选</button>
+  </form>
+</div>
+
+<div class="card card-pad-0">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>时间</th><th>用户</th><th>操作</th><th>对象</th><th>详情</th><th>IP</th></tr></thead>
+    <tbody>
+    <% if (logs.length === 0) { %>
+      <tr><td colspan="6" class="text-center muted">暂无日志</td></tr>
+    <% } %>
+    <% logs.forEach((log) => { %>
+      <tr>
+        <td class="small muted"><%= datetime(log.created_at) %></td>
+        <td class="small"><%= e(log.username || ('#' + String(log.user_id || ''))) %></td>
+        <td><code class="inline"><%= e(log.action) %></code></td>
+        <td class="small"><%= e(log.object_type || '') %> <span class="mono"><%= e(log.object_id || '') %></span></td>
+        <td class="small" style="max-width:320px;">
+          <% if (Object.keys(log.metadata_parsed || {}).length > 0) { %>
+            <details class="toggle">
+              <summary class="small">查看详情</summary>
+              <pre class="json mt-2"><%= JSON.stringify(log.metadata_parsed, null, 2) %></pre>
+            </details>
+          <% } else { %><span class="faint">—</span><% } %>
+        </td>
+        <td class="small mono"><%= e(log.ip || '') %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+</div>
+
+<%- include('../partials/pagination', { page, pages, href: pageHref }) %>

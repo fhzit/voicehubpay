@@ -1,0 +1,67 @@
+<% const type = describe.type || '—'; %>
+<div class="card" style="max-width:760px;">
+  <h3 class="card-title mb-3">数据库信息</h3>
+  <div class="summary-row"><span class="muted">类型</span><span><span class="badge badge-<%= type === 'PostgreSQL' ? 'blue' : 'green' %>"><%= e(type) %></span></span></div>
+  <div class="summary-row"><span class="muted">DSN</span><span class="small mono"><%= e(describe.dsn || '') %></span></div>
+  <% if (db_size !== null) { %><div class="summary-row"><span class="muted">文件大小</span><span><%= (db_size / 1024 / 1024).toFixed(2) %> MB</span></div><% } %>
+  <div class="summary-row"><span class="muted">Schema 最新版本</span><span class="mono small"><%= e(schema_version) %></span></div>
+  <div class="summary-row"><span class="muted">已应用迁移</span><span class="small mono"><%= e(applied.join(', ')) %></span></div>
+  <div class="summary-row"><span class="muted">安装时间</span><span class="small"><%= datetime(installed_at) %></span></div>
+  <div class="summary-row"><span class="muted">Analytics 缓存重建</span><span class="small"><%= datetime(analytics_last_rebuild) %></span></div>
+  <div class="flex mt-4">
+    <button class="btn btn-secondary" id="check-db">健康检查</button>
+    <form method="post" action="/admin/system/analytics/rebuild">
+      <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+      <button class="btn btn-secondary">重建 Analytics</button>
+    </form>
+  </div>
+  <div id="db-check-result" class="mt-3"></div>
+</div>
+
+<div class="card" style="max-width:760px;">
+  <h3 class="card-title mb-3">备份（storage/backups）</h3>
+  <% if (backups.length === 0) { %>
+    <div class="muted small">暂无备份。安装或迁移时系统会自动创建备份目录。</div>
+  <% } %>
+  <% backups.forEach((b) => { %>
+    <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div class="mono small"><%= e(b.name) %></div>
+        <div class="small muted"><%= Number(b.files || 0) %> 个文件 · <%= datetime(b.mtime) %></div>
+      </div>
+      <span class="small muted">请通过文件系统 / FTP 手动下载保存</span>
+    </div>
+  <% }) %>
+  <div class="hint mt-3">旧版数据迁移前会自动生成 <code class="inline">legacy-YYYYmmdd-HHMMSS</code> 备份目录，旧数据库文件不会被删除。</div>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('check-db');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = '检查中…';
+      var fd = new FormData();
+      fd.set('_csrf', '<%= e(csrf) %>');
+      fetch('/admin/system/database/check', { method: 'POST', credentials: 'same-origin', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          var box = document.getElementById('db-check-result');
+          var notice = document.createElement('div');
+          if (j.ok && j.tables && typeof j.tables === 'object') {
+            var bad = Object.keys(j.tables).filter(function (k) { return j.tables[k] !== 'ok'; });
+            notice.className = 'alert alert-' + (bad.length ? 'error' : 'success');
+            notice.textContent = bad.length ? '缺失表：' + bad.join(', ') : '全部 ' + Object.keys(j.tables).length + ' 张表正常 ✓';
+          } else {
+            notice.className = 'alert alert-error';
+            notice.textContent = '检查失败：' + (j.error || '未知');
+          }
+          box.replaceChildren(notice);
+          btn.disabled = false;
+          btn.textContent = '健康检查';
+        })
+        .catch(function () { btn.disabled = false; btn.textContent = '健康检查'; });
+    });
+  })();
+</script>

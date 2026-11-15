@@ -1,0 +1,66 @@
+<%
+  const orders = locals.orders || [];
+  const total = Number(locals.total ?? 0);
+  const page = Number(locals.page ?? 1);
+  const pages = Number(locals.pages ?? 0);
+  const status = locals.status || '';
+  const q = locals.q || '';
+  const tabs = ['', 'unpaid', 'paid', 'completed', 'abnormal'];
+  const tabLabels = ['全部', '待支付', '待发货', '已完成', '异常'];
+  const tabHref = (t) => '/account/orders?status=' + t + '&q=' + encodeURIComponent(q);
+  const pageHref = (i) => '/account/orders?status=' + encodeURIComponent(status) + '&q=' + encodeURIComponent(q) + '&page=' + i;
+%>
+<div class="container" style="padding-top:24px;">
+  <div class="page-head flex-between flex-wrap">
+    <div><h1 class="page-title">我的服务</h1><p class="page-sub">共 <%= total %> 项服务</p></div>
+    <a href="/products" class="btn btn-primary btn-sm">更多服务</a>
+  </div>
+
+  <div class="tab-bar">
+    <% for (let i = 0; i < tabs.length; i++) { const t = tabs[i]; %>
+      <a href="<%= e(tabHref(t)) %>" class="tab <%= status === t ? 'active' : '' %>"><%= tabLabels[i] %></a>
+    <% } %>
+  </div>
+
+  <form method="get" action="/account/orders" class="filters">
+    <input type="hidden" name="status" value="<%= e(status) %>">
+    <input type="text" name="q" class="input search" placeholder="搜索服务号…" value="<%= e(q) %>">
+    <button class="btn btn-primary">搜索</button>
+  </form>
+
+  <% if (orders.length === 0) { %>
+    <div class="card empty">
+      <div class="empty-ico">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+      </div>
+      <div class="empty-title">暂无服务记录</div>
+      <div>还没有符合条件的服务记录</div>
+    </div>
+  <% } else { %>
+    <div class="card card-pad-0">
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>服务号</th><th>服务</th><th>金额</th><th>支付</th><th>发货</th><th>时间</th><th></th></tr></thead>
+        <tbody>
+        <% for (const o of orders) { %>
+          <tr>
+            <td class="mono"><%= e(o.order_no) %></td>
+            <td><%= e(o.first_item_name || '') %><% if (Number(o.item_quantity ?? 1) > 1) { %> ×<%= Number(o.item_quantity) %><% } %></td>
+            <td class="num">¥<%= money(Number(o.amount_due_cents || o.amount_paid_cents || 0)) %></td>
+            <td><%- await include('../partials/status-badge', { kind: 'payment', status: o.payment_status }) %></td>
+            <td><%- await include('../partials/status-badge', { kind: 'fulfillment', status: o.fulfillment_status }) %></td>
+            <td class="small muted"><%= datetime(o.created_at) %></td>
+            <td><a href="/orders/<%= e(o.order_no) %>" class="btn-link">详情</a></td>
+          </tr>
+        <% } %>
+        </tbody>
+      </table></div>
+    </div>
+    <% if (pages > 1) { %>
+      <div class="pagination">
+        <% for (let i = 1; i <= pages; i++) { %>
+          <% if (i === page) { %><span class="current"><%= i %></span><% } else { %><a href="<%= e(pageHref(i)) %>"><%= i %></a><% } %>
+        <% } %>
+      </div>
+    <% } %>
+  <% } %>
+</div>

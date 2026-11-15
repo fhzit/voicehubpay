@@ -2,7 +2,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { Csrf } from "../auth-legacy/csrf.js";
 import { SESSION_COOKIE, SessionManager } from "../auth-legacy/session-manager.js";
 import type { LegacySessionContext } from "../auth-legacy/types.js";
+import { renderError, renderPage } from "../render.js";
+import { buildSite } from "../site.js";
+import { configureErrorPages } from "../error-pages.js";
 import { Sg65Client } from "./sg65-client.js";
+import { configureShopPageRoutes } from "./shop-pages.js";
 import { PaymentService, ShopService, PaymentError, ShopError } from "./shop-service.js";
 import type { Row, ShopLegacyDependencies } from "./types.js";
 
@@ -169,6 +173,13 @@ async function apiLoginGuard(ctx: Ctx, request: FastifyRequest, reply: FastifyRe
 export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDependencies): void {
   const deps = rawDeps as MutableDeps;
   const ctx = buildCtx(deps);
+  const site = buildSite(deps.config);
+
+  // Storefront pages (HTML) + shared 404/500 error pages. app.ts cannot be
+  // touched, so the shop module installs the not-found/error handlers for the
+  // storefront surface; /api/* and /health keep their JSON contracts.
+  configureErrorPages(app, { config: deps.config });
+  configureShopPageRoutes(app, deps, ctx);
 
   // -- POST /orders : create a shop order (session re-validated server-side) --
   app.post("/orders", async (request, reply) => {
@@ -215,20 +226,29 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
     const orderNo = (request.params as { orderNo?: string }).orderNo ?? "";
     const order = await deps.orders.orderWithItems(orderNo);
     if (order === null || !owns(order, user)) {
-      return reply.code(404).send("Not Found");
+      return renderError(reply, 404, { site, user, nav: "account" });
     }
+    const flash = ctx.sessions.takeFlash(context);
     await ctx.sessions.persist(context);
-    return reply.code(200).send({
-      template: "checkout/checkout",
-      data: {
+    return renderPage(
+      reply,
+      "checkout/checkout",
+      {
         order,
         enabled_types: sg65EnabledTypes(deps.config),
         default_type: defaultPayType(deps.config),
         payment_enabled: deps.config.bool("SG65_ENABLED", false),
         method: deps.config.get("SG65_DEFAULT_METHOD", "jump"),
-        csrf_token: Csrf.token(context.data),
+        order_ttl: deps.config.int("ORDER_TTL_MINUTES", 30),
+        user,
+        site,
+        flash,
+        csrf: Csrf.token(context.data),
+        nav: "account",
+        pageTitle: "确认订单",
       },
-    });
+      { layout: "shop" },
+    );
   });
 
   // -- POST /orders/{orderNo}/pay : create a SG65 payment ------------------------
@@ -265,6 +285,7 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
 export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacyDependencies): void {
   const deps = rawDeps as MutableDeps;
   const ctx = buildCtx(deps);
+  const site = buildSite(deps.config);
 
   // -- GET /payments/sg65/notify : SG65 sends notify as GET ----------------------
   app.get("/payments/sg65/notify", async (request, reply) => {
@@ -293,7 +314,7 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
     // The gateway return URL is public, but order status/details are not.
     // Treat missing, guessed and another user's order number identically.
     if (order === null || user === null || Number(order["user_id"]) !== Number(user["id"])) {
-      return reply.code(404).send("Not Found");
+      return renderError(reply, 404, { site, user, nav: "account" });
     }
     // If a logged-in user owns this order and local state is still unpaid,
     // attempt a server-side active query (best-effort, non-blocking).
@@ -304,11 +325,14 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
         console.error("[sg65 return query]", error instanceof Error ? error.message : error);
       }
     }
+    const flash = ctx.sessions.takeFlash(context);
     await ctx.sessions.persist(context);
-    return reply.code(200).send({
-      template: "checkout/pay-return",
-      data: { order, order_no: orderNo },
-    });
+    return renderPage(
+      reply,
+      "checkout/pay-return",
+      { order, order_no: orderNo, user, site, flash, csrf: Csrf.token(context.data), nav: "account", pageTitle: "支付结果" },
+      { layout: "shop" },
+    );
   });
 
   // -- GET /api/orders/{orderNo}/status : polling for the pay-return page ----------

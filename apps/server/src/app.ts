@@ -1,6 +1,9 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import fastifyStatic from "@fastify/static";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { healthResponseSchema } from "../../../packages/contracts/src/index.js";
+import { ASSET_ROOT } from "./render.js";
 import { configureAuth, type AuthDependencies } from "./auth.js";
 import { configureCommerce, type CommerceDependencies } from "./commerce.js";
 import { configurePaymentRoutes, configureShopRoutes } from "./shop-legacy/routes.js";
@@ -25,11 +28,29 @@ export function buildApp(options: {
     return payload;
   });
 
+  // Breadcrumb for every unhandled route error (loggers are disabled in this
+  // deployment, so a rendered 500 would otherwise leave no trace).
+  app.addHook("onError", async (request, _reply, error) => {
+    console.error(`[onError] ${request.method} ${request.url}`, error);
+  });
+
+  // Static assets (CSS/JS) served from the PHP-compatible public/assets tree.
+  void app.register(fastifyStatic, {
+    root: path.join(ASSET_ROOT, "assets"),
+    prefix: "/assets/",
+    decorateReply: false,
+    cacheControl: true,
+    maxAge: "1h",
+  });
+
   app.setErrorHandler((error, request, reply) => {
     if (typeof error === "object" && error !== null && "validation" in error) {
       return reply.code(400).send({ error: "BAD_REQUEST", message: "Request validation failed", requestId: request.id });
     }
     request.log.error({ err: error }, "request failed");
+    // Keep a stderr breadcrumb: the app runs with the Fastify logger disabled,
+    // so without this a rendered 500 page leaves no trace in container logs.
+    console.error(`[500] ${request.method} ${request.url}`, error);
     return reply.code(500).send({ error: "INTERNAL_ERROR", message: "An unexpected error occurred", requestId: request.id });
   });
 

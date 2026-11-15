@@ -1,0 +1,73 @@
+<%
+  const categories = locals.categories || [];
+  const products = locals.products || [];
+  const total = Number(locals.total ?? 0);
+  const page = Number(locals.page ?? 1);
+  const pages = Number(locals.pages ?? 0);
+  const filters = locals.filters || { category_id: null, q: '', sort: 'recommend' };
+  const qs = (overrides) => {
+    const values = Object.assign({ category: filters.category_id || '', q: filters.q || '', sort: filters.sort || '' }, overrides || {});
+    const params = new URLSearchParams();
+    if (values.category !== '' && values.category !== null && values.category !== undefined) params.set('category', String(values.category));
+    if (values.q) params.set('q', String(values.q));
+    if (values.sort) params.set('sort', String(values.sort));
+    const text = params.toString();
+    return text === '' ? '' : '?' + text;
+  };
+  const sortOptions = [['recommend', '推荐'], ['newest', '最新'], ['price_asc', '价格↑'], ['price_desc', '价格↓'], ['sales', '销量']];
+  const pageUrl = (index) => '/products' + qs() + (qs() === '' ? '?' : '&') + 'page=' + index;
+%>
+<div class="container" style="padding-top:32px;">
+  <div class="page-head flex-between flex-wrap">
+    <div>
+      <h1 class="page-title">服务</h1>
+      <p class="page-sub">选择你需要的数字服务，开通后即时生效</p>
+    </div>
+    <span class="small muted">共 <%= total %> 项服务</span>
+  </div>
+
+  <!-- Filter Toolbar -->
+  <div class="filters">
+    <form method="get" action="/products" class="flex" style="gap:10px;flex-wrap:wrap;flex:1;margin:0;">
+      <input type="hidden" name="sort" value="<%= e(filters.sort) %>">
+      <select name="category" class="select" style="min-width:130px;">
+        <option value="">全部分类</option>
+        <% for (const c of categories) { %>
+          <option value="<%= Number(c.id) %>" <%= Number(filters.category_id) === Number(c.id) ? 'selected' : '' %>><%= e(c.name) %></option>
+        <% } %>
+      </select>
+      <input type="text" name="q" class="input search" placeholder="搜索服务名称…" value="<%= e(filters.q) %>" style="min-width:220px;">
+      <button class="btn btn-primary">搜索</button>
+    </form>
+    <div class="seg" aria-label="排序">
+      <% for (const [key, label] of sortOptions) { %>
+        <a class="seg-item <%= filters.sort === key ? 'active' : '' %>" href="/products<%= e(qs({ sort: key })) %>"><%= label %></a>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (products.length === 0) { %>
+    <div class="card empty">
+      <div class="empty-ico">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+      <div class="empty-title">没有找到相关服务</div>
+      <div>换个关键词或分类试试</div>
+    </div>
+  <% } else { %>
+    <div class="product-grid">
+      <% for (const p of products) { %>
+        <%- await include('../partials/product-card', { p }) %>
+      <% } %>
+    </div>
+    <% if (pages > 1) { %>
+      <div class="pagination">
+        <% if (page > 1) { %><a href="<%= e(pageUrl(page - 1)) %>">‹</a><% } %>
+        <% for (let i = Math.max(1, page - 2); i <= Math.min(pages, page + 2); i++) { %>
+          <% if (i === page) { %><span class="current"><%= i %></span><% } else { %><a href="<%= e(pageUrl(i)) %>"><%= i %></a><% } %>
+        <% } %>
+        <% if (page < pages) { %><a href="<%= e(pageUrl(page + 1)) %>">›</a><% } %>
+      </div>
+    <% } %>
+  <% } %>
+</div>

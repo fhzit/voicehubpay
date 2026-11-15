@@ -1,0 +1,45 @@
+<%
+  const pageHref = (i) => `/admin/payments?pay_type=${encodeURIComponent(pay_type)}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}&page=${i}`;
+%>
+<div class="filters">
+  <form method="get" action="/admin/payments" class="flex" style="gap:10px;flex-wrap:wrap;flex:1;">
+    <input type="text" name="q" class="input" placeholder="商户单号/平台单号" value="<%= e(q) %>">
+    <select name="pay_type" class="select">
+      <option value="">全部支付方式</option>
+      <% [['alipay', '支付宝'], ['wxpay', '微信支付'], ['qqpay', 'QQ 钱包']].forEach(([tk, tl]) => { %>
+        <option value="<%= tk %>" <%= pay_type === tk ? 'selected' : '' %>><%= tl %></option>
+      <% }) %>
+    </select>
+    <select name="status" class="select">
+      <option value="">全部状态</option>
+      <% [['unpaid', '未支付'], ['paid', '已支付'], ['pending', '待确认'], ['cancelled', '已取消']].forEach(([sk, sl]) => { %>
+        <option value="<%= sk %>" <%= status === sk ? 'selected' : '' %>><%= sl %></option>
+      <% }) %>
+    </select>
+    <button class="btn btn-secondary">筛选</button>
+  </form>
+</div>
+
+<div class="card card-pad-0">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>商户单号</th><th>订单</th><th>支付方式</th><th class="num">金额</th><th>状态</th><th>确认来源</th><th>时间</th></tr></thead>
+    <tbody>
+    <% if (transactions.length === 0) { %>
+      <tr><td colspan="7" class="text-center muted">暂无支付流水</td></tr>
+    <% } %>
+    <% transactions.forEach((t) => { %>
+      <tr>
+        <td class="mono small"><%= e(t.merchant_order_no || '') %></td>
+        <td class="small"><a href="/admin/orders/<%= e(t.order_no || '') %>"><%= e(t.order_no || '—') %></a></td>
+        <td><span class="badge badge-blue"><%= e(t.pay_type || '—') %></span></td>
+        <td class="num">¥<%= money(Number(t.amount_cents || 0)) %></td>
+        <td><%- include('../../partials/status-badge', { kind: 'payment', status: t.status }) %></td>
+        <td class="small"><%= e(t.confirmation_source || '') %></td>
+        <td class="small muted"><%= datetime(t.created_at) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+</div>
+
+<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>

@@ -174,12 +174,11 @@ function jar() {
   };
 }
 
+/** Extract the CSRF token from the rendered HTML login/account form. */
 function csrfOf(body: unknown): string | null {
-  if (typeof body !== "object" || body === null) return null;
-  const data = (body as Record<string, unknown>)["data"];
-  if (typeof data !== "object" || data === null) return null;
-  const token = (data as Record<string, unknown>)["csrf_token"];
-  return typeof token === "string" ? token : null;
+  if (typeof body !== "string") return null;
+  const match = /name="_csrf" value="([^"]+)"/.exec(body);
+  return match ? match[1]! : null;
 }
 
 async function seedUser(db: Database, username: string, password: string, overrides: Record<string, unknown> = {}): Promise<number> {
@@ -207,7 +206,7 @@ async function getCsrfAndCookie(app: Awaited<ReturnType<typeof buildHarness>>["a
   const jar1 = jar();
   const page = await app.inject({ method: "GET", url: "/login" });
   jar1.capture(page.headers as Record<string, unknown>);
-  const token = csrfOf(page.json());
+  const token = csrfOf(page.body);
   assert.ok(token, "GET /login must expose a CSRF token for tests");
   return { cookie: jar1.header(), token };
 }
@@ -593,7 +592,7 @@ test("social completion creates the account, binds the identity and logs in", as
 
     // Fetch a fresh CSRF token from the completion page session.
     const page = await app.inject({ method: "GET", url: "/complete-social", headers: cookie2 });
-    const completionToken = csrfOf(page.json());
+    const completionToken = csrfOf(page.body);
     assert.ok(completionToken, "completion page must expose a CSRF token");
 
     const complete = await app.inject({
@@ -709,7 +708,7 @@ async function loginAs(app: Awaited<ReturnType<typeof buildHarness>>["app"], use
   // After login the session was rotated; fetch a fresh CSRF token from an
   // authenticated GET page (the login page would redirect away when authed).
   const profilePage = await app.inject({ method: "GET", url: "/account/profile", headers: sessionJar.header() });
-  const freshToken = csrfOf(profilePage.json());
+  const freshToken = csrfOf(profilePage.body);
   return { cookie: sessionJar.header(), token: freshToken ?? token, sessionJar };
 }
 
@@ -747,14 +746,15 @@ test("account overview returns order/card/connection aggregates for the logged-i
     const { cookie } = await loginAs(app, "alice", "password123");
     const response = await app.inject({ method: "GET", url: "/account", headers: cookie });
     assert.equal(response.statusCode, 200);
-    const body = response.json();
-    assert.equal(body.template, "account/overview");
-    assert.equal(body.data.order_count, 1);
-    assert.equal(body.data.card_count, 1);
-    assert.equal(body.data.connections.length, 1);
-    assert.equal(body.data.has_password, true);
-    assert.equal(body.data.recent_orders.length, 1);
-    assert.equal(body.data.recent_orders[0]["first_item_name"], "Voice Card");
+    assert.match(String(response.headers["content-type"]), /text\/html/);
+    const body = response.body;
+    assert.match(body, /<title>账户概览 · VoiceHubPay<\/title>/);
+    assert.match(body, /欢迎回来，alice/);
+    // order_count and card_count both render as 1; connections show n/3.
+    assert.equal((body.match(/<div class="stat-value">1<\/div>/g) ?? []).length, 2);
+    assert.match(body, /<div class="stat-value">1<small>\/3<\/small><\/div>/);
+    assert.match(body, /Voice Card/);
+    assert.match(body, /badge-green/);
   } finally {
     await app.close();
     await db.close();
@@ -767,21 +767,25 @@ test("account orders/cards/connections/security/profile pages render for the ses
     await seedUser(db, "alice", "password123");
     const { cookie } = await loginAs(app, "alice", "password123");
     const cases: Array<[string, string]> = [
-      ["/account/orders", "account/orders"],
-      ["/account/cards", "account/cards"],
-      ["/account/connections", "account/connections"],
-      ["/account/security", "account/security"],
-      ["/account/profile", "account/profile"],
+      ["/account/orders", "我的服务"],
+      ["/account/cards", "我的权益"],
+      ["/account/connections", "账号绑定"],
+      ["/account/security", "安全设置"],
+      ["/account/profile", "账号资料"],
     ];
-    for (const [url, template] of cases) {
+    for (const [url, marker] of cases) {
       const response = await app.inject({ method: "GET", url, headers: cookie });
       assert.equal(response.statusCode, 200, `${url} must render`);
-      assert.equal(response.json().template, template);
+      assert.match(String(response.headers["content-type"]), /text\/html/);
+      assert.match(response.body, new RegExp(marker), `${url} must render its page heading`);
+      assert.match(response.body, /<!DOCTYPE html>/);
+      assert.match(response.body, /account-sidebar/);
     }
     // Filters must not crash: status + q + page.
     const filtered = await app.inject({ method: "GET", url: "/account/orders?status=paid&q=ORD&page=2", headers: cookie });
     assert.equal(filtered.statusCode, 200);
-    assert.equal(filtered.json().data.page, 2);
+    assert.match(filtered.body, /我的服务/);
+    assert.match(filtered.body, /name="status" value="paid"/);
   } finally {
     await app.close();
     await db.close();

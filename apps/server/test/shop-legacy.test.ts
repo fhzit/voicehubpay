@@ -1396,7 +1396,9 @@ test("routes: GET /payments/sg65/return — public URL, private data (404 for st
 
   const owner = await app.inject({ method: "GET", url: `/payments/sg65/return?out_trade_no=${order["order_no"]}`, headers });
   assert.equal(owner.statusCode, 200);
-  assert.equal(owner.json()["template"], "checkout/pay-return");
+  assert.match(String(owner.headers["content-type"]), /text\/html/);
+  assert.match(owner.body, /正在确认支付/);
+  assert.match(owner.body, new RegExp(String(order["order_no"])));
 
   const stranger = await app.inject({ method: "GET", url: `/payments/sg65/return?out_trade_no=${order["order_no"]}` });
   assert.equal(stranger.statusCode, 404);

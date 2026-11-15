@@ -1,0 +1,108 @@
+<%
+  const cards = locals.cards || [];
+  const total = Number(locals.total ?? 0);
+  const page = Number(locals.page ?? 1);
+  const pages = Number(locals.pages ?? 0);
+  const status = locals.status || '';
+  const q = locals.q || '';
+  const groups = [];
+  const groupIndex = {};
+  for (const c of cards) {
+    const key = String(c.order_no ?? '');
+    if (groupIndex[key] === undefined) {
+      groupIndex[key] = groups.length;
+      groups.push({
+        order_no: key,
+        product_name: String(c.product_name_snapshot || ''),
+        created_at: String(c.updated_at || c.created_at || ''),
+        items: [],
+      });
+    }
+    groups[groupIndex[key]].items.push(c);
+  }
+  const pageHref = (i) => '/account/cards?status=' + encodeURIComponent(status) + '&q=' + encodeURIComponent(q) + '&page=' + i;
+%>
+<div class="page-head flex-between flex-wrap">
+  <div>
+    <h1 class="page-title" style="font-size:26px;">我的权益</h1>
+    <p class="page-sub">共 <%= total %> 条权益记录，加密保存，点击“显示”后查看完整内容</p>
+  </div>
+  <a href="/products" class="btn btn-primary btn-sm">更多服务</a>
+</div>
+
+<form method="get" action="/account/cards" class="filters">
+  <select name="status" class="select" style="min-width:120px;">
+    <option value="">全部状态</option>
+    <option value="completed" <%= status === 'completed' ? 'selected' : '' %>>已发放</option>
+    <option value="processing" <%= status === 'processing' ? 'selected' : '' %>>发放中</option>
+  </select>
+  <input type="text" name="q" class="input search" placeholder="搜索权益/服务号…" value="<%= e(q) %>" style="min-width:220px;">
+  <button class="btn btn-primary">筛选</button>
+</form>
+
+<% if (cards.length === 0) { %>
+  <div class="card empty">
+    <div class="empty-ico">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <div class="empty-title">暂无权益记录</div>
+    <div>开通服务后，权益将自动出现在这里</div>
+    <div style="margin-top:14px;"><a href="/products" class="btn btn-primary btn-sm">前往服务</a></div>
+  </div>
+<% } else { %>
+  <div class="code-groups">
+    <% for (const g of groups) { %>
+      <div class="code-group">
+        <div class="code-group-head">
+          <div class="flex-between flex-wrap" style="gap:8px;">
+            <div style="min-width:0;">
+              <div class="g-name"><%= e(g.product_name || '数字服务') %></div>
+              <div class="small muted" style="margin-top:2px;"><span class="mono"><%= e(g.order_no) %></span> · 获取于 <%= datetime(g.created_at) %> · <%= g.items.length %> 份</div>
+            </div>
+            <% if (g.items.length > 1) { %>
+              <button class="btn btn-secondary btn-sm" data-reveal-order="<%= e(g.order_no) %>">复制全部</button>
+            <% } %>
+          </div>
+        </div>
+        <div class="code-group-body">
+          <% for (const c of g.items) { %>
+            <%
+              const processing = ['pending', 'processing'].indexOf(c.status) !== -1;
+              const failed = ['failed'].indexOf(c.status) !== -1;
+            %>
+            <div class="code-item" style="flex-wrap:wrap;">
+              <div style="min-width:0;flex:1;">
+                <div class="ci-meta mono"><%= e(c.unit_no) %>
+                  <% if (processing) { %><span class="status-dot status-dot-info" style="margin-left:8px;">发放中</span>
+                  <% } else if (failed) { %><span class="status-dot status-dot-danger" style="margin-left:8px;">发放异常</span>
+                  <% } else { %><span class="status-dot status-dot-success" style="margin-left:8px;">已同步</span><% } %>
+                </div>
+                <div class="ci-code" id="code-box-<%= Number(c.id) %>"><%= e(c.code_masked || '') %></div>
+              </div>
+              <div class="flex" style="gap:8px;flex:none;">
+                <button class="btn btn-ghost btn-sm" data-copy-unit="<%= Number(c.id) %>">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  复制
+                </button>
+                <% if (c.delivery_code_ciphertext !== null && c.delivery_code_ciphertext !== undefined) { %>
+                  <button class="btn btn-primary btn-sm" data-reveal-unit="<%= Number(c.id) %>">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    显示
+                  </button>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <% if (pages > 1) { %>
+    <div class="pagination">
+      <% for (let i = 1; i <= pages; i++) { %>
+        <% if (i === page) { %><span class="current"><%= i %></span><% } else { %><a href="<%= e(pageHref(i)) %>"><%= i %></a><% } %>
+      <% } %>
+    </div>
+  <% } %>
+<% } %>

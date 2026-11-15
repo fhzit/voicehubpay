@@ -1,0 +1,37 @@
+<%
+  const p = locals.p || {};
+  const stockEnabled = Number(p.stock_enabled) === 1;
+  const stockAvailable = Number(p.stock_available ?? 0);
+  const soldOut = stockEnabled && stockAvailable === 0;
+  const stockClass = stockEnabled ? (stockAvailable === 0 ? 'out' : (stockAvailable <= 5 ? 'low' : '')) : '';
+  const slug = String(p.slug ?? '');
+  const initial = Array.from(String(p.name ?? ''))[0] || '';
+%>
+<div class="product-card">
+  <a href="/product/<%= e(slug) %>" class="product-cover">
+    <% if (p.cover_image) { %>
+      <img src="<%= e(p.cover_image) %>" alt="<%= e(p.name) %>" loading="lazy">
+    <% } else { %>
+      <%= e(initial) %>
+    <% } %>
+  </a>
+  <div class="product-info">
+    <h3 class="product-name"><a href="/product/<%= e(slug) %>"><%= e(p.name) %></a></h3>
+    <% if (p.description) { %>
+      <p class="product-desc"><%= e(p.description) %></p>
+    <% } %>
+    <div class="product-meta">
+      <span class="product-price"><small>¥</small><%= money(Number(p.price_cents ?? 0)) %></span>
+      <span class="product-stock <%= stockClass %>">
+        <% if (stockEnabled) { %>
+          <% if (stockAvailable > 0) { %>库存 <%= stockAvailable %><% } else { %>暂时缺货<% } %>
+        <% } else { %>即时发货<% } %>
+      </span>
+    </div>
+    <% if (soldOut) { %>
+      <a href="/product/<%= e(slug) %>" class="btn btn-secondary btn-block" style="height:36px;pointer-events:none;opacity:.6;">暂时缺货</a>
+    <% } else { %>
+      <a href="/product/<%= e(slug) %>" class="btn btn-primary btn-block" style="height:36px;">立即获取</a>
+    <% } %>
+  </div>
+</div>

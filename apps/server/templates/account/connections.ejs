@@ -1,0 +1,66 @@
+<%
+  const connections = locals.connections || [];
+  const hasPassword = locals.has_password === true;
+  const qqEnabled = locals.qq_enabled === true;
+  const wxEnabled = locals.wx_enabled === true;
+  const providers = [['qq', 'QQ 登录', 'QQ'], ['wx', '微信登录', '微信']];
+%>
+<div class="page-head">
+  <h1 class="page-title" style="font-size:26px;">账号绑定</h1>
+  <p class="page-sub">管理你的登录方式，至少需要保留一种</p>
+</div>
+
+<div class="card" style="max-width:640px;padding:0;overflow:hidden;">
+  <div class="settings-section" style="border:none;border-radius:0;padding:22px;">
+    <div class="flex-between flex-wrap" style="gap:10px;">
+      <div>
+        <h3 style="margin:0 0 2px;">账号密码（主要登录方式）</h3>
+        <p class="sec-desc" style="margin:0;">使用用户名 + 密码登录，QQ / 微信仅作为辅助</p>
+      </div>
+      <div class="flex" style="gap:8px;">
+        <a href="/account/profile" class="btn btn-secondary btn-sm">账号资料</a>
+        <a href="/account/security" class="btn btn-outline btn-sm"><%= hasPassword ? '修改密码' : '设置密码' %></a>
+      </div>
+    </div>
+    <div style="margin-top:8px;"><% if (hasPassword) { %><span class="status-dot status-dot-success">已设置用户名和密码</span><% } else { %><span class="status-dot status-dot-warning">未设置密码，建议尽快设置</span><% } %></div>
+  </div>
+
+  <% for (const [provider, label, short] of providers) { %>
+    <% const conn = connections.find((c) => c.provider === provider) || null; %>
+    <div style="border-top:1px solid var(--border);padding:22px;">
+      <div class="flex-between flex-wrap" style="gap:12px;">
+        <div class="flex" style="gap:14px;">
+          <span class="pm-ico" style="width:40px;height:40px;font-size:14px;<%= provider === 'qq' ? 'color:#12B7F5;' : 'color:#07C160;' %>font-weight:800;"><%= short %></span>
+          <div>
+            <div style="font-weight:650;"><%= label %></div>
+            <div class="small" style="margin-top:2px;">
+              <% if (conn !== null) { %>
+                <span class="status-dot status-dot-success">已绑定<%= conn.nickname ? ' · ' + e(conn.nickname) : '' %></span>
+              <% } else { %>
+                <span class="status-dot status-dot-muted">未绑定</span>
+              <% } %>
+            </div>
+          </div>
+        </div>
+        <div>
+          <% if (conn !== null) { %>
+            <form method="post" action="/account/connections/unbind" data-confirm="确定要解绑<%= label %>吗？解绑后将无法使用该方式登录。" data-confirm-danger data-confirm-title="解绑登录方式">
+              <input type="hidden" name="_csrf" value="<%= e(locals.csrf || '') %>">
+              <input type="hidden" name="provider" value="<%= provider %>">
+              <button class="btn btn-ghost btn-sm">解绑</button>
+            </form>
+          <% } else { %>
+            <% const enabled = provider === 'qq' ? qqEnabled : wxEnabled; %>
+            <% if (enabled) { %>
+              <a href="/auth/social/<%= provider %>?redirect=<%= e(encodeURIComponent('/account/connections')) %>" class="btn btn-secondary btn-sm">绑定</a>
+            <% } else { %>
+              <span class="small muted"><%= provider === 'qq' ? 'QQ 登录未开启' : '微信登录未开启' %></span>
+            <% } %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<div class="hint" style="margin-top:14px;max-width:640px;">QQ / 微信为第三方授权登录，绑定不会合并昵称或头像；解绑需保留至少一种登录方式。</div>

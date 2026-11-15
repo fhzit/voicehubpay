@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Database } from '../index.js';
 import { like, nowIso, type Paginated, type Row } from './shared.js';
-import type { CryptoService } from './crypto.js';
+import { CryptoService } from './crypto.js';
 
 export interface ImportReport {
   total: number;
@@ -15,6 +15,82 @@ export interface InventoryStats {
   reserved: number;
   sold: number;
   disabled: number;
+}
+
+/** Options for {@link insertGeneratedCodes}. */
+export interface InsertGeneratedCodesOptions {
+  productId: number;
+  /** Plaintext card codes to insert (trimmed; blank entries are skipped). */
+  codes: readonly string[];
+  /**
+   * Operator note for the generation batch. `inventory_cards` has no note
+   * column, so this is carried for call-site/audit symmetry only; the route
+   * records it in the audit log.
+   */
+  note?: string;
+  /** Acting admin id, likewise for audit provenance. */
+  actorId?: number | null;
+  /**
+   * CryptoService used for encryption + dedup hashes. Omit only when the
+   * deployment root is APP_BASE_PATH/cwd, matching apps/server/index.ts.
+   */
+  crypto?: CryptoService;
+}
+
+/** Result of a generated-code insert (no rows are written for duplicates). */
+export interface InsertGeneratedCodesReport {
+  inserted: number;
+  duplicates: number;
+}
+
+/**
+ * Insert already-generated plaintext card codes for a product using the exact
+ * storage contract of {@link InventoryRepository.import}: libsodium
+ * secretbox ciphertext in `secret_ciphertext`, SHA-256 hex in `secret_hash`,
+ * `status = 'available'`, ISO-8601 `created_at`/`updated_at`.
+ *
+ * Codes already present for the product (and repeats inside the batch) are
+ * skipped and counted in `duplicates`.
+ */
+export async function insertGeneratedCodes(
+  db: Database,
+  options: InsertGeneratedCodesOptions,
+): Promise<InsertGeneratedCodesReport> {
+  const productId = Number(options.productId);
+  if (!Number.isSafeInteger(productId) || productId <= 0) {
+    throw new RangeError('productId 必须是正整数。');
+  }
+
+  const crypto = options.crypto ?? new CryptoService(process.env.APP_BASE_PATH ?? process.cwd());
+  void options.note;
+  void options.actorId;
+
+  const report: InsertGeneratedCodesReport = { inserted: 0, duplicates: 0 };
+
+  // Existing hashes for this product, matching import()'s dedup scope.
+  const hashes = new Set<string>();
+  for (const row of (await db.query('SELECT secret_hash FROM inventory_cards WHERE product_id = ?', [productId])).rows) {
+    hashes.add(String(row.secret_hash));
+  }
+
+  const now = nowIso();
+  for (const raw of options.codes) {
+    const secret = String(raw).trim();
+    if (secret === '') continue;
+    const hash = crypto.hash(secret);
+    if (hashes.has(hash)) {
+      report.duplicates += 1;
+      continue;
+    }
+    hashes.add(hash);
+    await db.query(
+      "INSERT INTO inventory_cards (product_id, secret_ciphertext, secret_hash, status, created_at, updated_at) VALUES (?, ?, ?, 'available', ?, ?)",
+      [productId, crypto.encrypt(secret), hash, now, now],
+    );
+    report.inserted += 1;
+  }
+
+  return report;
 }
 
 /** Port of VoiceHubPay\Repositories\InventoryRepository. */
@@ -86,6 +162,15 @@ export class InventoryRepository {
       report.imported += 1;
     }
     return report;
+  }
+
+  /**
+   * Insert generated plaintext codes (see {@link insertGeneratedCodes}).
+   * Convenience wrapper bound to this repository's database; the standalone
+   * function is exported for call sites that hold only a Database handle.
+   */
+  async insertGeneratedCodes(options: InsertGeneratedCodesOptions): Promise<InsertGeneratedCodesReport> {
+    return insertGeneratedCodes(this.db, options);
   }
 
   /**

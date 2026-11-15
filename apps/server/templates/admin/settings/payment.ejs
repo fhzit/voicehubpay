@@ -1,0 +1,101 @@
+<%
+  const g = (k, d = '') => (settings[k] === undefined || settings[k] === null ? d : String(settings[k]));
+  const types = g('SG65_ENABLED_TYPES', 'alipay,wxpay,qqpay').split(',').filter((entry) => entry !== '');
+%>
+<div class="settings-layout settings-layout-single">
+<div class="settings-column" style="min-width:0;">
+<div class="settings-section" style="max-width:840px;">
+  <h3 class="card-title mb-2">SG65 聚合支付（V2 · RSA SHA256WithRSA）</h3>
+  <p class="muted small mb-4">仅支持 V2 签名（SHA256WithRSA），不支持 V1 MD5。密钥经主密钥加密保存，界面仅显示掩码。</p>
+
+  <form method="post" action="/admin/settings/payment">
+    <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+    <div class="field checkbox-row">
+      <input type="checkbox" name="sg65_enabled" id="sg65_enabled" value="1" <%= g('SG65_ENABLED', '0') === '1' ? 'checked' : '' %>>
+      <label for="sg65_enabled" class="small muted">启用 SG65 支付</label>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">商户 PID</label>
+        <input class="input" type="text" name="sg65_pid" required value="<%= e(g('SG65_PID')) %>">
+      </div>
+      <div class="field">
+        <label class="label">默认支付方式</label>
+        <select name="sg65_default_type" class="select">
+          <% [['alipay', '支付宝'], ['wxpay', '微信支付'], ['qqpay', 'QQ 钱包']].forEach(([tk, tl]) => { %>
+            <option value="<%= tk %>" <%= g('SG65_DEFAULT_PAYMENT_TYPE', 'alipay') === tk ? 'selected' : '' %>><%= tl %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">启用支付方式</label>
+      <div class="flex-wrap flex" style="gap:12px;">
+        <% [['alipay', '支付宝'], ['wxpay', '微信支付'], ['qqpay', 'QQ 钱包']].forEach(([tk, tl]) => { %>
+          <div class="checkbox-row">
+            <input type="checkbox" name="sg65_types[]" id="type_<%= tk %>" value="<%= tk %>" <%= types.includes(tk) ? 'checked' : '' %>>
+            <label for="type_<%= tk %>" class="small"><%= tl %></label>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">请求方式</label>
+      <select name="sg65_default_method" class="select">
+        <option value="jump" <%= g('SG65_DEFAULT_METHOD', 'jump') === 'jump' ? 'selected' : '' %>>跳转支付（生成支付地址跳转）</option>
+        <option value="web" <%= g('SG65_DEFAULT_METHOD', 'jump') === 'web' ? 'selected' : '' %>>内嵌收银台（网页支付）</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="label">商户私钥（RSA 私钥 PEM）</label>
+      <textarea class="textarea" name="sg65_merchant_private_key" rows="5" placeholder="<%= private_key_configured ? '••••••••' : '-----BEGIN RSA PRIVATE KEY-----…' %>"></textarea>
+      <div class="hint"><%= private_key_configured ? '当前已配置。留空或输入掩码表示不修改。' : '尚未配置，保存后加密存储。' %></div>
+    </div>
+    <div class="field">
+      <label class="label">平台公钥（SG65 平台 RSA 公钥 PEM）</label>
+      <textarea class="textarea" name="sg65_platform_public_key" rows="5" placeholder="<%= public_key_configured ? '••••••••' : '-----BEGIN PUBLIC KEY-----…' %>"></textarea>
+      <div class="hint">用于校验 SG65 通知签名。<%= public_key_configured ? '当前已配置，留空表示不修改。' : '尚未配置。' %></div>
+    </div>
+
+    <div class="field">
+      <label class="label">回调地址（在 SG65 商户后台填写）</label>
+      <div class="small"><code class="inline">异步通知：</code><code class="inline mono"><%= e(notify_url) %></code></div>
+      <div class="small mt-1"><code class="inline">同步跳转：</code><code class="inline mono"><%= e(return_url) %></code></div>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">商城手续费率（%）</label>
+        <input class="input" type="number" name="shop_fee_percent" min="0" max="100" step="0.1" value="<%= e(g('SHOP_FEE_PERCENT', '3')) %>">
+        <div class="hint">商城订单的实际收入按此比例扣除，默认 3%。</div>
+      </div>
+    </div>
+
+    <div class="flex">
+      <button class="btn btn-primary">保存支付设置</button>
+      <button class="btn btn-secondary" type="button" id="test-sg65">测试连接</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('test-sg65');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = '测试中…';
+      var fd = new FormData();
+      fd.set('_csrf', '<%= e(csrf) %>');
+      fetch('/admin/settings/payment/test', { method: 'POST', credentials: 'same-origin', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          alert(j.ok ? '连接成功：' + JSON.stringify(j.data) : '失败：' + j.error);
+          btn.disabled = false;
+          btn.textContent = '测试连接';
+        })
+        .catch(function () { alert('网络错误'); btn.disabled = false; btn.textContent = '测试连接'; });
+    });
+  })();
+</script>
+</div></div>

@@ -1,0 +1,61 @@
+<%
+  const f = filters;
+  const pageHref = (i) => {
+    const params = new URLSearchParams();
+    Object.entries(f).forEach(([key, value]) => { if (value !== '' && value !== undefined && value !== null) params.set(key, String(value)); });
+    params.set('page', String(i));
+    return `/admin/orders?${params.toString()}`;
+  };
+%>
+<div class="filters">
+  <form method="get" action="/admin/orders" class="flex" style="gap:10px;flex-wrap:wrap;flex:1;">
+    <input type="text" name="order_no" class="input" placeholder="订单号" value="<%= e(f.order_no) %>" style="min-width:160px;">
+    <input type="text" name="username" class="input" placeholder="用户" value="<%= e(f.username) %>">
+    <input type="text" name="product" class="input" placeholder="商品" value="<%= e(f.product) %>">
+    <select name="payment_status" class="select">
+      <option value="">全部支付状态</option>
+      <% [['paid', '已支付'], ['unpaid', '未支付'], ['pending', '待确认'], ['failed', '支付失败']].forEach(([pk, pl]) => { %>
+        <option value="<%= pk %>" <%= f.payment_status === pk ? 'selected' : '' %>><%= pl %></option>
+      <% }) %>
+    </select>
+    <select name="fulfillment_status" class="select">
+      <option value="">全部发货状态</option>
+      <% [['success', '已发货'], ['manual_completed', '人工完成'], ['partial', '部分完成'], ['processing', '发货中'], ['pending', '待发货'], ['failed', '发货失败'], ['manual_review', '待人工处理']].forEach(([fk, fl]) => { %>
+        <option value="<%= fk %>" <%= f.fulfillment_status === fk ? 'selected' : '' %>><%= fl %></option>
+      <% }) %>
+    </select>
+    <input type="date" name="from" class="input" value="<%= e(f.from) %>">
+    <input type="date" name="to" class="input" value="<%= e(f.to) %>">
+    <button class="btn btn-secondary">筛选</button>
+    <% if (f.abnormal) { %><a href="/admin/orders" class="btn btn-danger">× 异常过滤</a><% } %>
+  </form>
+  <a href="/admin/orders?abnormal=1" class="btn btn-<%= f.abnormal ? 'danger' : 'warning' %>">异常订单</a>
+</div>
+
+<div class="card card-pad-0">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>订单号</th><th>用户</th><th>商品</th><th class="num">应付</th><th>支付</th><th>发货</th><th>来源</th><th>时间</th><th></th></tr></thead>
+    <tbody>
+    <% if (orders.length === 0) { %>
+      <tr><td colspan="9" class="text-center muted">没有符合条件的订单</td></tr>
+    <% } %>
+    <% const nowIso = new Date().toISOString(); orders.forEach((o) => { %>
+      <% const abnormal = o.payment_status === 'paid' && ['failed', 'manual_review'].includes(o.fulfillment_status); %>
+      <% const cancelled = o.order_status === 'cancelled' || (o.payment_status !== 'paid' && o.expires_at && String(o.expires_at) < nowIso); %>
+      <tr<%= abnormal ? ' class="row-abnormal"' : '' %>>
+        <td class="mono"><%= e(o.order_no) %></td>
+        <td class="small"><%= e(o.username || '—') %></td>
+        <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= e(o.first_item_name || '') %></td>
+        <td class="num">¥<%= money(Number(o.amount_due_cents || 0)) %></td>
+        <td><% if (cancelled) { %><span class="badge badge-gray">已取消</span><% } else { %><%- include('../../partials/status-badge', { kind: 'payment', status: o.payment_status }) %><% } %></td>
+        <td><% if (cancelled) { %><span class="badge badge-gray">已取消</span><% } else { %><%- include('../../partials/status-badge', { kind: 'fulfillment', status: o.fulfillment_status }) %><% } %></td>
+        <td><span class="badge badge-<%= o.source === 'afdian' ? 'purple' : 'blue' %>"><%= o.source === 'afdian' ? '爱发电' : '商城' %></span></td>
+        <td class="small muted"><%= datetime(o.created_at) %></td>
+        <td><a href="/admin/orders/<%= e(o.order_no) %>" class="btn-link">处理</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+</div>
+
+<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>

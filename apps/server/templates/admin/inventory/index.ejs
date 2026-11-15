@@ -1,0 +1,149 @@
+<%
+  const pageHref = (i) => `/admin/inventory?product=${product_id || ''}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}&page=${i}`;
+%>
+<div class="filters">
+  <form method="get" action="/admin/inventory" class="flex" style="gap:10px;flex-wrap:wrap;flex:1;">
+    <select name="product" class="select" onchange="this.form.submit()">
+      <option value="">全部商品</option>
+      <% products.forEach((p) => { %>
+        <% if (['card', 'card_and_voicehub', 'voicehub'].includes(p.delivery_mode)) { %>
+          <option value="<%= Number(p.id) %>" <%= Number(product_id) === Number(p.id) ? 'selected' : '' %>><%= e(p.name) %></option>
+        <% } %>
+      <% }) %>
+    </select>
+    <select name="status" class="select">
+      <option value="">全部状态</option>
+      <% [['available', '可售'], ['reserved', '已占用'], ['sold', '已售'], ['disabled', '停用']].forEach(([sk, sl]) => { %>
+        <option value="<%= sk %>" <%= status === sk ? 'selected' : '' %>><%= sl %></option>
+      <% }) %>
+    </select>
+    <input type="text" name="q" class="input" style="max-width:240px;" value="<%= e(q) %>" placeholder="搜索卡密或商品名…">
+    <button class="btn btn-secondary">筛选</button>
+  </form>
+  <a href="/admin/inventory/import?product=<%= product_id || '' %>" class="btn btn-primary">＋ 导入卡密</a>
+</div>
+
+<div class="metric-seg" style="margin-bottom:18px;">
+  <div><div class="m-label">可售</div><div class="m-value" style="color:var(--success);"><%= stats.available %></div></div>
+  <div><div class="m-label">已占用（订单预留）</div><div class="m-value" style="color:var(--accent);"><%= stats.reserved %></div></div>
+  <div><div class="m-label">已售</div><div class="m-value"><%= stats.sold %></div></div>
+  <div><div class="m-label">停用</div><div class="m-value" style="color:var(--muted-foreground);"><%= stats.disabled %></div></div>
+</div>
+
+<div class="card">
+  <h3 class="card-title mb-3">生成卡密</h3>
+  <p class="muted small mb-3">按规则批量生成新卡密并直接入库，生成结果与手动导入一致：加密存储、仅展示掩码、自动去重。</p>
+  <form method="post" action="/admin/inventory/generate">
+    <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">目标商品 *</label>
+        <select name="product_id" class="select" required>
+          <option value="">请选择商品</option>
+          <% products.forEach((p) => { %>
+            <option value="<%= Number(p.id) %>" <%= Number(product_id) === Number(p.id) ? 'selected' : '' %>><%= e(p.name) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">生成数量 *</label>
+        <input class="input" type="number" name="count" min="1" max="5000" value="10" required>
+        <div class="hint">单次最多 5000 条</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">生成模式</label>
+        <select name="mode" class="select" id="generate-mode">
+          <option value="random" selected>随机（按字符集随机生成）</option>
+          <option value="pattern">模板（prefix + 随机串 + suffix）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">长度</label>
+        <input class="input" type="number" name="length" min="4" max="128" value="16">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">字符集</label>
+        <select name="charset" class="select" id="generate-charset">
+          <option value="alnum" selected>字母 + 数字</option>
+          <option value="upper">大写字母 + 数字</option>
+          <option value="lower">小写字母 + 数字</option>
+          <option value="digits" data-alias="numeric">纯数字</option>
+          <option value="custom">自定义字符集</option>
+        </select>
+        <div class="hint">「纯数字」与生成接口的 numeric 字符集等价。</div>
+      </div>
+      <div class="field">
+        <label class="label">自定义字符集</label>
+        <input class="input" type="text" name="custom_charset" id="generate-custom-charset" placeholder="仅在字符集选择“自定义”时生效" autocomplete="off">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">前缀（可选）</label>
+        <input class="input" type="text" name="prefix" placeholder="例如 VHP-" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="label">后缀（可选）</label>
+        <input class="input" type="text" name="suffix" placeholder="例如 -CN" autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">备注（可选）</label>
+      <input class="input" type="text" name="note" placeholder="写入操作日志的说明">
+    </div>
+    <div class="flex">
+      <button class="btn btn-primary">生成并入库</button>
+      <a href="/admin/inventory/import?product=<%= product_id || '' %>" class="btn btn-secondary">改用手动导入</a>
+    </div>
+  </form>
+</div>
+
+<div class="card card-pad-0">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>ID</th><th>商品</th><th>卡密（加密存储）</th><th>状态</th><th>预留订单</th><th>创建时间</th><th class="text-right">操作</th></tr></thead>
+    <tbody>
+    <% if (cards.length === 0) { %>
+      <tr><td colspan="7" class="text-center muted">暂无卡密，点击右上角“导入卡密”</td></tr>
+    <% } %>
+    <% cards.forEach((c) => { %>
+      <tr>
+        <td class="small mono faint">#<%= Number(c.id) %></td>
+        <td class="small"><%= e(c.product_name || '') %></td>
+        <td class="small mono"><%= e(c.secret_masked || '') %></td>
+        <td><%- include('../../partials/status-badge', { kind: 'inventory', status: c.status }) %></td>
+        <td class="small mono"><%= c.order_id ? e(c.order_id) : '—' %></td>
+        <td class="small muted"><%= datetime(c.created_at) %></td>
+        <td class="text-right">
+          <% if (['available', 'disabled'].includes(c.status)) { %>
+            <form method="post" action="/admin/inventory/<%= Number(c.id) %>/status" style="display:inline;">
+              <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+              <input type="hidden" name="action" value="<%= c.status === 'disabled' ? 'enable' : 'disable' %>">
+              <button class="btn btn-ghost btn-sm"><%= c.status === 'disabled' ? '启用' : '停用' %></button>
+            </form>
+          <% } else { %><span class="small faint">—</span><% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+</div>
+
+<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>
+
+<script>
+  (function () {
+    var form = document.querySelector('form[action="/admin/inventory/generate"]');
+    if (!form) return;
+    var select = form.querySelector('select[name="charset"]');
+    if (!select) return;
+    form.addEventListener('submit', function () {
+      var option = select.options[select.selectedIndex];
+      var alias = option && option.getAttribute('data-alias');
+      if (alias) select.value = alias;
+    });
+  })();
+</script>

@@ -1,0 +1,91 @@
+<%
+  const pageHref = (i) => `/admin/users?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&page=${i}`;
+  const currentId = Number(currentUser.id || 0);
+%>
+<div class="filters">
+  <form method="get" action="/admin/users" class="flex" style="gap:10px;flex-wrap:wrap;flex:1;">
+    <input type="text" name="q" class="input search" placeholder="用户名/昵称/邮箱" value="<%= e(q) %>">
+    <select name="status" class="select">
+      <option value="">全部状态</option>
+      <option value="active" <%= status === 'active' ? 'selected' : '' %>>正常</option>
+      <option value="disabled" <%= status === 'disabled' ? 'selected' : '' %>>已禁用</option>
+    </select>
+    <button class="btn btn-secondary">筛选</button>
+  </form>
+</div>
+
+<div class="card card-pad-0">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>用户</th><th>角色</th><th>订单数</th><th>绑定</th><th>状态</th><th>注册时间</th><th class="text-right">操作</th></tr></thead>
+    <tbody>
+    <% if (users.length === 0) { %>
+      <tr><td colspan="7" class="text-center muted">暂无用户</td></tr>
+    <% } %>
+    <% users.forEach((u) => { %>
+      <%
+        const isTargetSuper = Number(u.id) === Number(super_id || 0);
+        const isAdminUser = u.role === 'admin' || isTargetSuper;
+        const isSelf = Number(u.id) === currentId;
+      %>
+      <tr>
+        <td>
+          <div class="flex" style="gap:8px;">
+            <span class="avatar avatar-sm"><%= e(String(u.display_name || u.username || '').slice(0, 1)) %></span>
+            <div>
+              <div style="font-weight:600;"><%= e(u.username) %></div>
+              <div class="small muted"><%= e(u.display_name || '—') %><%= u.email ? ' · ' + e(u.email) : '' %></div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <% if (isTargetSuper) { %><span class="badge badge-purple" title="初始创建的第一位管理员，不可被降级">超级管理员</span>
+          <% } else if (u.role === 'admin') { %><span class="badge badge-purple">管理员</span>
+          <% } else { %><span class="badge badge-gray">用户</span><% } %>
+        </td>
+        <td><%= Number(u.order_count || 0) %></td>
+        <td class="small">
+          <% (u.social || []).forEach((s) => { %><span class="badge badge-blue" style="margin-right:4px;"><%= s.provider === 'qq' ? 'QQ' : '微信' %></span><% }) %>
+          <% if (u.password_hash) { %><span class="badge badge-gray">密码</span><% } %>
+        </td>
+        <td><%- include('../../partials/status-badge', { kind: 'user', status: u.status }) %></td>
+        <td class="small muted"><%= datetime(u.created_at) %></td>
+        <td class="text-right">
+          <div class="flex" style="justify-content:flex-end;gap:6px;">
+            <a href="/admin/users/<%= Number(u.id) %>" class="btn btn-secondary btn-sm">详情</a>
+            <a href="/admin/users/<%= Number(u.id) %>#edit-profile-toggle" class="btn btn-ghost btn-sm">编辑</a>
+            <% if (is_super && !isTargetSuper) { %>
+              <% if (isAdminUser) { %>
+                <form method="post" action="/admin/users/<%= Number(u.id) %>/role" style="display:inline;">
+                  <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+                  <input type="hidden" name="role" value="user">
+                  <button class="btn btn-ghost btn-sm">降级为普通用户</button>
+                </form>
+              <% } else { %>
+                <form method="post" action="/admin/users/<%= Number(u.id) %>/role" style="display:inline;">
+                  <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+                  <input type="hidden" name="role" value="admin">
+                  <button class="btn btn-primary btn-sm">设为管理员</button>
+                </form>
+              <% } %>
+            <% } %>
+            <% if (!isSelf) { %>
+              <form method="post" action="/admin/users/<%= Number(u.id) %>/status" style="display:inline;">
+                <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+                <button class="btn btn-<%= u.status === 'active' ? 'danger' : 'ghost' %> btn-sm"><%= u.status === 'active' ? '禁用' : '恢复' %></button>
+              </form>
+            <% } %>
+            <% if (u.status === 'disabled' && !isSelf && !isTargetSuper) { %>
+              <form method="post" action="/admin/users/<%= Number(u.id) %>/delete" style="display:inline;">
+                <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+                <button class="btn btn-danger btn-sm">删除</button>
+              </form>
+            <% } %>
+          </div>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+</div>
+
+<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>
