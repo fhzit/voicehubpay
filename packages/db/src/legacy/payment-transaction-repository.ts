@@ -100,13 +100,14 @@ export class PaymentTransactionRepository {
       params.push(status);
     }
     if (q !== '') {
-      where.push('(pt.merchant_order_no LIKE ? OR pt.gateway_trade_no LIKE ?)');
-      params.push(like(q), like(q));
+      where.push('(pt.merchant_order_no LIKE ? OR pt.gateway_trade_no LIKE ? OR u.username LIKE ? OR u.display_name LIKE ?)');
+      params.push(like(q), like(q), like(q), like(q));
     }
     const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-    const total = Number((await this.db.query(`SELECT COUNT(*) AS n FROM payment_transactions pt ${whereSql}`, params)).rows[0]?.n ?? 0);
+    const joinSql = 'FROM payment_transactions pt JOIN orders o ON o.id = pt.order_id LEFT JOIN users u ON u.id = o.user_id';
+    const total = Number((await this.db.query(`SELECT COUNT(*) AS n ${joinSql} ${whereSql}`, params)).rows[0]?.n ?? 0);
     const offset = Math.max(0, (page - 1) * perPage);
-    const items = (await this.db.query(`SELECT pt.*, o.order_no, o.amount_due_cents FROM payment_transactions pt JOIN orders o ON o.id = pt.order_id ${whereSql} ORDER BY pt.id DESC LIMIT ${perPage} OFFSET ${offset}`, params)).rows;
+    const items = (await this.db.query(`SELECT pt.*, o.order_no, o.amount_due_cents, o.user_id, u.username AS user_username, u.display_name AS user_display_name ${joinSql} ${whereSql} ORDER BY pt.id DESC LIMIT ${perPage} OFFSET ${offset}`, params)).rows;
     return { items, total, page, perPage };
   }
 }
