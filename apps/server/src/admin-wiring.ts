@@ -22,7 +22,7 @@ import {
 } from "../../../packages/db/src/legacy/index.js";
 import type { Database } from "../../../packages/db/src/index.js";
 import type { Clock, SessionStore } from "./auth-legacy/types.js";
-import type { AdminConfigPort } from "./admin/types.js";
+import type { AdminConfigPort, AdminMailerPort, AdminVoiceHubProbe } from "./admin/types.js";
 import type { AdminDependencies } from "./admin/types.js";
 import {
   type InventoryGenerateDependencies,
@@ -30,11 +30,14 @@ import {
 
 export interface AdminWiringOptions {
   config: AdminConfigPort;
+  // AdminMailerPort / AdminVoiceHubProbe come from the admin barrel.
   sessions: SessionStore;
   crypto: CryptoService;
   clock?: Clock;
   secureCookies?: boolean;
   loginPath?: string;
+  mailer?: AdminMailerPort;
+  voicehubProbe?: AdminVoiceHubProbe;
 }
 
 export interface AdminWiring {
@@ -71,6 +74,8 @@ export function createAdminWiring(db: Database, options: AdminWiringOptions): Ad
     // card silently reports zero (dashboard.ts falls back to an empty result).
     db,
     config: options.config,
+    ...(options.mailer === undefined ? {} : { mailer: options.mailer }),
+    ...(options.voicehubProbe === undefined ? {} : { voicehubProbe: options.voicehubProbe }),
     sessions: options.sessions,
     crypto: options.crypto,
     clock: options.clock,

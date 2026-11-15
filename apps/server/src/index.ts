@@ -27,6 +27,7 @@ import { AggregateOAuthProvider } from "./aggregate-oauth.js";
 import { PageConfig } from "./page-config.js";
 import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
 import { FileAdminConfig, registerAdminRoutes } from "./admin/index.js";
+import { SmtpMailer } from "./mailer.js";
 import { ensureAdminSchema } from "./admin/index.js";
 import { registerInventoryGenerateRoutes } from "./admin-inventory-generate.js";
 import { createAdminWiring } from "./admin-wiring.js";
@@ -148,6 +149,23 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
   const adminConfig = new FileAdminConfig(process.env.ADMIN_DATA_DIR ?? "/data");
   const wiring = createAdminWiring(db, {
     config: adminConfig,
+    mailer: new SmtpMailer(adminConfig, process.env.APP_BASE_PATH ?? "/legacy/vhpay"),
+    // HEAD/GET probe used by 后台 → 设置 → VoiceHub「连通性测试」.
+    voicehubProbe: async (baseUrl, token) => {
+      const base = baseUrl.replace(/\/+$/, "");
+      try {
+        const response = await fetch(base === "" ? "http://127.0.0.1" : base, {
+          method: "GET",
+          headers: token === "" ? {} : { "x-api-key": token },
+          signal: AbortSignal.timeout(8000),
+          redirect: "manual",
+        });
+        return { reachable: true, status: response.status, error: "" };
+      } catch (error) {
+        const cause = (error as { cause?: { code?: string } }).cause;
+        return { reachable: false, status: 0, error: cause?.code ?? (error instanceof Error ? error.message : String(error)) };
+      }
+    },
     sessions: legacyAuth.sessions,
     crypto: new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
     secureCookies,
