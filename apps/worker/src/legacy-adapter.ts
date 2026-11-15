@@ -34,7 +34,7 @@ export async function createLegacyWorkerPorts(env: NodeJS.ProcessEnv = process.e
       delivery = await deliveries.findById(Number(delivery.id)) ?? delivery;
       await orders.updateUnit(Number(unit.id), { status: "processing", voicehub_status: "processing", voicehub_attempts: Number(delivery.attempts) });
       try {
-        const response = await fetch(endpoint, { method: "POST", headers: { "x-api-key": config.get("VOICEHUB_API_TOKEN"), Accept: "application/json", "Content-Type": "application/json" }, body: payload, signal: AbortSignal.timeout(Math.max(5, config.int("VOICEHUB_TIMEOUT", 20)) * 1000), redirect: "manual" });
+        const response = await fetch(endpoint, { method: "POST", headers: { "x-api-key": secret("VOICEHUB_API_TOKEN"), Accept: "application/json", "Content-Type": "application/json" }, body: payload, signal: AbortSignal.timeout(Math.max(5, config.int("VOICEHUB_TIMEOUT", 20)) * 1000), redirect: "manual" });
         const body = await response.text(); let parsed: Record<string, unknown>; try { parsed = JSON.parse(body) as Record<string, unknown>; } catch { parsed = { raw: body }; }
         const message = String(parsed.message ?? parsed.error ?? ""); const exists = /点歌券已经存在|无需重复创建|已存在|already exists|already created/i.test(message);
         if (response.status >= 400 && !exists) throw new Error(`VoiceHub rejected request (HTTP ${response.status})`);
@@ -46,12 +46,18 @@ export async function createLegacyWorkerPorts(env: NodeJS.ProcessEnv = process.e
     }
     await orders.recalcFulfillmentStatus(orderId); return count;
   };
+  // Settings migrated from the PHP panel store secrets as `v1:` ciphertext.
+  const secret = (key: string, fallback = ""): string => {
+    const raw = config.get(key, fallback);
+    if (raw === "" || !raw.startsWith("v1:")) return raw;
+    try { return crypto.decrypt(raw); } catch { return raw; }
+  };
   return {
     fulfillment: { async process(limit: number): Promise<number> { let total = 0; for (const order of await orders.listPendingFulfillment(limit)) total += await processOrder(Number(order.id)); return total; } },
     afdian: { async poll(limit: number): Promise<number> {
       if (!config.bool("AFDIAN_ENABLED", true)) return 0;
       const userId = config.get("AFDIAN_USER_ID"); if (!userId) throw new Error("AFDIAN_USER_ID is required");
-      const token = config.get("AFDIAN_API_TOKEN"); if (!token) throw new Error("AFDIAN_API_TOKEN is required");
+      const token = secret("AFDIAN_API_TOKEN"); if (!token) throw new Error("AFDIAN_API_TOKEN is required");
       const boundedLimit = Math.max(1, Math.min(limit, config.int("AFDIAN_POLL_LIMIT", 20)));
       const perPage = Math.max(1, Math.min(config.int("AFDIAN_POLL_PER_PAGE", Math.min(boundedLimit, 50)), 100));
       const base = config.get("AFDIAN_API_BASE", "https://ifdian.net").replace(/\/+$/, "");
@@ -98,7 +104,7 @@ export async function createLegacyWorkerPorts(env: NodeJS.ProcessEnv = process.e
           await afdianOrders.markVoiceHub(Number(order.id), "processing", Number(delivery.attempts), null);
           try {
             const voiceEndpoint = `${config.get("VOICEHUB_API_BASE").replace(/\/+$/, "")}${config.get("VOICEHUB_TICKET_ENDPOINT", "/api/open/card-codes")}`;
-            const pushed = await fetch(voiceEndpoint, { method: "POST", headers: { "x-api-key": config.get("VOICEHUB_API_TOKEN"), Accept: "application/json", "Content-Type": "application/json" }, body: payload, signal: AbortSignal.timeout(Math.max(5, config.int("VOICEHUB_TIMEOUT", 20)) * 1000), redirect: "manual" });
+            const pushed = await fetch(voiceEndpoint, { method: "POST", headers: { "x-api-key": secret("VOICEHUB_API_TOKEN"), Accept: "application/json", "Content-Type": "application/json" }, body: payload, signal: AbortSignal.timeout(Math.max(5, config.int("VOICEHUB_TIMEOUT", 20)) * 1000), redirect: "manual" });
             const body = await pushed.text(); let parsed: Record<string, unknown>; try { parsed = JSON.parse(body) as Record<string, unknown>; } catch { parsed = { raw: body }; }
             const message = String(parsed.message ?? parsed.error ?? ""); const exists = /点歌券已经存在|无需重复创建|已存在|already exists|already created/i.test(message);
             if (pushed.status >= 400 && !exists) throw new Error(`VoiceHub rejected request (HTTP ${pushed.status})`);
