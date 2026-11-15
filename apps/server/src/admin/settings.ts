@@ -314,6 +314,8 @@ export function registerSettingsRoutes(router: AdminRouter): void {
     }
     const saved = await saveSettings(router, context, {
       AFDIAN_ENABLED: formBool(body, "afdian_enabled") ? "1" : "0",
+      // 轮询开关：关掉后只依赖 Webhook 通知，不再主动拉取订单。
+      AFDIAN_POLL_ENABLED: formBool(body, "afdian_poll_enabled") ? "1" : "0",
       AFDIAN_USER_ID: formTrimmed(body, "afdian_user_id"),
       AFDIAN_API_BASE: base,
       AFDIAN_ORDER_ENDPOINT: endpoint,

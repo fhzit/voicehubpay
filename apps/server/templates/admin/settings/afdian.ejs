@@ -50,6 +50,10 @@
       </div>
     </div>
     <div class="field checkbox-row">
+      <input type="checkbox" name="afdian_poll_enabled" id="afdian_poll_enabled" value="1" <%= g('AFDIAN_POLL_ENABLED', '1') === '1' ? 'checked' : '' %>>
+      <label for="afdian_poll_enabled" class="small muted">启用订单轮询（关闭后只依赖 Webhook 通知，建议关闭）</label>
+    </div>
+    <div class="field checkbox-row">
       <input type="checkbox" name="afdian_require_signature" id="afdian_require_signature" value="1" <%= g('AFDIAN_WEBHOOK_REQUIRE_SIGNATURE', '1') === '1' ? 'checked' : '' %>>
       <label for="afdian_require_signature" class="small muted">校验 Webhook 请求签名（RSA）</label>
     </div>

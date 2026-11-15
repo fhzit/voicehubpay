@@ -56,6 +56,8 @@ export async function createLegacyWorkerPorts(env: NodeJS.ProcessEnv = process.e
     fulfillment: { async process(limit: number): Promise<number> { let total = 0; for (const order of await orders.listPendingFulfillment(limit)) total += await processOrder(Number(order.id)); return total; } },
     afdian: { async poll(limit: number): Promise<number> {
       if (!config.bool("AFDIAN_ENABLED", true)) return 0;
+      // 只用 Webhook 时可关闭主动轮询，省调用/省 token。
+      if (!config.bool("AFDIAN_POLL_ENABLED", true)) return 0;
       const userId = config.get("AFDIAN_USER_ID"); if (!userId) throw new Error("AFDIAN_USER_ID is required");
       const token = secret("AFDIAN_API_TOKEN"); if (!token) throw new Error("AFDIAN_API_TOKEN is required");
       const boundedLimit = Math.max(1, Math.min(limit, config.int("AFDIAN_POLL_LIMIT", 20)));
