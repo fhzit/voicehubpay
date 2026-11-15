@@ -43,8 +43,8 @@
   <% if (orderCancelled) { %>
     <span class="badge badge-gray">已取消</span>
   <% } else { %>
-    <%- include('../../partials/status-badge', { kind: 'payment', status: order.payment_status }) %>
-    <%- include('../../partials/status-badge', { kind: 'fulfillment', status: order.fulfillment_status }) %>
+    <%- await include('../../partials/status-badge', { kind: 'payment', status: order.payment_status }) %>
+    <%- await include('../../partials/status-badge', { kind: 'fulfillment', status: order.fulfillment_status }) %>
   <% } %>
   <span class="badge badge-<%= order.source === 'afdian' ? 'purple' : 'blue' %>"><%= order.source === 'afdian' ? '爱发电' : '商城' %></span>
   <div class="flex-1"></div>
@@ -73,8 +73,8 @@
         <% units.forEach((u) => { %>
           <tr>
             <td class="mono small"><%= e(u.unit.unit_no) %></td>
-            <td><%- include('../../partials/status-badge', { kind: 'fulfillment', status: u.unit.status }) %></td>
-            <td><%- include('../../partials/status-badge', { kind: 'voicehub', status: u.unit.voicehub_status }) %></td>
+            <td><%- await include('../../partials/status-badge', { kind: 'fulfillment', status: u.unit.status }) %></td>
+            <td><%- await include('../../partials/status-badge', { kind: 'voicehub', status: u.unit.voicehub_status }) %></td>
             <td class="mono small"><%= e(u.code_masked || '—') %></td>
             <td class="small" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= e(u.unit.voicehub_last_error || '') %>"><%= e(u.unit.voicehub_last_error || '') %></td>
             <td class="text-right">
@@ -120,7 +120,7 @@
             </div>
             <div class="flex" style="gap:10px;">
               <span class="small">¥<%= money(Number(pt.amount_cents || 0)) %></span>
-              <%- include('../../partials/status-badge', { kind: 'payment', status: pt.status }) %>
+              <%- await include('../../partials/status-badge', { kind: 'payment', status: pt.status }) %>
             </div>
           </div>
         <% }) %>
@@ -159,7 +159,7 @@
       <% if (deliveries.length === 0) { %><div class="muted small">暂无推送记录</div><% } %>
       <% deliveries.forEach((u) => { %>
         <div class="small" style="padding:6px 0;border-bottom:1px solid var(--border);">
-          <div class="flex-between"><span class="mono"><%= e(u.delivery.source_order_no) %></span><%- include('../../partials/status-badge', { kind: 'delivery', status: u.delivery.status }) %></div>
+          <div class="flex-between"><span class="mono"><%= e(u.delivery.source_order_no) %></span><%- await include('../../partials/status-badge', { kind: 'delivery', status: u.delivery.status }) %></div>
           <div class="muted mt-1">码：<%= e(u.delivery_masked) %> · 尝试 <%= Number(u.delivery.attempts || 0) %> 次</div>
           <% if (u.delivery.last_error) { %><div class="small" style="color:var(--red);"><%= e(u.delivery.last_error) %></div><% } %>
         </div>

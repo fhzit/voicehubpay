@@ -48,7 +48,7 @@
         <td class="small"><%= e(o.buyer_name || '') %></td>
         <td class="small muted"><%= e(o.remark || '') %></td>
         <td class="num">¥<%= money(Number(o.amount_cents || 0)) %></td>
-        <td><%- include('../../partials/status-badge', { kind: 'voicehub', status: o.voicehub_status }) %></td>
+        <td><%- await include('../../partials/status-badge', { kind: 'voicehub', status: o.voicehub_status }) %></td>
         <td><%= Number(o.voicehub_attempts || 0) %></td>
         <td class="small muted"><%= datetime(o.created_at) %></td>
         <td>
@@ -66,4 +66,4 @@
   </table></div>
 </div>
 
-<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>
+<%- await include('../../partials/pagination', { page, pages, href: pageHref }) %>

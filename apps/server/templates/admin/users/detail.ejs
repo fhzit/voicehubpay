@@ -10,7 +10,7 @@
   <% if (isTargetSuper) { %><span class="badge badge-purple" title="初始创建的第一位管理员，不可被降级">超级管理员</span>
   <% } else if (user.role === 'admin') { %><span class="badge badge-purple">管理员</span>
   <% } else { %><span class="badge badge-gray">用户</span><% } %>
-  <%- include('../../partials/status-badge', { kind: 'user', status: user.status }) %>
+  <%- await include('../../partials/status-badge', { kind: 'user', status: user.status }) %>
   <div class="flex-1"></div>
   <% if (is_super && !isTargetSuper) { %>
     <% if (isAdminUser) { %>
@@ -96,8 +96,8 @@
         <td class="mono"><%= e(o.order_no) %></td>
         <td class="small"><%= e(o.first_item_name || '') %></td>
         <td class="num">¥<%= money(Number(o.amount_due_cents || 0)) %></td>
-        <td><%- include('../../partials/status-badge', { kind: 'payment', status: o.payment_status }) %></td>
-        <td><%- include('../../partials/status-badge', { kind: 'fulfillment', status: o.fulfillment_status }) %></td>
+        <td><%- await include('../../partials/status-badge', { kind: 'payment', status: o.payment_status }) %></td>
+        <td><%- await include('../../partials/status-badge', { kind: 'fulfillment', status: o.fulfillment_status }) %></td>
         <td class="small muted"><%= datetime(o.created_at) %></td>
         <td><a href="/admin/orders/<%= e(o.order_no) %>" class="btn-link">处理</a></td>
       </tr>

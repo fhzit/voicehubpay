@@ -47,7 +47,7 @@
         <td class="small mono faint">#<%= Number(d.id) %></td>
         <td class="mono small"><%= e(d.source_order_no) %></td>
         <td class="small"><%= e(sourceLabels[d.code_source] || d.code_source) %></td>
-        <td><%- include('../../partials/status-badge', { kind: 'delivery', status: d.status }) %></td>
+        <td><%- await include('../../partials/status-badge', { kind: 'delivery', status: d.status }) %></td>
         <td><%= Number(d.attempts || 0) %></td>
         <td class="small" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= e(d.last_error || '') %>"><%= e(d.last_error || '') %></td>
         <td class="small muted"><%= datetime(d.updated_at) %></td>
@@ -66,4 +66,4 @@
   </table></div>
 </div>
 
-<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>
+<%- await include('../../partials/pagination', { page, pages, href: pageHref }) %>

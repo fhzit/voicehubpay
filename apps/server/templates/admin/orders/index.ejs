@@ -47,8 +47,8 @@
         <td class="small"><%= e(o.username || '—') %></td>
         <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= e(o.first_item_name || '') %></td>
         <td class="num">¥<%= money(Number(o.amount_due_cents || 0)) %></td>
-        <td><% if (cancelled) { %><span class="badge badge-gray">已取消</span><% } else { %><%- include('../../partials/status-badge', { kind: 'payment', status: o.payment_status }) %><% } %></td>
-        <td><% if (cancelled) { %><span class="badge badge-gray">已取消</span><% } else { %><%- include('../../partials/status-badge', { kind: 'fulfillment', status: o.fulfillment_status }) %><% } %></td>
+        <td><% if (cancelled) { %><span class="badge badge-gray">已取消</span><% } else { %><%- await include('../../partials/status-badge', { kind: 'payment', status: o.payment_status }) %><% } %></td>
+        <td><% if (cancelled) { %><span class="badge badge-gray">已取消</span><% } else { %><%- await include('../../partials/status-badge', { kind: 'fulfillment', status: o.fulfillment_status }) %><% } %></td>
         <td><span class="badge badge-<%= o.source === 'afdian' ? 'purple' : 'blue' %>"><%= o.source === 'afdian' ? '爱发电' : '商城' %></span></td>
         <td class="small muted"><%= datetime(o.created_at) %></td>
         <td><a href="/admin/orders/<%= e(o.order_no) %>" class="btn-link">处理</a></td>
@@ -58,4 +58,4 @@
   </table></div>
 </div>
 
-<%- include('../../partials/pagination', { page, pages, href: pageHref }) %>
+<%- await include('../../partials/pagination', { page, pages, href: pageHref }) %>
