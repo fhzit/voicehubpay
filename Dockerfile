@@ -37,6 +37,9 @@ RUN npm ci --omit=dev --workspace @voicehubpay/server --workspace @voicehubpay/c
     && npm cache clean --force
 
 COPY --from=build /app/apps/web/dist ./apps/web/dist
+# Static CSS/JS for the server-rendered pages (/assets/*). Without this the
+# PHP-parity templates load unstyled and the mobile navigation stays hidden.
+COPY --from=build /app/public ./public
 COPY apps/server ./apps/server
 COPY apps/worker ./apps/worker
 COPY packages ./packages

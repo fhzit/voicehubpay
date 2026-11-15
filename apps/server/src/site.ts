@@ -30,7 +30,7 @@ export interface Site {
 }
 
 const DEFAULT_NAME = "VoiceHubPay";
-const DEFAULT_REGISTER = "/auth/password/register";
+const DEFAULT_REGISTER = "/register";
 const DEFAULT_LOGIN = "/login";
 
 /** Build the `site` object injected into every rendered page. */
