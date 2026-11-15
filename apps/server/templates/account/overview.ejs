@@ -57,8 +57,8 @@
           <td class="mono"><%= e(o.order_no) %></td>
           <td><%= e(o.first_item_name || '') %><% if (Number(o.item_count ?? 1) > 1) { %> <span class="small muted">×<%= Number(o.item_count) %></span><% } %></td>
           <td class="num">¥<%= money(Number(o.amount_paid_cents ?? 0)) %></td>
-          <td><%- await include('../partials/status-badge', { kind: 'payment', status: o.payment_status }) %></td>
-          <td><%- await include('../partials/status-badge', { kind: 'fulfillment', status: o.fulfillment_status }) %></td>
+          <td><%- badge('payment', o.payment_status) %></td>
+          <td><%- badge('fulfillment', o.fulfillment_status) %></td>
           <td class="small muted"><%= datetime(o.created_at) %></td>
           <td class="text-right"><a href="/orders/<%= e(o.order_no) %>" class="btn-link">详情</a></td>
         </tr>

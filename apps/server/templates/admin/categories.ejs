@@ -28,7 +28,7 @@
           <td class="small mono"><%= e(c.slug) %></td>
           <td><%= Number(c.product_count || 0) %></td>
           <td><%= Number(c.sort_order || 0) %></td>
-          <td><%- await include('../partials/status-badge', { kind: 'status', status: c.status }) %></td>
+          <td><%- badge('status', c.status) %></td>
           <td class="text-right">
             <details class="toggle">
               <summary class="small">编辑 / 删除</summary>

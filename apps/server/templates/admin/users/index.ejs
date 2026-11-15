@@ -47,7 +47,7 @@
           <% (u.social || []).forEach((s) => { %><span class="badge badge-blue" style="margin-right:4px;"><%= s.provider === 'qq' ? 'QQ' : '微信' %></span><% }) %>
           <% if (u.password_hash) { %><span class="badge badge-gray">密码</span><% } %>
         </td>
-        <td><%- await include('../../partials/status-badge', { kind: 'user', status: u.status }) %></td>
+        <td><%- badge('user', u.status) %></td>
         <td class="small muted"><%= datetime(u.created_at) %></td>
         <td class="text-right">
           <div class="flex" style="justify-content:flex-end;gap:6px;">

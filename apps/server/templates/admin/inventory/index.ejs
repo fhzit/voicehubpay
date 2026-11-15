@@ -114,7 +114,7 @@
         <td class="small mono faint">#<%= Number(c.id) %></td>
         <td class="small"><%= e(c.product_name || '') %></td>
         <td class="small mono"><%= e(c.secret_masked || '') %></td>
-        <td><%- await include('../../partials/status-badge', { kind: 'inventory', status: c.status }) %></td>
+        <td><%- badge('inventory', c.status) %></td>
         <td class="small mono"><%= c.order_id ? e(c.order_id) : '—' %></td>
         <td class="small muted"><%= datetime(c.created_at) %></td>
         <td class="text-right">

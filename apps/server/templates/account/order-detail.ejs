@@ -15,8 +15,8 @@
     <div>
       <h1 class="page-title mono"><%= e(order.order_no) %></h1>
       <p class="page-sub">
-        <%- await include('../partials/status-badge', { kind: 'payment', status: order.payment_status }) %>
-        <%- await include('../partials/status-badge', { kind: 'fulfillment', status: order.fulfillment_status }) %>
+        <%- badge('payment', order.payment_status) %>
+        <%- badge('fulfillment', order.fulfillment_status) %>
         <span class="small muted">下单于 <%= datetime(order.created_at) %></span>
       </p>
     </div>
@@ -73,7 +73,7 @@
                     <% } %>
                   </div>
                   <% if (u.voicehub_status) { %>
-                    <div class="mt-1"><%- await include('../partials/status-badge', { kind: 'voicehub', status: u.voicehub_status }) %></div>
+                    <div class="mt-1"><%- badge('voicehub', u.voicehub_status) %></div>
                   <% } %>
                 </div>
                 <div class="flex">
@@ -118,7 +118,7 @@
               </div>
               <div class="text-right">
                 <div class="small">¥<%= money(Number(pt.amount_cents ?? 0)) %></div>
-                <%- await include('../partials/status-badge', { kind: 'payment', status: pt.status }) %>
+                <%- badge('payment', pt.status) %>
               </div>
             </div>
           <% } %>

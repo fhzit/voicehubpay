@@ -48,7 +48,7 @@
         <td class="num"><%= Number(p.sold_units || 0) %></td>
         <td class="num">¥<%= money(Number(p.revenue_cents || 0)) %></td>
         <td class="num"><%= Number(p.stock_available || 0) %></td>
-        <td><%- await include('../../partials/status-badge', { kind: 'status', status: p.status }) %></td>
+        <td><%- badge('status', p.status) %></td>
         <td class="text-right">
           <div class="flex" style="justify-content:flex-end;gap:6px;">
             <a href="/admin/products/edit/<%= Number(p.id) %>" class="btn btn-secondary btn-sm">编辑</a>

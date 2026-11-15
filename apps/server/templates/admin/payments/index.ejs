@@ -33,7 +33,7 @@
         <td class="small"><a href="/admin/orders/<%= e(t.order_no || '') %>"><%= e(t.order_no || '—') %></a></td>
         <td><span class="badge badge-blue"><%= e(t.pay_type || '—') %></span></td>
         <td class="num">¥<%= money(Number(t.amount_cents || 0)) %></td>
-        <td><%- await include('../../partials/status-badge', { kind: 'payment', status: t.status }) %></td>
+        <td><%- badge('payment', t.status) %></td>
         <td class="small"><%= e(t.confirmation_source || '') %></td>
         <td class="small muted"><%= datetime(t.created_at) %></td>
       </tr>
