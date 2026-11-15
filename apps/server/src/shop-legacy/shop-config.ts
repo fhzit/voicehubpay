@@ -1,4 +1,5 @@
 import type { ConfigPort } from "./types.js";
+import { CryptoService } from "../../../../packages/db/src/index.js";
 
 /**
  * Environment-backed ConfigPort for the shop-legacy module (the deployment
@@ -16,11 +17,31 @@ import type { ConfigPort } from "./types.js";
  *   ORDER_TTL_MINUTES          unpaid-order TTL (min 5, default 30)
  */
 export class EnvShopConfig implements ConfigPort {
+  private crypto: CryptoService | undefined;
+
   constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}
+
+  /**
+   * Secrets migrated from the PHP panel are stored as `v1:<base64>` ciphertext
+   * (SG65 keys, Afdian/VoiceHub tokens, SMTP password). Every consumer expects
+   * plaintext, so decrypt on read with the shared master key.
+   */
+  private decryptIfNeeded(value: string): string {
+    if (!value.startsWith("v1:")) return value;
+    if (this.crypto === undefined) {
+      this.crypto = new CryptoService(this.env.APP_BASE_PATH ?? process.env.APP_BASE_PATH ?? process.cwd());
+    }
+    try {
+      return this.crypto.decrypt(value);
+    } catch {
+      return value;
+    }
+  }
 
   get(key: string, fallback = ""): string {
     const value = this.env[key];
-    return value === undefined || value === "" ? fallback : value;
+    if (value === undefined || value === "") return fallback;
+    return this.decryptIfNeeded(value);
   }
 
   bool(key: string, fallback: boolean): boolean {
