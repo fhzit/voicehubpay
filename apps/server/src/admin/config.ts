@@ -51,7 +51,7 @@ export class FileAdminConfig implements AdminConfigPort {
     if (value === undefined || value === "") return fallback;
     // Secrets migrated from PHP are `v1:` ciphertext; callers need plaintext.
     if (value.startsWith("v1:")) {
-      if (this.crypto === undefined) this.crypto = new CryptoService(this.basePath);
+      if (this.crypto === undefined) this.crypto = new CryptoService(this.env.APP_BASE_PATH ?? process.env.APP_BASE_PATH ?? this.basePath);
       try {
         return this.crypto.decrypt(value);
       } catch {
