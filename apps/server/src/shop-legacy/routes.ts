@@ -263,6 +263,7 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
       // jump method: redirect to pay_info.
       return ctx.redirectTo(reply, result.pay_info);
     } catch (error) {
+      console.error(`[pay] ${orderNo} createPayment failed`, error);
       const message = error instanceof ShopError || error instanceof PaymentError
         ? error.message
         : error instanceof Error && /支付网关连接失败/.test(error.message)
