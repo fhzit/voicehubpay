@@ -23,6 +23,22 @@ export function buildApp(options: {
     return typeof supplied === "string" && requestIdPattern.test(supplied) ? supplied : randomUUID();
   } });
 
+  // PHP-parity form posts (login, register, checkout, admin settings) all use
+  // application/x-www-form-urlencoded. Fastify ships no such parser, and the
+  // per-scope registrations left the shop routes without one — every
+  // POST /orders/:no/pay answered 415 and the user never reached the cashier.
+  app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_request, body, done) => {
+    const params = new URLSearchParams(String(body));
+    const parsed: Record<string, string | string[]> = {};
+    for (const [key, value] of params) {
+      const existing = parsed[key];
+      if (existing === undefined) parsed[key] = value;
+      else if (Array.isArray(existing)) existing.push(value);
+      else parsed[key] = [existing, value];
+    }
+    done(null, parsed);
+  });
+
   app.addHook("onSend", async (request, reply, payload) => {
     reply.header("x-request-id", request.id);
     return payload;
