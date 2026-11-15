@@ -70,11 +70,11 @@
     btn.addEventListener('click', function () {
       btn.disabled = true;
       btn.textContent = '测试中…';
-      var fd = new FormData();
+      var fd = new URLSearchParams();
       fd.set('_csrf', '<%= e(csrf) %>');
       var notify = document.querySelector('input[name=notify_email]');
       if (notify) fd.set('notify_email', notify.value);
-      fetch('/admin/settings/smtp/test', { method: 'POST', credentials: 'same-origin', body: fd })
+      fetch('/admin/settings/smtp/test', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd })
         .then(function (r) { return r.json(); })
         .then(function (j) {
           alert(j.ok ? (j.note || '发送成功') : '失败：' + j.error);

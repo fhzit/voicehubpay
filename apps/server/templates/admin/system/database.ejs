@@ -42,9 +42,9 @@
     btn.addEventListener('click', function () {
       btn.disabled = true;
       btn.textContent = '检查中…';
-      var fd = new FormData();
+      var fd = new URLSearchParams();
       fd.set('_csrf', '<%= e(csrf) %>');
-      fetch('/admin/system/database/check', { method: 'POST', credentials: 'same-origin', body: fd })
+      fetch('/admin/system/database/check', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd })
         .then(function (r) { return r.json(); })
         .then(function (j) {
           var box = document.getElementById('db-check-result');
