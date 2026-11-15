@@ -221,7 +221,12 @@ export function registerInventoryGenerateRoutes(app: FastifyInstance, deps: Inve
     }
     const mode = modeRaw as CodeMode;
 
-    const charset = formString(body["charset"]) || "alnum";
+    // Accept the UI vocabulary too: the form posts `digits`, the generator
+    // speaks `numeric`. Normalising server-side keeps the endpoint usable
+    // without JavaScript (the template also rewrites it client-side).
+    const charsetAliases: Record<string, string> = { digits: "numeric", number: "numeric", letters: "alpha" };
+    const requestedCharset = (formString(body["charset"]) || "alnum").toLowerCase();
+    const charset = charsetAliases[requestedCharset] ?? requestedCharset;
     const customCharset = formString(body["custom_charset"]);
     const prefix = formString(body["prefix"]);
     const suffix = formString(body["suffix"]);
