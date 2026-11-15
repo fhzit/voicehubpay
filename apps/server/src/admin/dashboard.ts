@@ -11,7 +11,7 @@ import type { AdminContext, AdminRouter } from "./router.js";
 import { formString } from "./router.js";
 import type { Row } from "./types.js";
 
-const RANGES = new Set(["today", "week", "month", "custom"]);
+const RANGES = new Set(["today", "week", "month", "all", "custom"]);
 const CHANNELS = new Set(["all", "shop", "afdian"]);
 const SHANGHAI_OFFSET_MS = 8 * 3600 * 1000;
 
@@ -61,6 +61,17 @@ export function rangeBounds(range: string, customFrom: string, customTo: string,
     if (Number.isFinite(from) && Number.isFinite(to) && from <= to) {
       return { from: iso(from), to: iso(to), granularity: "day", buckets: dayBuckets(from, to, "MM-DD") };
     }
+  }
+
+  if (range === "all") {
+    // Whole history: totals span every paid order, the trend window stays at the
+    // last 30 days so the chart remains readable.
+    return {
+      from: "1970-01-01T00:00:00+00:00",
+      to: iso(nowMs),
+      granularity: "day",
+      buckets: dayBuckets(nowMs - 30 * 24 * 3600 * 1000, nowMs, "MM-DD"),
+    };
   }
 
   if (range === "week" || range === "month") {

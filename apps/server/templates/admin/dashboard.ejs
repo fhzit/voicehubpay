@@ -22,7 +22,7 @@
 <div class="filters dash-filters" style="margin-bottom:20px;">
   <div class="filter-group">
     <span class="small muted fg-label">统计范围</span>
-    <% [['today', '今日'], ['week', '本周'], ['month', '本月']].forEach(([rk, rl]) => { %>
+    <% [['today', '今日'], ['week', '本周'], ['month', '本月'], ['all', '全部']].forEach(([rk, rl]) => { %>
       <a href="/admin?range=<%= rk %>&channel=<%= e(channel) %>" class="btn btn-sm <%= range === rk ? 'btn-primary' : 'btn-secondary' %>"><%= rl %></a>
     <% }) %>
   </div>
