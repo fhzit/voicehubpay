@@ -46,7 +46,7 @@ export function configureAuthRoutes(app: FastifyInstance, deps: LegacyAuthDepend
       const path = (request.url.split("?")[0] ?? "/");
       if (EMAIL_EXEMPT.some((pattern) => pattern.test(path))) return;
       const cookieHeader = request.headers.cookie ?? "";
-      const match = /(?:^|;\s*)vhpay_session=([^;]+)/.exec(cookieHeader);
+      const match = new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`).exec(cookieHeader);
       if (match === null) return;
       const context = await sessions.start(match[1]);
       if (context.isNew) return;
