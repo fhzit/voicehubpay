@@ -192,7 +192,9 @@ export function createAfdianAdminProcessor(deps: AfdianAdminProcessorDeps) {
     /** 拉取最近订单（受 AFDIAN_POLL_LIMIT 限制），逐条入库并发券。 */
     async processPoll(): Promise<PollResult[]> {
       assertConfigured();
-      const limit = Math.max(1, Math.min(config.int("AFDIAN_POLL_LIMIT", 20), 50));
+      // 手动同步是同步请求，必须留出响应时间：Cloudflare 100 秒就 524。
+      const limit = Math.max(1, Math.min(config.int("AFDIAN_POLL_LIMIT", 20), 10));
+      const deadline = Date.now() + 40_000;
       const perPage = Math.max(1, Math.min(config.int("AFDIAN_POLL_PER_PAGE", 50), 100));
       const results: PollResult[] = [];
       let page = 1;
@@ -202,6 +204,7 @@ export function createAfdianAdminProcessor(deps: AfdianAdminProcessorDeps) {
         totalPages = pages;
         for (const raw of list) {
           if (results.length >= limit) break;
+          if (Date.now() > deadline) break;
           const outcome = await handleOrder(raw);
           if (outcome !== null) results.push(outcome);
         }
