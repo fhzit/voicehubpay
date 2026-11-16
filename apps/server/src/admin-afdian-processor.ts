@@ -68,35 +68,54 @@ export function createAfdianAdminProcessor(deps: AfdianAdminProcessorDeps) {
 
   async function requestPage(page: number, perPage: number): Promise<{ list: Row[]; totalPages: number }> {
     const payload = signedPayload({ page, per_page: perPage });
-    // 爱发电文档用 JSON 提交；部分镜像网关只认表单，两种都试一遍。
-    const encodings: Array<{ contentType: string; body: string }> = [
-      { contentType: "application/json", body: JSON.stringify(payload) },
-      { contentType: "application/x-www-form-urlencoded", body: new URLSearchParams(payload).toString() },
-    ];
+    const jsonBody = JSON.stringify(payload);
+    const formBody = new URLSearchParams(payload).toString();
     let lastError: unknown;
-    for (const encoding of encodings) {
-      for (let attempt = 1; attempt <= 4; attempt += 1) {
-        try {
-          const response = await doFetch(endpoint(), {
-            method: "POST",
-            headers: { Accept: "application/json", "Content-Type": encoding.contentType },
-            body: encoding.body,
-            signal: AbortSignal.timeout(20_000),
-          });
-          if (!response.ok) throw new Error(`爱发电接口返回 HTTP ${response.status}`);
-          const envelope = (await response.json()) as Row;
-          const em = String(envelope["em"] ?? "");
-          if (Number(envelope["ec"]) !== 200) throw new Error(`爱发电接口错误：${em || "未知错误"}`);
+    // 集群到爱发电的出口抖动严重（偶发 UND_ERR_CONNECT_TIMEOUT），单次超时压到 8 秒、重试 3 次。
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const response = await doFetch(endpoint(), {
+          method: "POST",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: jsonBody,
+          signal: AbortSignal.timeout(8_000),
+        });
+        const raw = await response.text();
+        if (!response.ok) throw new Error(`爱发电接口返回 HTTP ${response.status}`);
+        let envelope: Row;
+        try { envelope = JSON.parse(raw) as Row; } catch { throw new Error(`爱发电返回非 JSON：${raw.slice(0, 120)}`); }
+        const em = String(envelope["em"] ?? "");
+        if (Number(envelope["ec"]) === 200) {
           const data = (envelope["data"] ?? {}) as Row;
           const list = Array.isArray(data["list"]) ? (data["list"] as Row[]) : [];
           return { list, totalPages: Math.max(1, Number(data["total_page"] ?? 1)) };
-        } catch (error) {
-          lastError = error;
-          if (attempt < 4) await new Promise((resolve) => { setTimeout(resolve, 500 * attempt + Math.floor(Math.random() * 250)); });
         }
+        // 网关只认表单时用表单重试一次，再走退避
+        if (/params/i.test(em)) {
+          const formResponse = await doFetch(endpoint(), {
+            method: "POST",
+            headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+            body: formBody,
+            signal: AbortSignal.timeout(8_000),
+          });
+          const formRaw = await formResponse.text();
+          const formEnvelope = JSON.parse(formRaw) as Row;
+          if (Number(formEnvelope["ec"]) === 200) {
+            const data = (formEnvelope["data"] ?? {}) as Row;
+            const list = Array.isArray(data["list"]) ? (data["list"] as Row[]) : [];
+            return { list, totalPages: Math.max(1, Number(data["total_page"] ?? 1)) };
+          }
+          throw new Error(`爱发电接口错误：${String(formEnvelope["em"] ?? em)}`);
+        }
+        throw new Error(`爱发电接口错误：${em || "未知错误"}`);
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) await new Promise((resolve) => { setTimeout(resolve, 400 * attempt + Math.floor(Math.random() * 200)); });
       }
     }
-    throw lastError instanceof Error ? lastError : new Error("爱发电接口请求失败");
+    const cause = (lastError as { cause?: { code?: string } } | undefined)?.cause;
+    const reason = cause?.code ?? (lastError instanceof Error ? lastError.message : String(lastError));
+    throw new Error(`爱发电接口请求失败：${reason}`);
   }
 
   function normalize(raw: Row): (Row & { out_trade_no: string }) | null {
