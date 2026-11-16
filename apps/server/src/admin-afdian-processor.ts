@@ -67,25 +67,33 @@ export function createAfdianAdminProcessor(deps: AfdianAdminProcessorDeps) {
   }
 
   async function requestPage(page: number, perPage: number): Promise<{ list: Row[]; totalPages: number }> {
-    const body = new URLSearchParams(signedPayload({ page, per_page: perPage })).toString();
+    const payload = signedPayload({ page, per_page: perPage });
+    // 爱发电文档用 JSON 提交；部分镜像网关只认表单，两种都试一遍。
+    const encodings: Array<{ contentType: string; body: string }> = [
+      { contentType: "application/json", body: JSON.stringify(payload) },
+      { contentType: "application/x-www-form-urlencoded", body: new URLSearchParams(payload).toString() },
+    ];
     let lastError: unknown;
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        const response = await doFetch(endpoint(), {
-          method: "POST",
-          headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body,
-          signal: AbortSignal.timeout(20_000),
-        });
-        if (!response.ok) throw new Error(`爱发电接口返回 HTTP ${response.status}`);
-        const envelope = (await response.json()) as Row;
-        if (Number(envelope["ec"]) !== 200) throw new Error(`爱发电接口错误：${String(envelope["em"] ?? "未知错误")}`);
-        const data = (envelope["data"] ?? {}) as Row;
-        const list = Array.isArray(data["list"]) ? (data["list"] as Row[]) : [];
-        return { list, totalPages: Math.max(1, Number(data["total_page"] ?? 1)) };
-      } catch (error) {
-        lastError = error;
-        if (attempt < 3) await new Promise((resolve) => { setTimeout(resolve, 400 * attempt); });
+    for (const encoding of encodings) {
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          const response = await doFetch(endpoint(), {
+            method: "POST",
+            headers: { Accept: "application/json", "Content-Type": encoding.contentType },
+            body: encoding.body,
+            signal: AbortSignal.timeout(20_000),
+          });
+          if (!response.ok) throw new Error(`爱发电接口返回 HTTP ${response.status}`);
+          const envelope = (await response.json()) as Row;
+          const em = String(envelope["em"] ?? "");
+          if (Number(envelope["ec"]) !== 200) throw new Error(`爱发电接口错误：${em || "未知错误"}`);
+          const data = (envelope["data"] ?? {}) as Row;
+          const list = Array.isArray(data["list"]) ? (data["list"] as Row[]) : [];
+          return { list, totalPages: Math.max(1, Number(data["total_page"] ?? 1)) };
+        } catch (error) {
+          lastError = error;
+          if (attempt < 2) await new Promise((resolve) => { setTimeout(resolve, 300 * attempt); });
+        }
       }
     }
     throw lastError instanceof Error ? lastError : new Error("爱发电接口请求失败");
