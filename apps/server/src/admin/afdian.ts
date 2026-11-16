@@ -43,15 +43,20 @@ export function registerAfdianRoutes(router: AdminRouter): void {
     if (deps.afdianProcessor === undefined) {
       return context.redirect("/admin/afdian", "爱发电处理器未配置，无法同步。", "error");
     }
-    try {
-      const results = await deps.afdianProcessor.processPoll();
-      const success = results.filter((entry) => entry.status === "success").length;
-      const failed = results.filter((entry) => entry.status === "failed").length;
-      await context.audit("afdian.sync", "afdian", "poll", { total: results.length, success, failed });
-      return context.redirect("/admin/afdian", `手动同步完成：共 ${results.length} 条，成功 ${success}，失败 ${failed}。`);
-    } catch (error) {
-      return context.redirect("/admin/afdian", `同步失败：${errorMessage(error)}`, "error");
-    }
+    // 同步要逐条拉单 + 推 VoiceHub，耗时可能超过 Cloudflare 的 100 秒超时（表现为 524）。
+    // 改为后台执行：立刻返回，页面刷新即可看到结果。
+    const processor = deps.afdianProcessor;
+    void processor
+      .processPoll()
+      .then(async (results) => {
+        const success = results.filter((entry) => entry.status === "success").length;
+        const failed = results.filter((entry) => entry.status === "failed").length;
+        console.info(JSON.stringify({ event: "afdian.sync", total: results.length, success, failed }));
+      })
+      .catch((error: unknown) => {
+        console.error(JSON.stringify({ event: "afdian.sync.failed", error: errorMessage(error) }));
+      });
+    return context.redirect("/admin/afdian", "已在后台开始同步，约 10~60 秒后刷新本页查看结果。");
   });
 
   router.post("/admin/afdian/retry", async (context) => {
