@@ -11,6 +11,14 @@ import type { AdminContext, AdminRouter } from "./router.js";
 import { formBool, formFloat, formInt, formList, formString, formTrimmed } from "./router.js";
 import type { AdminConfigPort, Row } from "./types.js";
 
+
+/** 易支付V2 下单地址：后台只填到 /xpay/epayn 时自动补 /api/pay/submit。 */
+function epaySubmitUrl(config: AdminConfigPort): string {
+  const raw = (config.get("EPAY_V2_BASE_URL", "https://666.hboqy.cn/xpay/epayn") || "").trim();
+  const base = (raw === "" ? "https://666.hboqy.cn/xpay/epayn" : raw).replace(/\/+$/, "");
+  return base.endsWith("/api/pay/submit") ? base : `${base}/api/pay/submit`;
+}
+
 const TIMEZONES = ["Asia/Shanghai", "Asia/Hong_Kong", "Asia/Taipei", "Asia/Tokyo", "Asia/Singapore", "UTC", "America/Los_Angeles", "Europe/London"];
 const MASK = "••••••••";
 
@@ -139,6 +147,11 @@ export function registerSettingsRoutes(router: AdminRouter): void {
       public_key_configured: secretConfigured(config, "SG65_PLATFORM_PUBLIC_KEY"),
       notify_url: `${appUrl(config)}/payments/sg65/notify`,
       return_url: `${appUrl(config)}/payments/sg65/return`,
+      epay_private_configured: secretConfigured(config, "EPAY_V2_MERCHANT_PRIVATE_KEY"),
+      epay_public_configured: secretConfigured(config, "EPAY_V2_PLATFORM_PUBLIC_KEY"),
+      epay_notify_url: `${appUrl(config)}/payments/epayv2/notify`,
+      epay_return_url: `${appUrl(config)}/payments/epayv2/return`,
+      epay_submit_url: epaySubmitUrl(config),
     });
   });
 
@@ -166,6 +179,7 @@ export function registerSettingsRoutes(router: AdminRouter): void {
     if (!saved) return context.reply;
     await maybeSaveSecret(router, "SG65_MERCHANT_PRIVATE_KEY", formTrimmed(body, "sg65_merchant_private_key"));
     await maybeSaveSecret(router, "SG65_PLATFORM_PUBLIC_KEY", formTrimmed(body, "sg65_platform_public_key"));
+
     await reload(router);
     await context.audit("settings.payment", "settings", "payment", { pid });
     return context.redirect("/admin/settings/payment", "支付设置已保存。");
@@ -184,6 +198,58 @@ export function registerSettingsRoutes(router: AdminRouter): void {
   });
 
   // ---------------------------------------------------------------- auth
+  router.post("/admin/settings/payment/epay", async (context) => {
+    if (!(await context.requireCsrf())) return context.reply;
+    const body = context.body;
+    const pid = formTrimmed(body, "epay_pid");
+    const base = (formTrimmed(body, "epay_base_url") || "https://666.hboqy.cn/xpay/epayn").replace(/\/+$/, "");
+    if (!isHttpBaseUrl(base)) return context.redirect("/admin/settings/payment", "易支付地址必须是合法的 HTTP(S) 地址。", "error");
+    const posted = formList(body, "epay_types").filter((entry) => ["alipay", "wxpay", "qqpay"].includes(entry));
+    const types = posted.length > 0 ? posted : ["alipay"];
+    let defaultType = formString(body, "epay_default_type", types[0]!);
+    if (!types.includes(defaultType)) defaultType = types[0]!;
+    const saved = await saveSettings(router, context, {
+      EPAY_V2_ENABLED: formBool(body, "epay_enabled") ? "1" : "0",
+      EPAY_V2_BASE_URL: base,
+      EPAY_V2_PID: pid,
+      EPAY_V2_DEFAULT_TYPE: defaultType,
+      EPAY_V2_ENABLED_TYPES: types.join(","),
+    });
+    if (!saved) return context.reply;
+    await maybeSaveSecret(router, "EPAY_V2_MERCHANT_PRIVATE_KEY", formTrimmed(body, "epay_merchant_private_key"));
+    await maybeSaveSecret(router, "EPAY_V2_PLATFORM_PUBLIC_KEY", formTrimmed(body, "epay_platform_public_key"));
+    await reload(router);
+    await context.audit("settings.epay", "settings", "payment", { pid });
+    return context.redirect("/admin/settings/payment", "易支付V2 设置已保存。");
+  });
+
+  router.post("/admin/settings/payment/epay-test", async (context) => {
+    if (!(await context.requireCsrf())) return context.reply;
+    const base = epaySubmitUrl(config).replace(/\/api\/pay\/submit$/, "");
+    const privateKey = config.get("EPAY_V2_MERCHANT_PRIVATE_KEY", "");
+    const publicKey = config.get("EPAY_V2_PLATFORM_PUBLIC_KEY", "");
+    const checks: Record<string, unknown> = { base };
+    try {
+      const { createPrivateKey, createPublicKey } = await import("node:crypto");
+      const { toPem } = await import("../shop-legacy/sg65-signer.js");
+      if (privateKey === "") checks["private_key"] = "未配置";
+      else { createPrivateKey(toPem(privateKey, ["PRIVATE KEY", "RSA PRIVATE KEY"])); checks["private_key"] = "可解析"; }
+      if (publicKey === "") checks["public_key"] = "未配置";
+      else { createPublicKey(toPem(publicKey, ["PUBLIC KEY", "RSA PUBLIC KEY"])); checks["public_key"] = "可解析"; }
+    } catch (error) {
+      return context.json({ ok: false, error: `密钥无法解析：${errorMessage(error)}`, checks });
+    }
+    try {
+      const response = await fetch(base, { method: "GET", signal: AbortSignal.timeout(8000), redirect: "manual" });
+      checks["http_status"] = response.status;
+      await context.audit("settings.epay_test", "settings", "payment", { ok: true });
+      return context.json({ ok: true, checks });
+    } catch (error) {
+      const cause = (error as { cause?: { code?: string } }).cause;
+      return context.json({ ok: false, error: `网关不可达：${cause?.code ?? errorMessage(error)}`, checks }, 400);
+    }
+  });
+
   router.get("/admin/settings/auth", async (context) => {
     const base = appUrl(config);
     return context.render("settings/auth", {

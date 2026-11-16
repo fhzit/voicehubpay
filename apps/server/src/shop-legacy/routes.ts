@@ -6,6 +6,7 @@ import { renderError, renderPage } from "../render.js";
 import { buildSite } from "../site.js";
 import { configureErrorPages } from "../error-pages.js";
 import { Sg65Client, sg65HttpPost } from "./sg65-client.js";
+import { EpayV2Client } from "./epayv2-client.js";
 import { configureShopPageRoutes } from "./shop-pages.js";
 import { PaymentService, ShopService, PaymentError, ShopError } from "./shop-service.js";
 import type { Row, ShopLegacyDependencies } from "./types.js";
@@ -135,6 +136,11 @@ function paymentService(deps: MutableDeps): PaymentService {
       deps.clock ?? { now: () => Math.floor(Date.now() / 1000) },
       deps.sg65Post ?? sg65HttpPost,
     ),
+    epayv2: new EpayV2Client(
+      deps.config,
+      deps.clock ?? { now: () => Math.floor(Date.now() / 1000) },
+      deps.sg65Post ?? sg65HttpPost,
+    ),
     orders: deps.orders,
     transactions: deps.transactions,
     crypto: deps.crypto,
@@ -221,14 +227,19 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
     }
     const flash = ctx.sessions.takeFlash(context);
     await ctx.sessions.persist(context);
+    const channels = payChannels(deps.config);
+    const requestedChannel = typeof (request.query as Record<string, unknown>)?.["channel"] === "string" ? String((request.query as Record<string, unknown>)["channel"]) : "";
+    const activeChannel = channels.find((entry) => entry.id === requestedChannel) ?? channels[0];
     return renderPage(
       reply,
       "checkout/checkout",
       {
         order,
-        enabled_types: sg65EnabledTypes(deps.config),
-        default_type: defaultPayType(deps.config),
-        payment_enabled: deps.config.bool("SG65_ENABLED", false),
+        enabled_types: activeChannel?.types ?? [],
+        default_type: activeChannel?.default_type ?? defaultPayType(deps.config),
+        payment_enabled: channels.length > 0,
+        channels,
+        selected_channel: activeChannel?.id ?? "sg65",
         method: deps.config.get("SG65_DEFAULT_METHOD", "jump"),
         order_ttl: deps.config.int("ORDER_TTL_MINUTES", 30),
         user,
@@ -254,9 +265,11 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
       return reply.code(404).send({ ok: false, error: "订单不存在。" });
     }
     const payType = formString(bodyOf(request)["pay_type"]) || "alipay";
+    const requestedChannel = formString(bodyOf(request)["channel"]);
+    const channel: "sg65" | "epayv2" = requestedChannel === "epayv2" ? "epayv2" : "sg65";
 
     try {
-      const result = await paymentService(deps).createPayment(order, payType, request.ip);
+      const result = await paymentService(deps).createPayment(order, payType, request.ip, channel);
       if (deps.audit) {
         await deps.audit.log(Number(user["id"]), "payment.create", "order", String(order["order_no"]), { type: payType }, request.ip, request.headers["user-agent"] ?? "");
       }
@@ -298,6 +311,42 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
       console.error("[sg65 notify]", error instanceof Error ? error.message : error);
       return reply.code(500).header("content-type", "text/plain; charset=utf-8").send("error");
     }
+  });
+
+  // -- 易支付V2 异步通知（GET/POST 均可能）----------------------------------------
+  const epayNotify = async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+    const query = { ...(request.query as Record<string, unknown> ?? {}), ...(request.body as Record<string, unknown> ?? {}) };
+    try {
+      const result = await paymentService(deps).handleEpayNotify(query);
+      if (result === "success") return reply.code(200).header("content-type", "text/plain; charset=utf-8").send("success");
+      console.error(`[epayv2 notify] rejected: ${result}`);
+      return reply.code(200).header("content-type", "text/plain; charset=utf-8").send("fail");
+    } catch (error) {
+      console.error("[epayv2 notify]", error instanceof Error ? error.message : error);
+      return reply.code(500).header("content-type", "text/plain; charset=utf-8").send("error");
+    }
+  };
+  app.get("/payments/epayv2/notify", epayNotify);
+  app.post("/payments/epayv2/notify", epayNotify);
+
+  // -- 易支付V2 同步跳转（同样不直接确认支付）--------------------------------------
+  app.get("/payments/epayv2/return", async (request, reply) => {
+    const context = await ctx.start(request, reply);
+    const query = (request.query ?? {}) as Record<string, unknown>;
+    const orderNo = typeof query["out_trade_no"] === "string" ? query["out_trade_no"] : "";
+    const order = orderNo !== "" ? await deps.orders.findByOrderNo(orderNo) : null;
+    const user = await ctx.currentUser(context);
+    if (order === null || user === null || Number(order["user_id"]) !== Number(user["id"])) {
+      return renderError(reply, 404, { site, user, nav: "account" });
+    }
+    const flash = ctx.sessions.takeFlash(context);
+    await ctx.sessions.persist(context);
+    return renderPage(
+      reply,
+      "checkout/pay-return",
+      { order, order_no: orderNo, user, site, flash, csrf: Csrf.token(context.data), nav: "account", pageTitle: "支付结果" },
+      { layout: "shop" },
+    );
   });
 
   // -- GET /payments/sg65/return : NEVER confirms payment directly -----------------
@@ -417,6 +466,32 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
 // ----------------------------------------------------------------------------------
 // Shared helpers
 // ----------------------------------------------------------------------------------
+
+/** 收银台可选渠道（仅返回已启用、且至少有一种支付方式的渠道）。 */
+export interface PayChannelOption {
+  id: "sg65" | "epayv2";
+  label: string;
+  types: string[];
+  default_type: string;
+}
+
+export function payChannels(config: { get(key: string, fallback?: string): string; bool(key: string, fallback: boolean): boolean }): PayChannelOption[] {
+  const out: PayChannelOption[] = [];
+  if (config.bool("SG65_ENABLED", false)) {
+    const types = sg65EnabledTypes(config);
+    if (types.length > 0) out.push({ id: "sg65", label: "易付通（SG65）", types, default_type: defaultPayType(config) });
+  }
+  if (config.bool("EPAY_V2_ENABLED", false)) {
+    const raw = config.get("EPAY_V2_ENABLED_TYPES", "alipay,wxpay");
+    const allowed = ["alipay", "wxpay", "qqpay"];
+    const types = allowed.filter((type) => raw.split(",").map((p) => p.trim()).includes(type));
+    const preferred = config.get("EPAY_V2_DEFAULT_TYPE", "alipay");
+    if (types.length > 0) {
+      out.push({ id: "epayv2", label: "易支付V2", types, default_type: types.includes(preferred) ? preferred : types[0]! });
+    }
+  }
+  return out;
+}
 
 function sg65EnabledTypes(config: { get(key: string, fallback?: string): string }): string[] {
   const raw = config.get("SG65_ENABLED_TYPES", "alipay,wxpay,qqpay");

@@ -78,6 +78,88 @@
   </form>
 </div>
 
+<div class="settings-section" style="max-width:840px;margin-top:20px;">
+  <h3 class="card-title mb-2">易支付 V2 · 页面支付（RSA-SHA256 双向签名）</h3>
+  <p class="muted small mb-4">
+    POST <code class="inline mono"><%= e(locals.epay_submit_url || 'https://666.hboqy.cn/xpay/epayn/api/pay/submit') %></code>，
+    跳转收银台完成支付。对接地址只需填到 <code class="inline mono">/xpay/epayn</code>，系统自动补 <code class="inline mono">/api/pay/submit</code>。
+  </p>
+
+  <form method="post" action="/admin/settings/payment/epay">
+    <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+    <div class="field checkbox-row">
+      <input type="checkbox" name="epay_enabled" id="epay_enabled" value="1" <%= g('EPAY_V2_ENABLED', '0') === '1' ? 'checked' : '' %>>
+      <label for="epay_enabled" class="small muted">启用易支付V2 渠道</label>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">对接地址（Base URL）</label>
+        <input class="input" type="text" name="epay_base_url" value="<%= e(g('EPAY_V2_BASE_URL', 'https://666.hboqy.cn/xpay/epayn')) %>" placeholder="https://666.hboqy.cn/xpay/epayn">
+        <div class="hint">可只填到 /xpay/epayn，系统自动补全 /api/pay/submit。</div>
+      </div>
+      <div class="field">
+        <label class="label">商户 ID（pid）</label>
+        <input class="input" type="text" name="epay_pid" value="<%= e(g('EPAY_V2_PID')) %>">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">商户私钥（RSA）</label>
+        <input class="input" type="text" name="epay_merchant_private_key" value="" placeholder="<%= locals.epay_private_configured ? '已配置（留空则不修改）' : '未配置' %>" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="label">平台公钥（RSA）</label>
+        <input class="input" type="text" name="epay_platform_public_key" value="" placeholder="<%= locals.epay_public_configured ? '已配置（留空则不修改）' : '未配置' %>" autocomplete="off">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label">默认支付方式</label>
+        <select name="epay_default_type" class="select">
+          <% [['alipay', '支付宝'], ['wxpay', '微信支付'], ['qqpay', 'QQ 钱包']].forEach(([tk, tl]) => { %>
+            <option value="<%= tk %>" <%= g('EPAY_V2_DEFAULT_TYPE', 'alipay') === tk ? 'selected' : '' %>><%= tl %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">启用的支付方式</label>
+        <% const epayTypes = g('EPAY_V2_ENABLED_TYPES', 'alipay,wxpay').split(',').filter((x) => x !== ''); %>
+        <div class="flex" style="gap:12px;flex-wrap:wrap;">
+          <% [['alipay', '支付宝'], ['wxpay', '微信支付'], ['qqpay', 'QQ 钱包']].forEach(([tk, tl]) => { %>
+            <label class="small muted flex" style="gap:6px;align-items:center;">
+              <input type="checkbox" name="epay_types" value="<%= tk %>" <%= epayTypes.includes(tk) ? 'checked' : '' %>><%= tl %>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">回调地址（填到易支付后台）</label>
+      <div class="small mono"><%= e(locals.epay_notify_url || '') %></div>
+      <div class="small mono muted"><%= e(locals.epay_return_url || '') %></div>
+    </div>
+    <div class="flex">
+      <button class="btn btn-primary">保存易支付设置</button>
+      <button class="btn btn-secondary" type="button" id="test-epay">测试密钥与连通性</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('test-epay');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      btn.disabled = true; btn.textContent = '测试中…';
+      var body = new URLSearchParams(); body.set('_csrf', '<%= e(csrf) %>');
+      fetch('/admin/settings/payment/epay-test', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { alert((j.ok ? '通过：' : '失败：') + JSON.stringify(j.checks ? { checks: j.checks, error: j.error } : j.error)); btn.disabled = false; btn.textContent = '测试密钥与连通性'; })
+        .catch(function () { alert('请求失败'); btn.disabled = false; btn.textContent = '测试密钥与连通性'; });
+    });
+  })();
+</script>
+
 <script>
   (function () {
     var btn = document.getElementById('test-sg65');

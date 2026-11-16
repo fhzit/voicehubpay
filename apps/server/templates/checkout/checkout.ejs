@@ -12,12 +12,15 @@
   const paymentEnabled = locals.payment_enabled === true;
   const orderTtl = Number(locals.order_ttl ?? 30);
   const selectedType = defaultType || (payTypes[0] || 'alipay');
+  const channels = locals.channels || [];
+  const selectedChannel = locals.selected_channel || (channels[0] ? channels[0].id : 'sg65');
+  const selectedChannelLabel = (channels.find((c) => c.id === selectedChannel) || {}).label || '';
 %>
 <div class="container" style="padding-top:32px;">
   <div class="page-head"><h1 class="page-title" style="font-size:24px;">确认订单</h1></div>
 
   <% if (!paymentEnabled) { %>
-    <div class="notice notice-red" style="margin-bottom:18px;">支付通道尚未配置，请联系管理员完成 SG65 支付设置后再购买。</div>
+    <div class="notice notice-red" style="margin-bottom:18px;">支付通道尚未配置，请联系管理员完成支付设置后再购买。</div>
   <% } %>
 
   <div class="checkout-grid">
@@ -40,7 +43,7 @@
 
       <div class="checkout-card" style="margin-top:20px;">
         <h3 class="card-title mb-1">安全保障</h3>
-        <p class="small muted" style="margin:0 0 4px;">由 SG65 聚合支付提供（RSA 签名，安全可靠）；卡密支付成功后加密保存。</p>
+        <p class="small muted" style="margin:0 0 4px;">由 <%= e(selectedChannelLabel || '聚合支付') %> 提供（RSA-SHA256 双向签名）；卡密支付成功后加密保存。</p>
       </div>
     </div>
 
@@ -51,6 +54,18 @@
         <form method="post" action="/orders/<%= e(order.order_no) %>/pay">
           <input type="hidden" name="_csrf" value="<%= e(locals.csrf || '') %>">
           <input type="hidden" name="pay_type" id="pay_type" value="<%= e(selectedType) %>">
+          <input type="hidden" name="channel" value="<%= e(selectedChannel) %>">
+          <% if (channels.length > 1) { %>
+            <div style="margin-bottom:14px;">
+              <div class="small muted" style="margin-bottom:8px;">收款渠道</div>
+              <div class="flex" style="gap:8px;flex-wrap:wrap;">
+                <% for (const ch of channels) { %>
+                  <a href="/checkout/<%= e(order.order_no) %>?channel=<%= e(ch.id) %>"
+                     class="btn btn-sm <%= ch.id === selectedChannel ? 'btn-primary' : 'btn-secondary' %>"><%= e(ch.label) %></a>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
           <div class="pay-methods" role="radiogroup" aria-label="支付方式">
             <% for (const t of payTypes) { %>
               <% const meta = typeMeta[t]; %>

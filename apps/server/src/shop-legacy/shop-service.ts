@@ -1,6 +1,7 @@
 import { toCents, format } from "../../../../packages/db/src/legacy/money.js";
 import { sign, verify } from "./sg65-signer.js";
 import { Sg65Client } from "./sg65-client.js";
+import { EpayV2Client } from "./epayv2-client.js";
 import type { Clock, CryptoPortFull, FulfillmentPort, MailerPort, OrdersPort, Row, TransactionsPort, UsersLookupPort } from "./types.js";
 
 export { toCents as moneyToCents, format as moneyFormat };
@@ -260,6 +261,7 @@ export class ShopService {
 /** Port of VoiceHubPay\Payments\PaymentService (create/notify/query/reconcile). */
 export class PaymentService {
   private readonly sg65: Sg65Client;
+  private readonly epayv2: EpayV2Client | undefined;
   private readonly orders: OrdersPort;
   private readonly transactions: TransactionsPort;
   private readonly clock: Clock;
@@ -273,6 +275,7 @@ export class PaymentService {
     config: { get(key: string, fallback?: string): string; appUrl(): string };
     clock?: Clock;
     sg65: Sg65Client;
+    epayv2?: EpayV2Client;
     orders: OrdersPort;
     transactions: TransactionsPort;
     crypto: CryptoPortFull;
@@ -281,6 +284,7 @@ export class PaymentService {
     users?: UsersLookupPort;
   }) {
     this.sg65 = deps.sg65;
+    this.epayv2 = deps.epayv2;
     this.orders = deps.orders;
     this.transactions = deps.transactions;
     this.clock = deps.clock ?? { now: () => Math.floor(Date.now() / 1000) };
@@ -292,7 +296,13 @@ export class PaymentService {
   }
 
   /** Port of PaymentService::createPayment(). Returns { pay_info, trade_no }. */
-  async createPayment(order: Row, payType: string, clientIp: string): Promise<{ pay_info: string; trade_no: string }> {
+  async createPayment(
+    order: Row,
+    payType: string,
+    clientIp: string,
+    channel: "sg65" | "epayv2" = "sg65",
+  ): Promise<{ pay_info: string; trade_no: string }> {
+    if (channel === "epayv2") return this.createEpayV2Payment(order, payType, clientIp);
     if (!this.sg65.isEnabled()) throw new PaymentError("支付功能暂未开启。");
     if (!["alipay", "wxpay", "qqpay"].includes(payType)) throw new PaymentError("不支持的支付方式。");
     if (!this.sg65.isPayTypeEnabled(payType)) throw new PaymentError("该支付方式未开启。");
@@ -344,6 +354,93 @@ export class PaymentService {
     });
 
     return { pay_info: payInfo, trade_no: tradeNo };
+  }
+
+  /**
+   * 易支付 V2 下单：POST {base}/api/pay/submit，返回 pay_info（收银台地址）。
+   * 签名规则与 SG65 相同，仅字段集合与网关地址不同。
+   */
+  private async createEpayV2Payment(order: Row, payType: string, clientIp: string): Promise<{ pay_info: string; trade_no: string }> {
+    const gateway = this.epayv2;
+    if (gateway === undefined || !gateway.isEnabled()) throw new PaymentError("该支付渠道暂未开启。");
+    if (!["alipay", "wxpay", "qqpay"].includes(payType)) throw new PaymentError("不支持的支付方式。");
+    if (!gateway.isPayTypeEnabled(payType)) throw new PaymentError("该支付方式未开启。");
+    if (String(order["payment_status"] ?? "") === "paid") throw new PaymentError("订单已支付，请勿重复支付。");
+
+    const appUrl = this.config.appUrl();
+    const items = await this.orders.items(Number(order["id"]));
+    const firstName = items.length > 0 ? String(items[0]?.["product_name_snapshot"] ?? "") : "";
+    let name = firstName !== "" ? firstName : "数字商品";
+    const firstQuantity = items.length > 0 ? Number(items[0]?.["quantity"] ?? 1) : 1;
+    if (Number(order["amount_due_cents"]) > 0 && (items.length > 1 || firstQuantity > 1)) name += " 等";
+
+    const response = await gateway.create({
+      type: payType,
+      out_trade_no: String(order["order_no"]),
+      notify_url: `${appUrl}/payments/epayv2/notify`,
+      return_url: `${appUrl}/payments/epayv2/return`,
+      name: truncateUtf8(name, 64),
+      money: format(Number(order["amount_due_cents"])),
+      clientip: clientIp,
+    });
+
+    const code = Number(response["code"] ?? 0);
+    const payInfo = String(firstOf(response, "pay_info") ?? firstOf(response, "payurl") ?? firstOf(response, "url") ?? "");
+    const tradeNo = String(firstOf(response, "trade_no") ?? "");
+    if (payInfo === "") {
+      const message = String(response["msg"] ?? response["message"] ?? "未返回跳转地址");
+      throw new PaymentError(`易支付下单失败：${code === 0 ? message : message || `code=${code}`}`);
+    }
+
+    await this.transactions.upsert({
+      order_id: Number(order["id"]),
+      gateway: "epayv2",
+      merchant_order_no: String(order["order_no"]),
+      gateway_trade_no: tradeNo !== "" ? tradeNo : null,
+      amount_cents: Number(order["amount_due_cents"]),
+      status: "pending",
+      pay_type: payType,
+      pay_url: payInfo,
+      confirmation_source: "callback",
+    });
+    return { pay_info: payInfo, trade_no: tradeNo };
+  }
+
+  /** 易支付 V2 异步回调：平台公钥验签 → 金额校验 → 幂等确认。 */
+  async handleEpayNotify(query: Record<string, unknown>): Promise<string> {
+    const gateway = this.epayv2;
+    if (gateway === undefined || !gateway.isEnabled()) return "disabled";
+    if (!gateway.verifySignature(query)) return "verify_failed";
+    if (String(query["pid"] ?? "") !== gateway.pid()) return "pid_mismatch";
+    const status = String(query["trade_status"] ?? "");
+    if (status !== "TRADE_SUCCESS" && status !== "1") return "not_success";
+    const orderNo = String(query["out_trade_no"] ?? "");
+    const order = orderNo !== "" ? await this.orders.findByOrderNo(orderNo) : null;
+    if (order === null) return "order_not_found";
+
+    let paidCents: number;
+    try {
+      paidCents = toCents(String(query["money"] ?? ""));
+    } catch {
+      return "bad_money";
+    }
+    if (paidCents !== Number(order["amount_due_cents"])) return "amount_mismatch";
+
+    const tradeNo = String(query["trade_no"] ?? "");
+    const tx = await this.transactions.upsert({
+      order_id: Number(order["id"]),
+      gateway: "epayv2",
+      merchant_order_no: orderNo,
+      gateway_trade_no: tradeNo !== "" ? tradeNo : null,
+      amount_cents: paidCents,
+      status: "paid",
+      pay_type: String(query["type"] ?? "") || null,
+      confirmation_source: "callback",
+      raw_notify_payload: jsonEncodeUnicode(query),
+    });
+    if (tx !== null) await this.transactions.markPaid(Number(tx["id"]), tradeNo, "", "callback");
+    await this.confirmPaid(order, "epayv2", "callback");
+    return "success";
   }
 
   /** Port of PaymentService::handleNotify(). Returns plain-text body ("success"). */
