@@ -28,6 +28,7 @@ import { PageConfig } from "./page-config.js";
 import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
 import { FileAdminConfig, registerAdminRoutes } from "./admin/index.js";
 import { SmtpMailer } from "./mailer.js";
+import { createAfdianAdminProcessor } from "./admin-afdian-processor.js";
 import { EmailCodeService } from "./email-code.js";
 import { Sg65Client, sg65HttpPost } from "./shop-legacy/sg65-client.js";
 import { ensureAdminSchema } from "./admin/index.js";
@@ -176,6 +177,13 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
         return { reachable: false, status: 0, error: cause?.code ?? (error instanceof Error ? error.message : String(error)) };
       }
     },
+    // 后台「爱发电订单 → 手动同步/重试」的真实处理器（此前未装配，永远提示未配置）。
+    afdianProcessor: createAfdianAdminProcessor({
+      config: adminConfig,
+      orders: new AfdianOrderRepository(db),
+      deliveries: new VoiceHubDeliveryRepository(db),
+      crypto: new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
+    }),
     sessions: legacyAuth.sessions,
     crypto: new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
     secureCookies,

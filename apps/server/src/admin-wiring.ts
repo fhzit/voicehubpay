@@ -22,7 +22,7 @@ import {
 } from "../../../packages/db/src/legacy/index.js";
 import type { Database } from "../../../packages/db/src/index.js";
 import type { Clock, SessionStore } from "./auth-legacy/types.js";
-import type { AdminConfigPort, AdminMailerPort, AdminSg65ProbePort, AdminVoiceHubProbe } from "./admin/types.js";
+import type { AdminAfdianProcessorPort, AdminConfigPort, AdminMailerPort, AdminSg65ProbePort, AdminVoiceHubProbe } from "./admin/types.js";
 import type { AdminDependencies } from "./admin/types.js";
 import {
   type InventoryGenerateDependencies,
@@ -38,6 +38,7 @@ export interface AdminWiringOptions {
   loginPath?: string;
   mailer?: AdminMailerPort;
   sg65Probe?: AdminSg65ProbePort;
+  afdianProcessor?: AdminAfdianProcessorPort;
   voicehubProbe?: AdminVoiceHubProbe;
 }
 
@@ -78,6 +79,7 @@ export function createAdminWiring(db: Database, options: AdminWiringOptions): Ad
     ...(options.mailer === undefined ? {} : { mailer: options.mailer }),
     ...(options.voicehubProbe === undefined ? {} : { voicehubProbe: options.voicehubProbe }),
     ...(options.sg65Probe === undefined ? {} : { sg65Probe: options.sg65Probe }),
+    ...(options.afdianProcessor === undefined ? {} : { afdianProcessor: options.afdianProcessor }),
     sessions: options.sessions,
     crypto: options.crypto,
     clock: options.clock,
