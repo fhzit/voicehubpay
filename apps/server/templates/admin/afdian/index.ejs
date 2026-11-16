@@ -9,6 +9,10 @@
   </form>
 </div>
 
+<% if (locals.last_sync) { %>
+  <div class="hint" style="margin:-6px 0 14px;">上次同步：<%= e(locals.last_sync) %></div>
+<% } %>
+
 <div class="stat-grid" style="margin-bottom:16px;grid-template-columns:repeat(4,1fr);">
   <div class="stat-card"><div class="stat-label">累计营收</div><div class="stat-value">¥<%= money(Number(stats.sum || 0)) %></div></div>
   <div class="stat-card"><div class="stat-label">今日订单</div><div class="stat-value"><%= Number(stats.today_orders || 0) %></div></div>

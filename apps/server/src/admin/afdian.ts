@@ -29,6 +29,7 @@ export function registerAfdianRoutes(router: AdminRouter): void {
       status,
       voicehub,
       q,
+      last_sync: deps.config.get("AFDIAN_LAST_SYNC_RESULT", ""),
       stats: {
         sum: await deps.afdianOrders.sumPaid().catch(() => 0),
         today_sum: await deps.afdianOrders.sumToday().catch(() => 0),

@@ -75,7 +75,7 @@ export function createAfdianAdminProcessor(deps: AfdianAdminProcessorDeps) {
     ];
     let lastError: unknown;
     for (const encoding of encodings) {
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
         try {
           const response = await doFetch(endpoint(), {
             method: "POST",
@@ -92,7 +92,7 @@ export function createAfdianAdminProcessor(deps: AfdianAdminProcessorDeps) {
           return { list, totalPages: Math.max(1, Number(data["total_page"] ?? 1)) };
         } catch (error) {
           lastError = error;
-          if (attempt < 2) await new Promise((resolve) => { setTimeout(resolve, 300 * attempt); });
+          if (attempt < 4) await new Promise((resolve) => { setTimeout(resolve, 500 * attempt + Math.floor(Math.random() * 250)); });
         }
       }
     }
@@ -218,6 +218,10 @@ export function createAfdianAdminProcessor(deps: AfdianAdminProcessorDeps) {
         }
         page += 1;
       } while (results.length < limit && page <= totalPages);
+      const ok = results.filter((entry) => entry.status === "success").length;
+      const failed = results.filter((entry) => entry.status === "failed").length;
+      const summary = `${new Date().toISOString().replace("T", " ").slice(0, 19)} 同步 ${results.length} 条，成功 ${ok}，失败 ${failed}`;
+      try { await config.settings?.saveMany({ ...(config.settings.all()), AFDIAN_LAST_SYNC_RESULT: summary }); } catch { /* 设置只读时忽略 */ }
       return results;
     },
 
