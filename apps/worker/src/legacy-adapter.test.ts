@@ -66,6 +66,57 @@ test("fulfillment delivers each pending paid unit once and records successful de
   }
 });
 
+test("库存卡密订单付款后直接标记已发货，库存卡转为已售", async () => {
+  const root = await mkdtemp(join(tmpdir(), "voicehub-card-"));
+  const dbPath = join(root, "db.sqlite");
+  await mkdir(join(root, "storage"));
+  await writeFile(join(root, "storage", ".masterkey"), "a".repeat(64));
+  const db = createSqliteDatabase(dbPath);
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return new Response(JSON.stringify({ success: true }), { status: 200 }); };
+  try {
+    const projectRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+    const migrations = await Promise.all(migrationFiles("sqlite").map(async (filename) => ({
+      filename,
+      version: migrationVersion("sqlite", filename),
+      sql: await readFile(resolve(projectRoot, filename.startsWith("017_") ? "packages/db/migrations/sqlite" : "database/migrations/sqlite", filename), "utf8"),
+    })));
+    await applyMigrations({ exec: async (sql: string) => { await db.query(sql); }, query: async (sql: string) => ({ rows: (await db.query(sql)).rows }) }, migrations);
+    // delivery_mode = card + voicehub_code_source = inventory: the stock card IS the deliverable.
+    await db.query("INSERT INTO orders (order_no, user_id, payment_status, fulfillment_status, amount_due_cents, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["O2", 1, "paid", "pending", 100, "shop", "2026-01-01", "2026-01-01"]);
+    await db.query("INSERT INTO order_items (order_id, product_id, product_name_snapshot, product_price_cents_snapshot, quantity, delivery_mode_snapshot, voicehub_code_source_snapshot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [1, 1, "Card", 100, 1, "card", "inventory", "2026-01-01"]);
+    await db.query("INSERT INTO inventory_cards (product_id, secret_ciphertext, secret_hash, status, reserved_order_id, reserved_until, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [1, "CIPHER", "hash1", "reserved", 1, "2026-01-02", "2026-01-01", "2026-01-01"]);
+    await db.query("INSERT INTO fulfillment_units (order_id, order_item_id, unit_index, unit_no, inventory_card_id, delivery_code_ciphertext, delivery_code_hash, status, voicehub_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [1, 1, 1, "1", 1, "CIPHER", "hash1", "pending", "not_required", "2026-01-01", "2026-01-01"]);
+    await db.close();
+
+    const ports = await createLegacyWorkerPorts({ DATABASE_PATH: dbPath, APP_BASE_PATH: root, VOICEHUB_API_BASE: "https://voicehub.example", VOICEHUB_API_TOKEN: "token" });
+    // Delivered on the first sweep, and the order leaves the pending queue.
+    assert.equal(await ports.fulfillment.process(10), 1);
+    assert.equal(await ports.fulfillment.process(10), 0);
+    assert.equal(calls, 0, "库存卡密不应触发 VoiceHub 推送");
+
+    const verify = createSqliteDatabase(dbPath);
+    try {
+      const unit = (await verify.query("SELECT status, voicehub_status, fulfilled_at FROM fulfillment_units WHERE id = 1")).rows[0];
+      assert.equal(unit?.status, "success");
+      assert.equal(unit?.voicehub_status, "not_required");
+      assert.ok(String(unit?.fulfilled_at ?? "") !== "", "fulfilled_at 应写入");
+      const order = (await verify.query("SELECT fulfillment_status FROM orders WHERE id = 1")).rows[0];
+      assert.equal(order?.fulfillment_status, "success");
+      const card = (await verify.query("SELECT status, sold_order_id FROM inventory_cards WHERE id = 1")).rows[0];
+      assert.equal(card?.status, "sold");
+      assert.equal(Number(card?.sold_order_id), 1);
+    } finally {
+      await verify.close();
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    await db.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Afdian polling rejects negative amounts before storing or delivering", async () => {
   const root = await mkdtemp(join(tmpdir(), "voicehub-afdian-invalid-"));
   const dbPath = join(root, "db.sqlite");

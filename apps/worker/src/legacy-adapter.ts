@@ -17,8 +17,21 @@ export async function createLegacyWorkerPorts(env: NodeJS.ProcessEnv = process.e
   const afdianOrders = new AfdianOrderRepository(db);
   const processOrder = async (orderId: number): Promise<number> => {
     const order = await orders.findById(orderId); if (!order || order.payment_status !== "paid") return 0;
+    // Paid order: reserved inventory cards become sold (parity with the PHP
+    // FulfillmentService::preparePaidOrder).
+    await inventory.markSoldForOrder(orderId);
     let count = 0;
     for (const unit of await orders.units(orderId)) {
+      // Pure inventory card, no VoiceHub push: the card secret was attached at
+      // order creation, so the unit is delivered as soon as the order is paid.
+      // Skipping this leaves the unit pending, and recalcFulfillmentStatus()
+      // then parks the order at "processing" (发货中) permanently.
+      if (unit.voicehub_status === "not_required" && unit.delivery_code_ciphertext
+        && ["pending", "processing"].includes(String(unit.status))) {
+        await orders.updateUnit(Number(unit.id), { status: "success", voicehub_status: "not_required", fulfilled_at: new Date().toISOString() });
+        count += 1;
+        continue;
+      }
       if (!["pending", "processing", "failed"].includes(String(unit.voicehub_status)) || !unit.voicehub_code_ciphertext) continue;
       let delivery = await deliveries.findByUnitId(Number(unit.id));
       if (!delivery) {
