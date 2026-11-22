@@ -60,16 +60,20 @@
           <input type="hidden" name="_csrf" value="<%= e(locals.csrf || '') %>">
           <input type="hidden" name="pay_type" id="pay_type" value="<%= e(selectedType) %>">
           <input type="hidden" name="channel" value="<%= e(selectedChannel) %>">
-          <% if (channels.length > 1) { %>
+          <% if (channels.length > 0) { %>
             <div style="margin-bottom:14px;">
-              <div class="small muted" style="margin-bottom:8px;">收款渠道</div>
-              <div class="flex" style="gap:8px;flex-wrap:wrap;">
-                <% for (const ch of channels) { %>
-                  <a href="/checkout/<%= e(order.order_no) %>?channel=<%= e(ch.id) %>"
-                     class="btn btn-sm <%= ch.id === selectedChannel ? 'btn-primary' : 'btn-secondary' %>"
-                     title="<%= e(ch.remark || '') %>"><%= e(ch.label) %></a>
-                <% } %>
-              </div>
+              <div class="small muted" style="margin-bottom:8px;">收款渠道<%= channels.length > 1 ? '（可切换）' : '' %></div>
+              <% if (channels.length > 1) { %>
+                <div class="flex" style="gap:8px;flex-wrap:wrap;">
+                  <% for (const ch of channels) { %>
+                    <a href="/checkout/<%= e(order.order_no) %>?channel=<%= e(ch.id) %>"
+                       class="btn btn-sm <%= ch.id === selectedChannel ? 'btn-primary' : 'btn-secondary' %>"
+                       title="<%= e(ch.remark || '') %>"><%= e(ch.label) %></a>
+                  <% } %>
+                </div>
+              <% } else { %>
+                <div class="small" style="font-weight:600;"><%= e(selectedChannelLabel) %></div>
+              <% } %>
               <% if (channelRemark !== '') { %><div class="hint" style="margin-top:8px;"><%= e(channelRemark) %></div><% } %>
             </div>
           <% } %>

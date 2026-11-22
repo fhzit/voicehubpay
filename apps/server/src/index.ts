@@ -26,6 +26,7 @@ import { AggregateOAuthProvider } from "./aggregate-oauth.js";
 import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
 import { registerAdminRoutes } from "./admin/index.js";
 import { createSiteConfig, type SiteConfig } from "./site-config.js";
+import { DbSettingsStore } from "./settings-db.js";
 import { SmtpMailer } from "./mailer.js";
 import { createAfdianAdminProcessor } from "./admin-afdian-processor.js";
 import { EmailCodeService } from "./email-code.js";
@@ -45,10 +46,8 @@ if (!deployment.ok) {
 const config = loadConfig();
 const databaseUrl = process.env.DATABASE_URL;
 const databasePath = process.env.DATABASE_PATH;
-// 后台与前台共用同一份配置实例：settings.json 优先、环境变量兜底。
-// 否则后台改的通道开关/名称/手续费前台读不到。
-const siteConfig = createSiteConfig();
-const afdianConfig = siteConfig;
+// 后台与前台共用同一份配置实例（在数据库就绪后创建），
+// 设置同时落库，容器重建后不会丢。
 
 try {
   // PostgreSQL (DATABASE_URL) takes precedence; SQLite (DATABASE_PATH) is the
@@ -58,6 +57,7 @@ try {
     const db = createPostgresDatabase(pool);
     await migrateAuthSchema(db);
     await migrateShopSchema(db);
+    const siteConfig = await createPersistentSiteConfig(db);
     const auth = createSqliteAuthRepositories(db);
     const commerce = {
       auth,
@@ -75,9 +75,9 @@ try {
     await wirePageRoutes(app, db, siteConfig, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {
-      enabled: () => afdianConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
-      requireSignature: () => afdianConfig.bool("AFDIAN_WEBHOOK_REQUIRE_SIGNATURE", true),
-      publicKey: afdianConfig.get("AFDIAN_WEBHOOK_PUBLIC_KEY").replace(/\\n/g, "\n"),
+      enabled: () => siteConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
+      requireSignature: () => siteConfig.bool("AFDIAN_WEBHOOK_REQUIRE_SIGNATURE", true),
+      publicKey: siteConfig.get("AFDIAN_WEBHOOK_PUBLIC_KEY").replace(/\\n/g, "\n"),
       processNormalizedOrder: createAfdianWebhookProcessor(
         new AfdianOrderRepository(db), new VoiceHubDeliveryRepository(db),
         new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
@@ -90,6 +90,7 @@ try {
     const db = createSqliteDatabase(databasePath);
     await migrateAuthSchema(db);
     await migrateShopSchema(db);
+    const siteConfig = await createPersistentSiteConfig(db);
     const auth = createSqliteAuthRepositories(db);
     const commerce = {
       auth,
@@ -107,9 +108,9 @@ try {
     await wirePageRoutes(app, db, siteConfig, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {
-      enabled: () => afdianConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
-      requireSignature: () => afdianConfig.bool("AFDIAN_WEBHOOK_REQUIRE_SIGNATURE", true),
-      publicKey: afdianConfig.get("AFDIAN_WEBHOOK_PUBLIC_KEY").replace(/\\n/g, "\n"),
+      enabled: () => siteConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
+      requireSignature: () => siteConfig.bool("AFDIAN_WEBHOOK_REQUIRE_SIGNATURE", true),
+      publicKey: siteConfig.get("AFDIAN_WEBHOOK_PUBLIC_KEY").replace(/\\n/g, "\n"),
       processNormalizedOrder: createAfdianWebhookProcessor(
         new AfdianOrderRepository(db), new VoiceHubDeliveryRepository(db),
         new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
@@ -195,6 +196,15 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, siteConfig: Si
   // configureShopRoutes already registers the shared 404/500 pages when the
   // legacy shop is enabled; only add them for API-only deployments.
   if (withErrorPages) configureErrorPages(app, { config: shopConfig });
+}
+
+/** 建立设置表并从数据库回填设置（容器本地文件可能已清空）。 */
+async function createPersistentSiteConfig(db: Database): Promise<SiteConfig> {
+  const store = new DbSettingsStore(db);
+  await store.ensureSchema();
+  const siteConfig = createSiteConfig(process.env, store);
+  await siteConfig.hydrate();
+  return siteConfig;
 }
 
 async function configureAfdianTables(db: Database): Promise<void> {

@@ -8,6 +8,7 @@
 
 import type { ConfigPort } from "./shop-legacy/types.js";
 import { FileAdminConfig } from "./admin/config.js";
+import type { SettingsStore } from "./settings-db.js";
 
 export class SiteConfig implements ConfigPort {
   constructor(readonly file: FileAdminConfig) {}
@@ -54,10 +55,20 @@ export class SiteConfig implements ConfigPort {
   reloadSettings(): void {
     this.file.reloadSettings();
   }
+
+  /** 从数据库恢复设置（容器重建后不丢配置）。 */
+  async hydrate(): Promise<void> {
+    await this.file.hydrate();
+  }
+
+  /** 立即落库（测试/优雅关闭用）。 */
+  async persist(): Promise<void> {
+    await this.file.persist();
+  }
 }
 
 /** 按部署约定构造共享站点配置（默认 /data，可用 ADMIN_DATA_DIR 覆盖）。 */
-export function createSiteConfig(env: NodeJS.ProcessEnv = process.env): SiteConfig {
+export function createSiteConfig(env: NodeJS.ProcessEnv = process.env, remote?: SettingsStore): SiteConfig {
   const basePath = env.ADMIN_DATA_DIR ?? "/data";
-  return new SiteConfig(new FileAdminConfig(basePath, env));
+  return new SiteConfig(new FileAdminConfig(basePath, env, remote));
 }

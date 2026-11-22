@@ -10,7 +10,7 @@
 import type { AdminContext, AdminRouter } from "./router.js";
 import { formBool, formFloat, formInt, formList, formString, formTrimmed } from "./router.js";
 import type { AdminConfigPort, Row } from "./types.js";
-import { parseFeePercent } from "../shop-legacy/pay-channels.js";
+import { parseFeePercent, payChannels } from "../shop-legacy/pay-channels.js";
 
 
 /** 易支付V2 下单地址：后台只填到 /xpay/epayn 时自动补 /api/pay/submit。 */
@@ -166,6 +166,12 @@ export function registerSettingsRoutes(router: AdminRouter): void {
       epay_v1_submit_url: epayV1SubmitUrl(config),
       epay_v1_notify_url: `${appUrl(config)}/payments/epayv1/notify`,
       epay_v1_return_url: `${appUrl(config)}/payments/epayv1/return`,
+      // 收银台实际判定结果（用于排查“后台开了但前台没有选择器”）
+      live_channels: payChannels(config).map((channel) => ({
+        id: channel.id,
+        label: channel.label,
+        fee_percent: channel.fee_percent,
+      })),
     });
   });
 

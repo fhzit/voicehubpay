@@ -7,6 +7,22 @@
 %>
 <div class="settings-layout settings-layout-single">
 <div class="settings-column" style="min-width:0;">
+<% const liveChannels = locals.live_channels || []; %>
+<div class="settings-section" style="max-width:840px;margin-bottom:16px;">
+  <h3 class="card-title mb-2">收银台通道判定</h3>
+  <% if (liveChannels.length === 0) { %>
+    <div class="notice notice-red">前台当前没有可用支付通道：请至少启用一个通道并保存。</div>
+  <% } else { %>
+    <div class="small">
+      前台实际识别到 <strong><%= liveChannels.length %></strong> 个通道：
+      <% liveChannels.forEach((ch, i) => { %><span class="badge badge-green"><%= e(ch.label) %><%= ch.fee_percent > 0 ? ` +${ch.fee_percent}%` : '' %></span><%= i < liveChannels.length - 1 ? ' ' : '' %><% }) %>
+    </div>
+    <% if (liveChannels.length === 1) { %>
+      <div class="hint" style="margin-top:8px;">只有 1 个通道时收银台不显示通道选择器（用户无需选择）。要出现「收款渠道」选择，请再启用至少一个通道。</div>
+    <% } %>
+  <% } %>
+</div>
+
 <div class="settings-section" style="max-width:840px;">
   <h3 class="card-title mb-2">SG65 聚合支付（V2 · RSA SHA256WithRSA）</h3>
   <p class="muted small mb-4">仅支持 V2 签名（SHA256WithRSA），不支持 V1 MD5。密钥经主密钥加密保存，界面仅显示掩码。</p>

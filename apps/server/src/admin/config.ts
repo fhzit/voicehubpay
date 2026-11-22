@@ -10,6 +10,7 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { CryptoService } from "../../../../packages/db/src/index.js";
 import path from "node:path";
 import type { AdminConfigPort, AdminSettingsPort } from "./types.js";
+import type { SettingsStore } from "../settings-db.js";
 
 const SECRET_KEYS = new Set([
   "SMTP_PASSWORD",
@@ -30,7 +31,11 @@ export class FileAdminConfig implements AdminConfigPort {
   private values: Record<string, string>;
   private readonly file: string;
 
-  constructor(private readonly basePath: string, private readonly env: NodeJS.ProcessEnv = process.env) {
+  constructor(
+    private readonly basePath: string,
+    private readonly env: NodeJS.ProcessEnv = process.env,
+    private readonly remote?: SettingsStore,
+  ) {
     this.file = path.join(basePath, "storage", "settings.json");
     this.values = this.read();
     this.settings = {
@@ -38,12 +43,14 @@ export class FileAdminConfig implements AdminConfigPort {
       saveMany: (next: Record<string, string>) => {
         this.values = { ...this.values, ...next };
         this.write();
+        this.schedulePersist();
       },
       remove: (keys: readonly string[]) => {
         const next = { ...this.values };
         for (const key of keys) delete next[key];
         this.values = next;
         this.write();
+        this.schedulePersist();
       },
     };
   }
@@ -95,6 +102,40 @@ export class FileAdminConfig implements AdminConfigPort {
     if (!SECRET_KEYS.has(key)) return;
     this.values[key] = value;
     this.write();
+    this.schedulePersist();
+  }
+
+  /**
+   * 启动时用数据库里的设置回填（容器本地文件可能已被重建清空）。
+   * 数据库为空时把当前文件值回写一次，作为首次持久化。
+   */
+  async hydrate(): Promise<void> {
+    if (this.remote === undefined) return;
+    try {
+      const stored = await this.remote.loadAll();
+      if (Object.keys(stored).length === 0) {
+        if (Object.keys(this.values).length > 0) await this.remote.saveAll(this.values);
+        return;
+      }
+      this.values = { ...this.values, ...stored };
+      this.write();
+    } catch (error) {
+      console.error("[settings] 从数据库恢复设置失败（继续使用本地文件/环境变量）：", error instanceof Error ? error.message : error);
+    }
+  }
+
+  /** 立即把当前设置写入数据库（供关闭流程/测试显式调用）。 */
+  async persist(): Promise<void> {
+    if (this.remote === undefined) return;
+    await this.remote.saveAll(this.values);
+  }
+
+  private schedulePersist(): void {
+    if (this.remote === undefined) return;
+    const snapshot = { ...this.values };
+    void this.remote.saveAll(snapshot).catch((error: unknown) => {
+      console.error("[settings] 写入数据库失败：", error instanceof Error ? error.message : error);
+    });
   }
 
   reloadSettings(): void {
