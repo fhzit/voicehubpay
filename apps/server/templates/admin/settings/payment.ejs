@@ -206,6 +206,43 @@
   </form>
 </div>
 
+<div class="settings-section" style="max-width:840px;margin-top:20px;">
+  <h3 class="card-title mb-2">通道显示与手续费</h3>
+  <p class="muted small mb-4">
+    显示名称与备注会展示在用户收银台；手续费按商品原价百分比叠加，应付 = 原价 + 原价 × 费率。
+    每个通道独立保存，互不覆盖。
+  </p>
+  <% const channelSettings = locals.channel_settings || []; %>
+  <% const channelDefaults = { sg65: '易付通（SG65）', epayv2: '易支付V2', epayv1: '易支付V1（页面支付）' }; %>
+  <% for (const ch of channelSettings) { %>
+    <form method="post" action="/admin/settings/payment/channel/<%= e(ch.id) %>" style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+      <input type="hidden" name="_csrf" value="<%= e(csrf) %>">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <div class="small" style="font-weight:650;"><%= e(channelDefaults[ch.id] || ch.id) %></div>
+        <span class="badge <%= ch.enabled ? 'badge-green' : 'badge-gray' %>"><%= ch.enabled ? '已启用' : '未启用' %></span>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label class="label">显示名称</label>
+          <input class="input" type="text" name="channel_name" value="<%= e(ch.name || '') %>" placeholder="<%= e(channelDefaults[ch.id] || '') %>" maxlength="32">
+        </div>
+        <div class="field">
+          <label class="label">手续费（%）</label>
+          <input class="input" type="text" name="channel_fee_percent" value="<%= e(String(ch.fee_percent ?? '0')) %>" placeholder="0" inputmode="decimal">
+          <div class="hint">0 表示不加收；支持两位小数，按原价百分比计算。</div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">备注（展示给用户）</label>
+        <input class="input" type="text" name="channel_remark" value="<%= e(ch.remark || '') %>" placeholder="例如：支持花呗分期，到账更快" maxlength="120">
+      </div>
+      <div class="flex">
+        <button class="btn btn-secondary">保存该通道</button>
+      </div>
+    </form>
+  <% } %>
+</div>
+
 <script>
   (function () {
     var btn = document.getElementById('test-epay');

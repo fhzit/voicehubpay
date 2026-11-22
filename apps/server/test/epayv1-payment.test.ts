@@ -138,3 +138,17 @@ test("V1 渠道关闭时回调返回 disabled", async () => {
   assert.equal(await h.service.handleEpayV1Notify(signedNotify()), "disabled");
   assert.equal(h.markPaidCalls.length, 0);
 });
+
+test("V1 手续费叠加到应付金额，回调按含手续费金额核对", async () => {
+  const h = harness({ PAY_CHANNEL_EPAYV1_FEE_PERCENT: "2" });
+  const result = await h.service.createPayment(h.order, "alipay", "127.0.0.1", "epayv1");
+  const url = new URL(result.pay_info);
+  assert.equal(url.searchParams.get("money"), "10.10", "990 分 + 2% 手续费 = 1010 分");
+  assert.equal(h.transactions[0]!["amount_cents"], 1010);
+
+  assert.equal(await h.service.handleEpayV1Notify(signedNotify({ money: "9.90" })), "amount_mismatch");
+  assert.equal(h.markPaidCalls.length, 0);
+
+  assert.equal(await h.service.handleEpayV1Notify(signedNotify({ money: "10.10" })), "success");
+  assert.equal(h.markPaidCalls[0]!["amount"], 1010);
+});

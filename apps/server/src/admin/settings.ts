@@ -10,6 +10,7 @@
 import type { AdminContext, AdminRouter } from "./router.js";
 import { formBool, formFloat, formInt, formList, formString, formTrimmed } from "./router.js";
 import type { AdminConfigPort, Row } from "./types.js";
+import { parseFeePercent, channelConfigPrefix, type PayChannelId } from "../shop-legacy/pay-channels.js";
 
 
 /** 易支付V2 下单地址：后台只填到 /xpay/epayn 时自动补 /api/pay/submit。 */
@@ -165,6 +166,16 @@ export function registerSettingsRoutes(router: AdminRouter): void {
       epay_v1_submit_url: epayV1SubmitUrl(config),
       epay_v1_notify_url: `${appUrl(config)}/payments/epayv1/notify`,
       epay_v1_return_url: `${appUrl(config)}/payments/epayv1/return`,
+      channel_settings: (["sg65", "epayv2", "epayv1"] as PayChannelId[]).map((id) => {
+        const prefix = channelConfigPrefix(id);
+        return {
+          id,
+          name: config.get(`${prefix}_NAME`, ""),
+          remark: config.get(`${prefix}_REMARK`, ""),
+          fee_percent: config.get(`${prefix}_FEE_PERCENT`, "0"),
+          enabled: config.bool(`${id === "sg65" ? "SG65" : id === "epayv2" ? "EPAY_V2" : "EPAY_V1"}_ENABLED`, false),
+        };
+      }),
     });
   });
 
@@ -258,6 +269,30 @@ export function registerSettingsRoutes(router: AdminRouter): void {
     await reload(router);
     await context.audit("settings.epay_v1", "settings", "payment", { pid });
     return context.redirect("/admin/settings/payment", "易支付V1 设置已保存。");
+  });
+
+  // 通道展示名称 / 备注 / 手续费：每个通道独立表单，只写自己的键。
+  router.post("/admin/settings/payment/channel/:channelId", async (context) => {
+    if (!(await context.requireCsrf())) return context.reply;
+    const rawId = String(context.params["channelId"] ?? "");
+    const allowed: PayChannelId[] = ["sg65", "epayv2", "epayv1"];
+    if (!allowed.includes(rawId as PayChannelId)) {
+      return context.redirect("/admin/settings/payment", "未知的支付通道。", "error");
+    }
+    const id = rawId as PayChannelId;
+    const prefix = channelConfigPrefix(id);
+    const body = context.body;
+    const name = formTrimmed(body, "channel_name").slice(0, 32);
+    const remark = formTrimmed(body, "channel_remark").slice(0, 120);
+    const fee = parseFeePercent(formString(body, "channel_fee_percent", "0"));
+    await saveSettings(router, context, {
+      [`${prefix}_NAME`]: name,
+      [`${prefix}_REMARK`]: remark,
+      [`${prefix}_FEE_PERCENT`]: String(fee),
+    });
+    await reload(router);
+    await context.audit("settings.payment_channel", "settings", id, { name, fee_percent: fee });
+    return context.redirect("/admin/settings/payment", "通道显示与手续费已保存。");
   });
 
   router.post("/admin/settings/payment/epay-test", async (context) => {

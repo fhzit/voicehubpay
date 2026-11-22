@@ -19,6 +19,9 @@ const SECRET_KEYS = new Set([
   "AFDIAN_API_TOKEN",
   "AGGREGATE_OAUTH_APP_KEY",
   "APP_MASTER_KEY",
+  "EPAY_V1_KEY",
+  "EPAY_V2_MERCHANT_PRIVATE_KEY",
+  "EPAY_V2_PLATFORM_PUBLIC_KEY",
 ]);
 
 export class FileAdminConfig implements AdminConfigPort {

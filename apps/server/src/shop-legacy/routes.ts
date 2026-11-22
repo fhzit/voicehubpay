@@ -8,6 +8,7 @@ import { configureErrorPages } from "../error-pages.js";
 import { Sg65Client, sg65HttpPost } from "./sg65-client.js";
 import { EpayV2Client } from "./epayv2-client.js";
 import { EpayV1Client } from "./epayv1-client.js";
+import { payChannels, channelFeeCents, payableCents, findChannel, type PayChannelOption, type PayChannelId } from "./pay-channels.js";
 import { configureShopPageRoutes } from "./shop-pages.js";
 import { PaymentService, ShopService, PaymentError, ShopError } from "./shop-service.js";
 import type { Row, ShopLegacyDependencies } from "./types.js";
@@ -232,16 +233,22 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
     const channels = payChannels(deps.config);
     const requestedChannel = typeof (request.query as Record<string, unknown>)?.["channel"] === "string" ? String((request.query as Record<string, unknown>)["channel"]) : "";
     const activeChannel = channels.find((entry) => entry.id === requestedChannel) ?? channels[0];
+    const amountCents = Number(order["amount_due_cents"] ?? 0);
+    const feeCents = activeChannel ? channelFeeCents(amountCents, activeChannel.fee_percent) : 0;
     return renderPage(
       reply,
       "checkout/checkout",
       {
         order,
         enabled_types: activeChannel?.types ?? [],
-        default_type: activeChannel?.default_type ?? defaultPayType(deps.config),
+        default_type: activeChannel?.default_type ?? "alipay",
         payment_enabled: channels.length > 0,
         channels,
         selected_channel: activeChannel?.id ?? "sg65",
+        channel_remark: activeChannel?.remark ?? "",
+        fee_percent: activeChannel?.fee_percent ?? 0,
+        fee_cents: feeCents,
+        payable_cents: amountCents + feeCents,
         method: deps.config.get("SG65_DEFAULT_METHOD", "jump"),
         order_ttl: deps.config.int("ORDER_TTL_MINUTES", 30),
         user,
@@ -489,48 +496,6 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
 // Shared helpers
 // ----------------------------------------------------------------------------------
 
-/** 收银台可选渠道（仅返回已启用、且至少有一种支付方式的渠道）。 */
-export interface PayChannelOption {
-  id: "sg65" | "epayv2" | "epayv1";
-  label: string;
-  types: string[];
-  default_type: string;
-}
-
-export function payChannels(config: { get(key: string, fallback?: string): string; bool(key: string, fallback: boolean): boolean }): PayChannelOption[] {
-  const out: PayChannelOption[] = [];
-  if (config.bool("SG65_ENABLED", false)) {
-    const types = sg65EnabledTypes(config);
-    if (types.length > 0) out.push({ id: "sg65", label: "易付通（SG65）", types, default_type: defaultPayType(config) });
-  }
-  if (config.bool("EPAY_V2_ENABLED", false)) {
-    const raw = config.get("EPAY_V2_ENABLED_TYPES", "alipay,wxpay");
-    const allowed = ["alipay", "wxpay", "qqpay"];
-    const types = allowed.filter((type) => raw.split(",").map((p) => p.trim()).includes(type));
-    const preferred = config.get("EPAY_V2_DEFAULT_TYPE", "alipay");
-    if (types.length > 0) {
-      out.push({ id: "epayv2", label: "易支付V2", types, default_type: types.includes(preferred) ? preferred : types[0]! });
-    }
-  }
-  if (config.bool("EPAY_V1_ENABLED", false)) {
-    const raw = config.get("EPAY_V1_ENABLED_TYPES", "alipay,wxpay");
-    const allowed = ["alipay", "wxpay", "qqpay"];
-    const types = allowed.filter((type) => raw.split(",").map((p) => p.trim()).includes(type));
-    const preferred = config.get("EPAY_V1_DEFAULT_TYPE", "alipay");
-    if (types.length > 0) {
-      out.push({ id: "epayv1", label: "易支付V1（页面支付）", types, default_type: types.includes(preferred) ? preferred : types[0]! });
-    }
-  }
-  return out;
-}
-
-function sg65EnabledTypes(config: { get(key: string, fallback?: string): string }): string[] {
-  const raw = config.get("SG65_ENABLED_TYPES", "alipay,wxpay,qqpay");
-  const allowed = ["alipay", "wxpay", "qqpay"];
-  return allowed.filter((type) => raw.split(",").map((p) => p.trim()).includes(type));
-}
-
-function defaultPayType(config: { get(key: string, fallback?: string): string }): string {
-  const t = config.get("SG65_DEFAULT_PAYMENT_TYPE", "alipay");
-  return ["alipay", "wxpay", "qqpay"].includes(t) ? t : "alipay";
-}
+// 通道注册表与手续费计算位于 pay-channels.ts（后台展示配置、收银台、支付服务共用）。
+export { payChannels, findChannel, channelFeeCents, payableCents };
+export type { PayChannelOption, PayChannelId };

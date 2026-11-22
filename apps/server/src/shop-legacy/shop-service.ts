@@ -3,6 +3,7 @@ import { sign, verify } from "./sg65-signer.js";
 import { Sg65Client } from "./sg65-client.js";
 import { EpayV2Client } from "./epayv2-client.js";
 import { EpayV1Client } from "./epayv1-client.js";
+import { channelFeeCents, parseFeePercent } from "./pay-channels.js";
 import type { Clock, CryptoPortFull, FulfillmentPort, MailerPort, OrdersPort, Row, TransactionsPort, UsersLookupPort } from "./types.js";
 
 export { toCents as moneyToCents, format as moneyFormat };
@@ -299,6 +300,32 @@ export class PaymentService {
     this.users = deps.users;
   }
 
+  /** 通道手续费叠加后的应付金额（分）：原价 + round(原价 × 费率%)。 */
+  private chargedCents(order: Row, channelId: "sg65" | "epayv2" | "epayv1"): number {
+    const amount = Number(order["amount_due_cents"] ?? 0);
+    if (!Number.isFinite(amount) || amount <= 0) return 0;
+    const percent = parseFeePercent(this.config.get(`PAY_CHANNEL_${channelId.toUpperCase()}_FEE_PERCENT`, "0"));
+    return amount + channelFeeCents(amount, percent);
+  }
+
+  /**
+   * 回调/查单应比对的金额：优先取该网关本单最近一笔流水的实付额（含手续费），
+   * 没有流水时回落到订单原价。
+   */
+  private async expectedPaidCents(order: Row, gateway: "sg65" | "epayv2" | "epayv1"): Promise<number> {
+    try {
+      const list = await this.transactions.listForOrder(Number(order["id"]));
+      const relevant = list
+        .filter((tx) => String(tx["gateway"] ?? "") === gateway && Number(tx["amount_cents"] ?? 0) > 0)
+        .sort((left, right) => Number(left["id"] ?? 0) - Number(right["id"] ?? 0));
+      const latest = relevant.length > 0 ? relevant[relevant.length - 1] : undefined;
+      if (latest !== undefined) return Number(latest["amount_cents"]);
+    } catch {
+      /* 流水读取失败时回落到订单金额 */
+    }
+    return this.chargedCents(order, gateway);
+  }
+
   /** Port of PaymentService::createPayment(). Returns { pay_info, trade_no }. */
   async createPayment(
     order: Row,
@@ -334,7 +361,7 @@ export class PaymentService {
       notify_url: `${appUrl}/payments/sg65/notify`,
       return_url: `${appUrl}/payments/sg65/return`,
       name: truncateUtf8(name, 64),
-      money: format(Number(order["amount_due_cents"])),
+      money: format(this.chargedCents(order, "sg65")),
       clientip: clientIp,
       timestamp: String(this.clock.now()),
     };
@@ -351,7 +378,7 @@ export class PaymentService {
       gateway: "sg65",
       merchant_order_no: String(order["order_no"]),
       gateway_trade_no: tradeNo !== "" ? tradeNo : null,
-      amount_cents: Number(order["amount_due_cents"]),
+      amount_cents: this.chargedCents(order, "sg65"),
       status: "pending",
       pay_type: payType,
       pay_url: payInfo,
@@ -385,7 +412,7 @@ export class PaymentService {
       notify_url: `${appUrl}/payments/epayv2/notify`,
       return_url: `${appUrl}/payments/epayv2/return`,
       name: truncateUtf8(name, 64),
-      money: format(Number(order["amount_due_cents"])),
+      money: format(this.chargedCents(order, "epayv2")),
       clientip: clientIp,
     });
 
@@ -402,7 +429,7 @@ export class PaymentService {
       gateway: "epayv2",
       merchant_order_no: String(order["order_no"]),
       gateway_trade_no: tradeNo !== "" ? tradeNo : null,
-      amount_cents: Number(order["amount_due_cents"]),
+      amount_cents: this.chargedCents(order, "epayv2"),
       status: "pending",
       pay_type: payType,
       pay_url: payInfo,
@@ -436,7 +463,7 @@ export class PaymentService {
       notify_url: `${appUrl}/payments/epayv1/notify`,
       return_url: `${appUrl}/payments/epayv1/return`,
       name: truncateUtf8(name, 64),
-      money: format(Number(order["amount_due_cents"])),
+      money: format(this.chargedCents(order, "epayv1")),
     });
 
     await this.transactions.upsert({
@@ -444,7 +471,7 @@ export class PaymentService {
       gateway: "epayv1",
       merchant_order_no: String(order["order_no"]),
       gateway_trade_no: null,
-      amount_cents: Number(order["amount_due_cents"]),
+      amount_cents: this.chargedCents(order, "epayv1"),
       status: "pending",
       pay_type: payType,
       pay_url: payInfo,
@@ -471,7 +498,7 @@ export class PaymentService {
     } catch {
       return "bad_money";
     }
-    if (paidCents !== Number(order["amount_due_cents"])) return "amount_mismatch";
+    if (paidCents !== (await this.expectedPaidCents(order, "epayv1"))) return "amount_mismatch";
 
     const tradeNo = String(query["trade_no"] ?? "");
     const tx = await this.transactions.upsert({
@@ -486,7 +513,7 @@ export class PaymentService {
       raw_notify_payload: jsonEncodeUnicode(query),
     });
     if (tx !== null) await this.transactions.markPaid(Number(tx["id"]), tradeNo, "", "callback");
-    await this.confirmPaid(order, "epayv1", "callback");
+    await this.confirmPaid(order, "epayv1", "callback", paidCents);
     return "success";
   }
 
@@ -508,7 +535,7 @@ export class PaymentService {
     } catch {
       return "bad_money";
     }
-    if (paidCents !== Number(order["amount_due_cents"])) return "amount_mismatch";
+    if (paidCents !== (await this.expectedPaidCents(order, "epayv2"))) return "amount_mismatch";
 
     const tradeNo = String(query["trade_no"] ?? "");
     const tx = await this.transactions.upsert({
@@ -523,7 +550,7 @@ export class PaymentService {
       raw_notify_payload: jsonEncodeUnicode(query),
     });
     if (tx !== null) await this.transactions.markPaid(Number(tx["id"]), tradeNo, "", "callback");
-    await this.confirmPaid(order, "epayv2", "callback");
+    await this.confirmPaid(order, "epayv2", "callback", paidCents);
     return "success";
   }
 
@@ -543,7 +570,7 @@ export class PaymentService {
     } catch {
       return "bad_money";
     }
-    if (paidCents !== Number(order["amount_due_cents"])) return "amount_mismatch";
+    if (paidCents !== (await this.expectedPaidCents(order, "sg65"))) return "amount_mismatch";
 
     const tradeNo = String(query["trade_no"] ?? "");
     const apiTradeNo = String(query["api_trade_no"] ?? "");
@@ -566,7 +593,7 @@ export class PaymentService {
     }
 
     // Idempotent payment confirmation.
-    await this.confirmPaid(order, "sg65", "callback");
+    await this.confirmPaid(order, "sg65", "callback", paidCents);
     return "success";
   }
 
@@ -574,9 +601,10 @@ export class PaymentService {
    * Port of PaymentService::confirmPaid(). Idempotent; never blocks on
    * VoiceHub — fulfillment/mailer failures are logged and swallowed.
    */
-  async confirmPaid(order: Row, gateway: string, confirmationSource: string): Promise<void> {
+  async confirmPaid(order: Row, gateway: string, confirmationSource: string, paidCents?: number): Promise<void> {
     if (String(order["payment_status"] ?? "") === "paid") return;
-    await this.orders.markPaid(Number(order["id"]), Number(order["amount_due_cents"]), gateway, confirmationSource);
+    const settled = Number.isFinite(paidCents) && Number(paidCents) > 0 ? Number(paidCents) : Number(order["amount_due_cents"]);
+    await this.orders.markPaid(Number(order["id"]), settled, gateway, confirmationSource);
     // Notifications are best-effort and must never break the payment path.
     try {
       await this.notifyOrderPaid(order);
@@ -637,14 +665,14 @@ export class PaymentService {
 
     // SG65 status: 0 unpaid, 1 paid, 2 refunded, 3 frozen, 4 pre-auth.
     const status = Number(firstOf(response, "status") ?? -1);
-    if (status === 1 && this.verifyBackfill(response, order)) {
+    if (status === 1 && (await this.verifyBackfill(response, order))) {
       await this.confirmPaid(order, "sg65", "query");
       return { paid: true, status };
     }
     return { paid: false, status };
   }
 
-  private verifyBackfill(response: Record<string, unknown>, order: Row): boolean {
+  private async verifyBackfill(response: Record<string, unknown>, order: Row): Promise<boolean> {
     if (!verify(response, this.sg65.platformPublicKey())) return false;
     const pid = String(response["pid"] ?? "");
     if (pid !== "" && pid !== this.sg65.pid()) return false;
@@ -653,7 +681,7 @@ export class PaymentService {
     const money = String(firstOf(response, "money") ?? "");
     if (money === "") return false;
     try {
-      if (toCents(money) !== Number(order["amount_due_cents"])) return false;
+      if (toCents(money) !== (await this.expectedPaidCents(order, "sg65"))) return false;
     } catch {
       return false;
     }
