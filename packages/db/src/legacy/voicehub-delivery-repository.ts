@@ -20,6 +20,20 @@ export class VoiceHubDeliveryRepository {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  /** Reverse lookup by the SHA-256 of the issued code (coupon-code queries). */
+  async findByCodeHash(hash: string): Promise<Row | null> {
+    const rows = (await this.db.query('SELECT * FROM voicehub_deliveries WHERE code_hash = ? ORDER BY id DESC LIMIT 1', [hash])).rows;
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /** All deliveries issued for one source order (e.g. every coupon of an Afdian order). */
+  async listBySourceOrderNo(sourceType: string, sourceOrderNo: string): Promise<Row[]> {
+    return (await this.db.query(
+      'SELECT * FROM voicehub_deliveries WHERE source_type = ? AND source_order_no = ? ORDER BY id',
+      [sourceType, sourceOrderNo],
+    )).rows;
+  }
+
   /**
    * Create a delivery unless one already exists for the idempotency key.
    * The unique idempotency key is the arbiter under concurrency. Returns

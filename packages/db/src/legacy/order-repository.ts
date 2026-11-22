@@ -117,6 +117,18 @@ export class OrderRepository {
     return first(await this.db.query('SELECT * FROM fulfillment_units WHERE id = ?', [unitId]));
   }
 
+  /**
+   * Reverse lookup by a unit's code hash (SHA-256 of the plaintext code).
+   * Matches either the delivered card secret or the VoiceHub-issued code —
+   * both columns are one-way hashes, so a coupon query never needs plaintext.
+   */
+  async findUnitByCodeHash(hash: string): Promise<Row | null> {
+    return first(await this.db.query(
+      'SELECT * FROM fulfillment_units WHERE delivery_code_hash = ? OR voicehub_code_hash = ? ORDER BY id LIMIT 1',
+      [hash, hash],
+    ));
+  }
+
   async updateUnit(unitId: number, fields: Row): Promise<void> {
     const allowed = ['status', 'voicehub_status', 'voicehub_attempts', 'voicehub_last_error', 'manual_note', 'delivery_code_ciphertext', 'delivery_code_hash', 'voicehub_code_ciphertext', 'voicehub_code_hash', 'inventory_card_id', 'fulfilled_at'];
     const { sets, params } = buildUpdate(fields, allowed);

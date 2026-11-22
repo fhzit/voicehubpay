@@ -8,6 +8,7 @@ import { configureAuth, type AuthDependencies } from "./auth.js";
 import { configureCommerce, type CommerceDependencies } from "./commerce.js";
 import { configurePaymentRoutes, configureShopRoutes } from "./shop-legacy/routes.js";
 import type { ShopLegacyDependencies } from "./shop-legacy/types.js";
+import { configureBotQuery, type BotQueryDependencies } from "./bot-query.js";
 
 const requestIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -16,6 +17,8 @@ export function buildApp(options: {
   commerce?: CommerceDependencies;
   /** Legacy shop/payment pipeline (order create, SG65 pay/notify, status/reveal). */
   shop?: ShopLegacyDependencies;
+  /** Token-guarded bot lookup API (order number / Afdian trade no / coupon). */
+  botQuery?: BotQueryDependencies;
   secureCookies?: boolean;
 } = {}): FastifyInstance {
   const app = Fastify({ logger: false, genReqId: (request) => {
@@ -92,6 +95,9 @@ export function buildApp(options: {
     configureShopRoutes(app, options.shop);
     configurePaymentRoutes(app, options.shop);
   }
+  // Bot lookup is independent of the storefront: it must answer even when the
+  // legacy shop is off (the bot still needs to resolve Afdian-only coupons).
+  if (options.botQuery) configureBotQuery(app, options.botQuery);
 
   return app;
 }

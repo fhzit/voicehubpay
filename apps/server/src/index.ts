@@ -13,7 +13,7 @@ import {
   createShopLegacyDependencies,
   migrateShopSchema,
 } from "./shop-legacy/index.js";
-import { AfdianOrderRepository, VoiceHubDeliveryRepository, CryptoService, type Database } from "../../../packages/db/src/index.js";
+import { AfdianOrderRepository, VoiceHubDeliveryRepository, CryptoService, OrderRepository, type Database } from "../../../packages/db/src/index.js";
 import { configureAfdianWebhook } from "./afdian-webhook.js";
 import { createAfdianWebhookProcessor } from "./afdian-webhook-processor.js";
 import {
@@ -71,7 +71,13 @@ try {
         basePath: process.env.APP_BASE_PATH ?? process.cwd(),
       });
     }
-    const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production" });
+    const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production", botQuery: {
+      orders: new OrderRepository(db),
+      afdianOrders: new AfdianOrderRepository(db),
+      deliveries: new VoiceHubDeliveryRepository(db),
+      crypto: new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
+      token: process.env.BOT_QUERY_TOKEN ?? "",
+    } });
     await wirePageRoutes(app, db, siteConfig, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {
@@ -104,7 +110,13 @@ try {
         basePath: process.env.APP_BASE_PATH ?? process.cwd(),
       });
     }
-    const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production" });
+    const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production", botQuery: {
+      orders: new OrderRepository(db),
+      afdianOrders: new AfdianOrderRepository(db),
+      deliveries: new VoiceHubDeliveryRepository(db),
+      crypto: new CryptoService(process.env.APP_BASE_PATH ?? process.cwd()),
+      token: process.env.BOT_QUERY_TOKEN ?? "",
+    } });
     await wirePageRoutes(app, db, siteConfig, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {

@@ -105,6 +105,67 @@ php -S 127.0.0.1:8080 -t public
   - 爱发电 Webhook：`POST {APP_URL}/webhook/afdian`
   - QQ 登录回调 / 微信登录回调：由「登录设置」页展示
 
+## 机器人查询接口（`apps/server` · TypeScript）
+
+给聊天机器人（AstrBot 插件）用的只读查询接口，按商城订单号 / 爱发电 `out_trade_no` /
+点歌券码查到订单与券。**这是唯一会返回券码明文的接口**，因此由共享令牌保护。
+
+- 环境变量：`BOT_QUERY_TOKEN`（必填才启用；不设置时接口返回 `503 BOT_QUERY_DISABLED`）
+- `POST /api/bot/coupon-query`
+- 鉴权：`X-Bot-Token: <BOT_QUERY_TOKEN>` 或 `Authorization: Bearer <BOT_QUERY_TOKEN>`
+  （常量时间比较）
+- 请求：`{"query":"<订单号或券码>"}`，trim 后 6–128 字符；只拒绝空白与控制字符（券码可能带中文/标点自定义前缀）
+
+```bash
+curl -s https://你的域名/api/bot/coupon-query \
+  -H "X-Bot-Token: $BOT_QUERY_TOKEN" -H 'content-type: application/json' \
+  -d '{"query":"20261122153000001234"}'
+```
+
+```json
+{
+  "ok": true,
+  "found_by": "shop_order",
+  "source": "shop",
+  "order": {
+    "order_no": "20261122153000001234",
+    "source": "shop",
+    "amount_cents": 990,
+    "amount_paid_cents": 990,
+    "currency": "CNY",
+    "payment_status": "paid",
+    "order_status": "active",
+    "fulfillment_status": "success",
+    "created_at": "2026-11-22T07:30:00.000Z",
+    "paid_at": "2026-11-22T07:31:00.000Z",
+    "fulfilled_at": "2026-11-22T07:32:00.000Z",
+    "expires_at": "2026-11-22T08:00:00.000Z",
+    "items": [{ "name": "点歌券", "quantity": 1, "unit_price_cents": 990, "delivery_mode": "voicehub" }],
+    "afdian": null
+  },
+  "coupons": [
+    {
+      "code": "20261122153000001234-001",
+      "masked_code": "2026******************01",
+      "unit_no": "20261122153000001234-001",
+      "kind": "voicehub",
+      "unit_status": "success",
+      "voicehub_status": "success",
+      "voicehub_error": null,
+      "delivered_at": "2026-11-22T07:32:00.000Z"
+    }
+  ]
+}
+```
+
+- 查询顺序：商城 `orders.order_no` → `afdian_orders.out_trade_no` → 券码 SHA-256
+  反查（`fulfillment_units` / `voicehub_deliveries`）→ `<orderNo>-NNN` 取前缀订单号。
+- 金额一律整数分；时间沿用库内 ISO 字符串；`coupons[].code` 为明文、同时给出
+  `masked_code`；`voicehub_status=not_required` 的 unit 标 `kind=card`，其余 `kind=voicehub`，
+  没有券码的 unit 不出现在 `coupons` 里。
+- 错误：`400 INVALID_QUERY` / `401 UNAUTHORIZED` / `404 NOT_FOUND` / `503 BOT_QUERY_DISABLED`，
+  body 形如 `{"ok":false,"error":"..."}`。
+
 ## 定时任务（cron）
 
 每分钟跑履约 worker，其它按需：
