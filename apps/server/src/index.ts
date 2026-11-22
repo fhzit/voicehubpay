@@ -11,7 +11,6 @@ import { loadConfig } from "./config.js";
 import { createSqliteAuthRepositories, createSqliteOrderStatusRepository, migrateAuthSchema } from "./sqlite-auth.js";
 import {
   createShopLegacyDependencies,
-  EnvShopConfig,
   migrateShopSchema,
 } from "./shop-legacy/index.js";
 import { AfdianOrderRepository, VoiceHubDeliveryRepository, CryptoService, type Database } from "../../../packages/db/src/index.js";
@@ -24,9 +23,9 @@ import {
 } from "./auth-legacy/index.js";
 import { configureErrorPages } from "./error-pages.js";
 import { AggregateOAuthProvider } from "./aggregate-oauth.js";
-import { PageConfig } from "./page-config.js";
 import { checkDeploymentEnv, formatDeploymentReport } from "./env-check.js";
-import { FileAdminConfig, registerAdminRoutes } from "./admin/index.js";
+import { registerAdminRoutes } from "./admin/index.js";
+import { createSiteConfig, type SiteConfig } from "./site-config.js";
 import { SmtpMailer } from "./mailer.js";
 import { createAfdianAdminProcessor } from "./admin-afdian-processor.js";
 import { EmailCodeService } from "./email-code.js";
@@ -46,7 +45,10 @@ if (!deployment.ok) {
 const config = loadConfig();
 const databaseUrl = process.env.DATABASE_URL;
 const databasePath = process.env.DATABASE_PATH;
-const afdianConfig = new EnvShopConfig();
+// 后台与前台共用同一份配置实例：settings.json 优先、环境变量兜底。
+// 否则后台改的通道开关/名称/手续费前台读不到。
+const siteConfig = createSiteConfig();
+const afdianConfig = siteConfig;
 
 try {
   // PostgreSQL (DATABASE_URL) takes precedence; SQLite (DATABASE_PATH) is the
@@ -61,16 +63,16 @@ try {
       auth,
       products: new PostgresCatalogRepository(db),
       orders: createSqliteOrderStatusRepository(db),
-      shop: createShopLegacyDependencies(db, new EnvShopConfig(), { basePath: process.env.APP_BASE_PATH ?? process.cwd() }),
+      shop: createShopLegacyDependencies(db, siteConfig, { basePath: process.env.APP_BASE_PATH ?? process.cwd() }),
     };
     let shop;
-    if (new EnvShopConfig().bool("SHOP_LEGACY_ENABLED", false)) {
-      shop = createShopLegacyDependencies(db, new EnvShopConfig(), {
+    if (siteConfig.bool("SHOP_LEGACY_ENABLED", false)) {
+      shop = createShopLegacyDependencies(db, siteConfig, {
         basePath: process.env.APP_BASE_PATH ?? process.cwd(),
       });
     }
     const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production" });
-    await wirePageRoutes(app, db, config.nodeEnv === "production", shop === undefined);
+    await wirePageRoutes(app, db, siteConfig, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {
       enabled: () => afdianConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
@@ -93,16 +95,16 @@ try {
       auth,
       products: new SqliteCatalogRepository(db),
       orders: createSqliteOrderStatusRepository(db),
-      shop: createShopLegacyDependencies(db, new EnvShopConfig(), { basePath: process.env.APP_BASE_PATH ?? process.cwd() }),
+      shop: createShopLegacyDependencies(db, siteConfig, { basePath: process.env.APP_BASE_PATH ?? process.cwd() }),
     };
     let shop;
-    if (new EnvShopConfig().bool("SHOP_LEGACY_ENABLED", false)) {
-      shop = createShopLegacyDependencies(db, new EnvShopConfig(), {
+    if (siteConfig.bool("SHOP_LEGACY_ENABLED", false)) {
+      shop = createShopLegacyDependencies(db, siteConfig, {
         basePath: process.env.APP_BASE_PATH ?? process.cwd(),
       });
     }
     const app = buildApp({ auth, commerce, shop, secureCookies: config.nodeEnv === "production" });
-    await wirePageRoutes(app, db, config.nodeEnv === "production", shop === undefined);
+    await wirePageRoutes(app, db, siteConfig, config.nodeEnv === "production", shop === undefined);
     await configureAfdianTables(db);
     configureAfdianWebhook(app, {
       enabled: () => afdianConfig.bool("AFDIAN_WEBHOOK_ENABLED", false),
@@ -131,8 +133,8 @@ try {
  * `/login`, `/register`, `/auth/password/*`, `/account/*` (auth-legacy routes)
  * and the 404/500 error pages. Storefront pages are wired by `shop`.
  */
-async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies: boolean, withErrorPages: boolean): Promise<void> {
-  const shopConfig = new PageConfig();
+async function wirePageRoutes(app: FastifyInstance, db: Database, siteConfig: SiteConfig, secureCookies: boolean, withErrorPages: boolean): Promise<void> {
+  const shopConfig = siteConfig;
   const legacyAuth = await createSqliteLegacyAuthDependencies(db, {
     config: shopConfig,
     socialProvider: new AggregateOAuthProvider(shopConfig, undefined, () => process.env.APP_URL ?? ""),
@@ -140,7 +142,7 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
     basePath: process.env.APP_BASE_PATH ?? process.cwd(),
   });
   // 注册/绑定邮箱需要验证码与发信能力（SmtpMailer 读取后台 SMTP 设置）。
-  const authConfig = new FileAdminConfig(process.env.ADMIN_DATA_DIR ?? "/data");
+  const authConfig = siteConfig;
   const emailCodes = new EmailCodeService(db);
   await emailCodes.ensureSchema();
   legacyAuth.emailCodes = emailCodes;
@@ -155,7 +157,7 @@ async function wirePageRoutes(app: FastifyInstance, db: Database, secureCookies:
   await ensureAdminSchema(db);
   // Admin settings persist to a writable dir (env/Secret supplies the defaults,
   // so SG65 / Afdian / VoiceHub values are visible and editable without SQLite).
-  const adminConfig = new FileAdminConfig(process.env.ADMIN_DATA_DIR ?? "/data");
+  const adminConfig = siteConfig;
   const wiring = createAdminWiring(db, {
     config: adminConfig,
     mailer: new SmtpMailer(adminConfig, process.env.APP_BASE_PATH ?? "/legacy/vhpay"),
