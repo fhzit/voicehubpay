@@ -69,7 +69,7 @@ export function datetime(iso?: string | null, timezone = "Asia/Shanghai"): strin
 }
 
 /** Build a versioned /assets URL so CSS/JS updates are cache-busted. */
-const ASSET_VERSION = "10";
+const ASSET_VERSION = "11";
 export function asset(relativePath: string): string {
   const clean = relativePath.replace(/^\/+/, "");
   return `/assets/${clean}${clean.includes("?") ? "&" : "?"}v=${ASSET_VERSION}`;
