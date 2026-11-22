@@ -19,6 +19,15 @@ function epaySubmitUrl(config: AdminConfigPort): string {
   return base.endsWith("/api/pay/submit") ? base : `${base}/api/pay/submit`;
 }
 
+/** 易支付V1 下单地址：后台只填到 /xpay/epay 或 /xpay 时自动补 submit.php。 */
+function epayV1SubmitUrl(config: AdminConfigPort): string {
+  const raw = (config.get("EPAY_V1_BASE_URL", "https://666.hboqy.cn/xpay/epay") || "").trim();
+  const base = (raw === "" ? "https://666.hboqy.cn/xpay/epay" : raw).replace(/\/+$/, "");
+  if (base.endsWith("/submit.php")) return base;
+  if (base.endsWith("/epay")) return `${base}/submit.php`;
+  return `${base}/epay/submit.php`;
+}
+
 const TIMEZONES = ["Asia/Shanghai", "Asia/Hong_Kong", "Asia/Taipei", "Asia/Tokyo", "Asia/Singapore", "UTC", "America/Los_Angeles", "Europe/London"];
 const MASK = "••••••••";
 
@@ -152,6 +161,10 @@ export function registerSettingsRoutes(router: AdminRouter): void {
       epay_notify_url: `${appUrl(config)}/payments/epayv2/notify`,
       epay_return_url: `${appUrl(config)}/payments/epayv2/return`,
       epay_submit_url: epaySubmitUrl(config),
+      epay_v1_key_configured: secretConfigured(config, "EPAY_V1_KEY"),
+      epay_v1_submit_url: epayV1SubmitUrl(config),
+      epay_v1_notify_url: `${appUrl(config)}/payments/epayv1/notify`,
+      epay_v1_return_url: `${appUrl(config)}/payments/epayv1/return`,
     });
   });
 
@@ -221,6 +234,30 @@ export function registerSettingsRoutes(router: AdminRouter): void {
     await reload(router);
     await context.audit("settings.epay", "settings", "payment", { pid });
     return context.redirect("/admin/settings/payment", "易支付V2 设置已保存。");
+  });
+
+  router.post("/admin/settings/payment/epay-v1", async (context) => {
+    if (!(await context.requireCsrf())) return context.reply;
+    const body = context.body;
+    const pid = formTrimmed(body, "epay_v1_pid");
+    const base = (formTrimmed(body, "epay_v1_base_url") || "https://666.hboqy.cn/xpay/epay").replace(/\/+$/, "");
+    if (!isHttpBaseUrl(base)) return context.redirect("/admin/settings/payment", "易支付V1 地址必须是合法的 HTTP(S) 地址。", "error");
+    const posted = formList(body, "epay_v1_types").filter((entry) => ["alipay", "wxpay", "qqpay"].includes(entry));
+    const types = posted.length > 0 ? posted : ["alipay"];
+    let defaultType = formString(body, "epay_v1_default_type", types[0]!);
+    if (!types.includes(defaultType)) defaultType = types[0]!;
+    const saved = await saveSettings(router, context, {
+      EPAY_V1_ENABLED: formBool(body, "epay_v1_enabled") ? "1" : "0",
+      EPAY_V1_BASE_URL: base,
+      EPAY_V1_PID: pid,
+      EPAY_V1_DEFAULT_TYPE: defaultType,
+      EPAY_V1_ENABLED_TYPES: types.join(","),
+    });
+    if (!saved) return context.reply;
+    await maybeSaveSecret(router, "EPAY_V1_KEY", formTrimmed(body, "epay_v1_key"));
+    await reload(router);
+    await context.audit("settings.epay_v1", "settings", "payment", { pid });
+    return context.redirect("/admin/settings/payment", "易支付V1 设置已保存。");
   });
 
   router.post("/admin/settings/payment/epay-test", async (context) => {

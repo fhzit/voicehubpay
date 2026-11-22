@@ -7,6 +7,7 @@ import { buildSite } from "../site.js";
 import { configureErrorPages } from "../error-pages.js";
 import { Sg65Client, sg65HttpPost } from "./sg65-client.js";
 import { EpayV2Client } from "./epayv2-client.js";
+import { EpayV1Client } from "./epayv1-client.js";
 import { configureShopPageRoutes } from "./shop-pages.js";
 import { PaymentService, ShopService, PaymentError, ShopError } from "./shop-service.js";
 import type { Row, ShopLegacyDependencies } from "./types.js";
@@ -141,6 +142,7 @@ function paymentService(deps: MutableDeps): PaymentService {
       deps.clock ?? { now: () => Math.floor(Date.now() / 1000) },
       deps.sg65Post ?? sg65HttpPost,
     ),
+    epayv1: new EpayV1Client(deps.config),
     orders: deps.orders,
     transactions: deps.transactions,
     crypto: deps.crypto,
@@ -266,7 +268,9 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
     }
     const payType = formString(bodyOf(request)["pay_type"]) || "alipay";
     const requestedChannel = formString(bodyOf(request)["channel"]);
-    const channel: "sg65" | "epayv2" = requestedChannel === "epayv2" ? "epayv2" : "sg65";
+    const channel: "sg65" | "epayv2" | "epayv1" = requestedChannel === "epayv2" || requestedChannel === "epayv1"
+      ? requestedChannel
+      : "sg65";
 
     try {
       const result = await paymentService(deps).createPayment(order, payType, request.ip, channel);
@@ -329,8 +333,24 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
   app.get("/payments/epayv2/notify", epayNotify);
   app.post("/payments/epayv2/notify", epayNotify);
 
+  // -- 易支付V1 异步通知（MD5，GET/POST 均可能；纯文本 success 应答）---------------
+  const epayV1Notify = async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+    const query = { ...(request.query as Record<string, unknown> ?? {}), ...(request.body as Record<string, unknown> ?? {}) };
+    try {
+      const result = await paymentService(deps).handleEpayV1Notify(query);
+      if (result === "success") return reply.code(200).header("content-type", "text/plain; charset=utf-8").send("success");
+      console.error(`[epayv1 notify] rejected: ${result}`);
+      return reply.code(200).header("content-type", "text/plain; charset=utf-8").send("fail");
+    } catch (error) {
+      console.error("[epayv1 notify]", error instanceof Error ? error.message : error);
+      return reply.code(500).header("content-type", "text/plain; charset=utf-8").send("error");
+    }
+  };
+  app.get("/payments/epayv1/notify", epayV1Notify);
+  app.post("/payments/epayv1/notify", epayV1Notify);
+
   // -- 易支付V2 同步跳转（同样不直接确认支付）--------------------------------------
-  app.get("/payments/epayv2/return", async (request, reply) => {
+  const epayReturn = async (request: FastifyRequest, reply: FastifyReply): Promise<unknown> => {
     const context = await ctx.start(request, reply);
     const query = (request.query ?? {}) as Record<string, unknown>;
     const orderNo = typeof query["out_trade_no"] === "string" ? query["out_trade_no"] : "";
@@ -347,7 +367,9 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
       { order, order_no: orderNo, user, site, flash, csrf: Csrf.token(context.data), nav: "account", pageTitle: "支付结果" },
       { layout: "shop" },
     );
-  });
+  };
+  app.get("/payments/epayv2/return", epayReturn);
+  app.get("/payments/epayv1/return", epayReturn);
 
   // -- GET /payments/sg65/return : NEVER confirms payment directly -----------------
   app.get("/payments/sg65/return", async (request, reply) => {
@@ -469,7 +491,7 @@ export function configurePaymentRoutes(app: FastifyInstance, rawDeps: ShopLegacy
 
 /** 收银台可选渠道（仅返回已启用、且至少有一种支付方式的渠道）。 */
 export interface PayChannelOption {
-  id: "sg65" | "epayv2";
+  id: "sg65" | "epayv2" | "epayv1";
   label: string;
   types: string[];
   default_type: string;
@@ -488,6 +510,15 @@ export function payChannels(config: { get(key: string, fallback?: string): strin
     const preferred = config.get("EPAY_V2_DEFAULT_TYPE", "alipay");
     if (types.length > 0) {
       out.push({ id: "epayv2", label: "易支付V2", types, default_type: types.includes(preferred) ? preferred : types[0]! });
+    }
+  }
+  if (config.bool("EPAY_V1_ENABLED", false)) {
+    const raw = config.get("EPAY_V1_ENABLED_TYPES", "alipay,wxpay");
+    const allowed = ["alipay", "wxpay", "qqpay"];
+    const types = allowed.filter((type) => raw.split(",").map((p) => p.trim()).includes(type));
+    const preferred = config.get("EPAY_V1_DEFAULT_TYPE", "alipay");
+    if (types.length > 0) {
+      out.push({ id: "epayv1", label: "易支付V1（页面支付）", types, default_type: types.includes(preferred) ? preferred : types[0]! });
     }
   }
   return out;

@@ -3,6 +3,8 @@ export { createShopLegacyDependencies } from "./sqlite.js";
 export { EnvShopConfig } from "./shop-config.js";
 export { migrateShopSchema } from "./migrate.js";
 export { Sg65Client, formEncode } from "./sg65-client.js";
+export { EpayV1Client } from "./epayv1-client.js";
+export { EpayV2Client } from "./epayv2-client.js";
 export {
   buildString,
   sign,
