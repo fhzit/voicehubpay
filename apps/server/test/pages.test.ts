@@ -163,7 +163,8 @@ test("GET /checkout/:orderNo renders the payment panel for the owner only", asyn
     assert.match(owner.body, /确认订单/);
     assert.match(owner.body, new RegExp(orderNo));
     assert.match(owner.body, /微信支付/);
-    assert.match(owner.body, /name="pay_type" id="pay_type" value="wxpay"/);
+    // 支付方式改为原生 radio：默认选中通道默认方式（wxpay）
+    assert.match(owner.body, /type="radio" name="pay_type" value="wxpay" class="pay-method-input" checked/);
     assert.match(owner.body, /¥19\.90 立即支付/);
 
     const foreign = await app.inject({ method: "GET", url: "/checkout/does-not-exist", headers: auth });

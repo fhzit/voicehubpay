@@ -1723,3 +1723,8 @@ body.has-mobile-buybar { padding-bottom: 72px; }
 .input-row .input { flex: 1 1 auto; min-width: 0; }
 .input-row .btn { flex: 0 0 auto; white-space: nowrap; }
 .label .req { color: var(--destructive, #dc2626); margin-left: 2px; }
+
+/* 原生 radio 承载支付方式选择：视觉保留卡片，输入元素本身不可见但可聚焦 */
+.pay-method { position: relative; cursor: pointer; }
+.pay-method-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pay-method:has(.pay-method-input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }

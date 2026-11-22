@@ -372,20 +372,20 @@
     });
   });
 
-  /* ------------------------------------------------------------ 支付方式选择 */
-  function selectPayMethod(el) {
-    document.querySelectorAll('.pay-method').forEach(function (o) { o.classList.remove('active'); o.setAttribute('aria-checked', 'false'); });
-    el.classList.add('active');
-    el.setAttribute('aria-checked', 'true');
-    var hidden = document.getElementById('pay_type');
-    if (hidden) { hidden.value = el.getAttribute('data-type'); }
-  }
-  document.querySelectorAll('.pay-method').forEach(function (el) {
-    el.addEventListener('click', function () { selectPayMethod(el); });
-    el.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPayMethod(el); }
+  /* ------------------------------------------------------------ 支付方式选择
+     原生 radio 提交（不依赖脚本）；这里只负责高亮当前选中项。 */
+  function syncPayMethodActive() {
+    document.querySelectorAll('.pay-method').forEach(function (el) {
+      var input = el.querySelector('input[type=radio]');
+      var on = !!input && input.checked;
+      el.classList.toggle('active', on);
+      el.setAttribute('aria-checked', on ? 'true' : 'false');
     });
+  }
+  document.querySelectorAll('.pay-method input[type=radio]').forEach(function (input) {
+    input.addEventListener('change', syncPayMethodActive);
   });
+  syncPayMethodActive();
 
   /* ------------------------------------------------------------ 卡密展示 */
   function revealError(btn, fallbackLabel) {

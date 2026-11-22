@@ -58,7 +58,7 @@
       <% if (paymentEnabled && payTypes.length > 0) { %>
         <form method="post" action="/orders/<%= e(order.order_no) %>/pay">
           <input type="hidden" name="_csrf" value="<%= e(locals.csrf || '') %>">
-          <input type="hidden" name="pay_type" id="pay_type" value="<%= e(selectedType) %>">
+          <%# 支付方式用原生 radio：即使前端脚本被缓存/禁用，提交的 pay_type 也一定正确 %>
           <input type="hidden" name="channel" value="<%= e(selectedChannel) %>">
           <% if (channels.length > 0) { %>
             <div style="margin-bottom:14px;">
@@ -80,11 +80,12 @@
           <div class="pay-methods" role="radiogroup" aria-label="支付方式">
             <% for (const t of payTypes) { %>
               <% const meta = typeMeta[t]; %>
-              <div class="pay-method <%= t === selectedType ? 'active' : '' %>" data-type="<%= e(t) %>" role="radio" aria-checked="<%= t === selectedType ? 'true' : 'false' %>" tabindex="0">
+              <label class="pay-method <%= t === selectedType ? 'active' : '' %>" data-type="<%= e(t) %>">
+                <input type="radio" name="pay_type" value="<%= e(t) %>" class="pay-method-input" <%= t === selectedType ? 'checked' : '' %>>
                 <span class="pm-radio" aria-hidden="true"></span>
                 <span class="pm-ico <%= meta.icon %>" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="<%- meta.path %>"/></svg></span>
                 <span class="pm-label"><%= e(meta.label) %></span>
-              </div>
+              </label>
             <% } %>
           </div>
           <% if (feeCents > 0) { %>

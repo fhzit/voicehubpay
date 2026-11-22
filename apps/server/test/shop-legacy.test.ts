@@ -1422,7 +1422,7 @@ test("routes: 易支付V1 支付返回自动 POST 到 submit.php 的表单页（
     method: "POST",
     url: `/orders/${order["order_no"]}/pay`,
     headers,
-    payload: { pay_type: "alipay", channel: "epayv1", _csrf: "test-csrf-token" },
+    payload: { pay_type: "wxpay", channel: "epayv1", _csrf: "test-csrf-token" },
   });
 
   assert.equal(res.statusCode, 200);
@@ -1431,6 +1431,8 @@ test("routes: 易支付V1 支付返回自动 POST 到 submit.php 的表单页（
   assert.match(res.body, /name="sign" value="[0-9a-f]{32}"/);
   assert.match(res.body, /name="out_trade_no"/);
   assert.match(res.body, /name="sign_type" value="MD5"/);
+  // 用户选的支付方式必须原样传给网关（选微信支付不能变成支付宝）
+  assert.match(res.body, /name="type" value="wxpay"/);
   assert.match(res.body, /\.submit\(\)/);
   await app.close();
 });
