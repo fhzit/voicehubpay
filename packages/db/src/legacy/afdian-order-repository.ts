@@ -17,6 +17,12 @@ export class AfdianOrderRepository {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  /** 爱发电后台同时展示「交易号」，用户可能把它当成订单号发来。 */
+  async findByTradeNo(tradeNo: string): Promise<Row | null> {
+    const rows = (await this.db.query('SELECT * FROM afdian_orders WHERE trade_no = ? ORDER BY id DESC LIMIT 1', [tradeNo])).rows;
+    return rows.length > 0 ? rows[0] : null;
+  }
+
   async findById(id: number): Promise<Row | null> {
     const rows = (await this.db.query('SELECT * FROM afdian_orders WHERE id = ?', [id])).rows;
     return rows.length > 0 ? rows[0] : null;

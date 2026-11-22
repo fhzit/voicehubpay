@@ -558,6 +558,11 @@ test("bot-query: 爱发电订单返回 out_trade_no、sku_detail 商品项、afd
     const byCode = await query(harness, { query: AFDIAN_OUT_TRADE_NO });
     assert.equal(byCode.status, 200);
     assert.equal((byCode.json() as Record<string, unknown>)["found_by"], "afdian_order");
+
+    // 爱发电「交易号」也能查到同一笔订单（用户常把交易号当订单号发）。
+    const byTrade = await query(harness, { query: "TRADE-9988" });
+    assert.equal(byTrade.status, 200);
+    assert.equal(((byTrade.json() as Record<string, unknown>)["order"] as Record<string, unknown>)["order_no"], AFDIAN_OUT_TRADE_NO);
   } finally {
     await harness.app.close();
   }

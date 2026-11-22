@@ -158,7 +158,7 @@ curl -s https://你的域名/api/bot/coupon-query \
 }
 ```
 
-- 查询顺序：商城 `orders.order_no` → `afdian_orders.out_trade_no` → 券码 SHA-256
+- 查询顺序：商城 `orders.order_no` → `afdian_orders.out_trade_no` / `trade_no` → 券码 SHA-256
   反查（`fulfillment_units` / `voicehub_deliveries`）→ `<orderNo>-NNN` 取前缀订单号。
 - 金额一律整数分；时间沿用库内 ISO 字符串；`coupons[].code` 为明文、同时给出
   `masked_code`；`voicehub_status=not_required` 的 unit 标 `kind=card`，其余 `kind=voicehub`，

@@ -30,6 +30,7 @@ export interface BotOrderRepository {
 /** Structural port of `AfdianOrderRepository`. */
 export interface BotAfdianOrderRepository {
   findByOutTradeNo(outTradeNo: string): Promise<Row | null>;
+  findByTradeNo(tradeNo: string): Promise<Row | null>;
 }
 
 /** Structural port of `VoiceHubDeliveryRepository`. */
@@ -283,9 +284,11 @@ async function findOrder(deps: BotQueryDependencies, query: string): Promise<Bot
   const shopOrder = await deps.orders.findByOrderNo(query);
   if (shopOrder !== null) return shopResult(deps, shopOrder, "shop_order");
 
-  // 2. Afdian out_trade_no
+  // 2. Afdian out_trade_no (order number) or trade_no (transaction number)
   const afdianOrder = await deps.afdianOrders.findByOutTradeNo(query);
   if (afdianOrder !== null) return afdianResult(deps, afdianOrder, "afdian_order");
+  const afdianByTrade = await deps.afdianOrders.findByTradeNo(query);
+  if (afdianByTrade !== null) return afdianResult(deps, afdianByTrade, "afdian_order");
 
   // 3. coupon code: SHA-256 reverse lookup (units first, then deliveries).
   // 券码由库存生成器产生，大小写可能与用户输入不同；按原文、全大写、全小写
