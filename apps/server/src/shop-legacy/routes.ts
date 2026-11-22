@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { Csrf } from "../auth-legacy/csrf.js";
 import { SESSION_COOKIE, SessionManager } from "../auth-legacy/session-manager.js";
 import type { LegacySessionContext } from "../auth-legacy/types.js";
-import { renderError, renderPage } from "../render.js";
+import { escapeHtml, renderError, renderPage } from "../render.js";
 import { buildSite } from "../site.js";
 import { configureErrorPages } from "../error-pages.js";
 import { Sg65Client, sg65HttpPost } from "./sg65-client.js";
@@ -284,7 +284,21 @@ export function configureShopRoutes(app: FastifyInstance, rawDeps: ShopLegacyDep
       if (deps.audit) {
         await deps.audit.log(Number(user["id"]), "payment.create", "order", String(order["order_no"]), { type: payType }, request.ip, request.headers["user-agent"] ?? "");
       }
-      // jump method: redirect to pay_info.
+      // 易支付 V1 官方要求「表单提交方式」：渲染自动 POST 的支付页。
+      if (result.pay_form !== undefined) {
+        const inputs = Object.entries(result.pay_form.fields)
+          .map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`)
+          .join("");
+        const action = escapeHtml(result.pay_form.action);
+        return reply.type("text/html; charset=utf-8").send(
+          `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>正在跳转支付…</title></head>` +
+          `<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:70vh;margin:0;color:#334">` +
+          `<form id="epay-form" method="post" action="${action}">${inputs}<noscript><button type="submit">继续支付</button></noscript></form>` +
+          `<div><p>正在跳转到收银台…</p><p style="font-size:13px;color:#889">如未自动跳转，<a href="${action}">点此继续</a>。</p></div>` +
+          `<script>document.getElementById('epay-form').submit();</script></body></html>`,
+        );
+      }
+      // 其它渠道：跳转支付地址。
       return ctx.redirectTo(reply, result.pay_info);
     } catch (error) {
       console.error(`[pay] ${orderNo} createPayment failed`, error);

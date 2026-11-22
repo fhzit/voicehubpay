@@ -332,7 +332,7 @@ export class PaymentService {
     payType: string,
     clientIp: string,
     channel: "sg65" | "epayv2" | "epayv1" = "sg65",
-  ): Promise<{ pay_info: string; trade_no: string }> {
+  ): Promise<{ pay_info: string; trade_no: string; pay_form?: { action: string; fields: Record<string, string> } }> {
     if (channel === "epayv1") return this.createEpayV1Payment(order, payType);
     if (channel === "epayv2") return this.createEpayV2Payment(order, payType, clientIp);
     if (!this.sg65.isEnabled()) throw new PaymentError("支付功能暂未开启。");
@@ -442,7 +442,7 @@ export class PaymentService {
    * 易支付 V1（页面支付）下单：生成带 MD5 签名的 submit.php 地址，
    * 浏览器跳转即进入收银台。无需网关 API 回调响应解析。
    */
-  private async createEpayV1Payment(order: Row, payType: string): Promise<{ pay_info: string; trade_no: string }> {
+  private async createEpayV1Payment(order: Row, payType: string): Promise<{ pay_info: string; trade_no: string; pay_form: { action: string; fields: Record<string, string> } }> {
     const gateway = this.epayv1;
     if (gateway === undefined || !gateway.isEnabled()) throw new PaymentError("该支付渠道暂未开启。");
     if (!["alipay", "wxpay", "qqpay"].includes(payType)) throw new PaymentError("不支持的支付方式。");
@@ -457,7 +457,7 @@ export class PaymentService {
     const firstQuantity = items.length > 0 ? Number(items[0]?.["quantity"] ?? 1) : 1;
     if (Number(order["amount_due_cents"]) > 0 && (items.length > 1 || firstQuantity > 1)) name += " 等";
 
-    const payInfo = gateway.payUrl({
+    const fields = gateway.payParams({
       type: payType,
       out_trade_no: String(order["order_no"]),
       notify_url: `${appUrl}/payments/epayv1/notify`,
@@ -465,6 +465,10 @@ export class PaymentService {
       name: truncateUtf8(name, 64),
       money: format(this.chargedCents(order, "epayv1")),
     });
+    const payInfo = `${gateway.submitUrl()}?${Object.entries(fields)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join("&")}`;
+
 
     await this.transactions.upsert({
       order_id: Number(order["id"]),
@@ -477,7 +481,7 @@ export class PaymentService {
       pay_url: payInfo,
       confirmation_source: "callback",
     });
-    return { pay_info: payInfo, trade_no: "" };
+    return { pay_info: payInfo, trade_no: "", pay_form: { action: gateway.submitUrl(), fields } };
   }
 
   /** 易支付 V1 异步回调：MD5 验签 → 商户号 → 交易状态 → 金额 → 幂等确认。 */

@@ -100,7 +100,15 @@ test("V1 下单返回带 MD5 签名的 submit.php 地址并写入 epayv1 流水"
   assert.equal(url.searchParams.get("out_trade_no"), "20240101120000001");
   assert.equal(url.searchParams.get("money"), "9.90");
   assert.equal(url.searchParams.get("notify_url"), "https://example.test/payments/epayv1/notify");
-  assert.match(url.searchParams.get("sign") ?? "", /^[0-9A-F]{32}$/);
+  assert.match(url.searchParams.get("sign") ?? "", /^[0-9a-f]{32}$/);
+  // 官方要求表单提交：字段与 action 必须一并给出
+  assert.ok(result.pay_form, "V1 必须返回表单数据");
+  assert.match(result.pay_form!.action, /\/xpay\/epay\/submit\.php$/);
+  assert.equal(result.pay_form!.fields["pid"], "1001");
+  assert.equal(result.pay_form!.fields["money"], "9.90");
+  assert.equal(result.pay_form!.fields["sign_type"], "MD5");
+  assert.match(result.pay_form!.fields["sign"], /^[0-9a-f]{32}$/);
+  assert.equal(result.pay_form!.fields["sign"], url.searchParams.get("sign"), "表单与跳转地址签名一致");
   assert.equal(h.transactions.length, 1);
   assert.equal(h.transactions[0]!["gateway"], "epayv1");
   assert.equal(h.transactions[0]!["status"], "pending");

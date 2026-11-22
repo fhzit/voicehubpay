@@ -7,7 +7,10 @@
  * 签名规则（易支付通用）：
  *   1. 取所有非空参数，剔除 sign / sign_type；
  *   2. 按参数名 ASCII 升序拼成 `k=v&k=v`；
- *   3. 末尾直接拼接商户密钥（无分隔符），MD5 后转大写。
+ *   3. 末尾直接拼接商户密钥（无分隔符），MD5 后按 EPAY_V1_SIGN_CASE 决定大小写。
+ *
+ * 大小写：彩虹易支付系（submit.php 页面支付）默认 **小写** MD5；少数魔改网关要求
+ * 大写。默认输出小写，可用 EPAY_V1_SIGN_CASE=upper 切换。
  *
  * 后台只填到 `.../xpay/epay`（或 `.../xpay`）时自动补全 `/epay/submit.php`。
  */
@@ -63,7 +66,7 @@ export class EpayV1Client {
     return this.enabledPayTypes().includes(type);
   }
 
-  /** 计算签名（大写 MD5）。 */
+  /** 计算签名（MD5；默认小写，可用 EPAY_V1_SIGN_CASE=upper 切换）。 */
   signParams(params: Record<string, unknown>): string {
     const key = this.merchantKey();
     if (key === "") throw new Error("易支付V1 商户密钥未配置。");
@@ -74,11 +77,35 @@ export class EpayV1Client {
       if (value === null || value === undefined || value === "") continue;
       pairs.push(`${name}=${String(value)}`);
     }
-    return createHash("md5").update(`${pairs.join("&")}${key}`, "utf8").digest("hex").toUpperCase();
+    const digest = createHash("md5").update(`${pairs.join("&")}${key}`, "utf8").digest("hex");
+    return this.signCaseUpperCase() ? digest.toUpperCase() : digest;
   }
 
-  /** 生成带签名参数的完整收银台地址（页面跳转即可完成支付）。 */
-  payUrl(params: Record<string, unknown>): string {
+  /** 网关要求大写 MD5 时可用 EPAY_V1_SIGN_CASE=upper 开启（默认小写）。 */
+  private signCaseUpperCase(): boolean {
+    return this.config.get("EPAY_V1_SIGN_CASE", "lower").trim().toLowerCase() === "upper";
+  }
+
+  /**
+   * 待签名字符串（ASCII 升序、剔除 sign/sign_type 与空值、末尾拼密钥）。
+   * 不含密钥部分可用于后台自检对比，切勿整体泄露。
+   */
+  signingString(params: Record<string, unknown>): string {
+    const pairs: string[] = [];
+    for (const name of Object.keys(params).sort()) {
+      if (name === "sign" || name === "sign_type") continue;
+      const value = params[name];
+      if (value === null || value === undefined || value === "") continue;
+      pairs.push(`${name}=${String(value)}`);
+    }
+    return pairs.join("&");
+  }
+
+  /**
+   * 生成已签名的表单字段（含 pid/sign/sign_type）。
+   * 官方文档要求「表单提交方式」，因此支付页用这些字段 POST 到 submitUrl()。
+   */
+  payParams(params: Record<string, unknown>): Record<string, string> {
     const payload: Record<string, string> = { pid: this.pid() };
     for (const [name, value] of Object.entries(params)) {
       if (value === null || value === undefined || value === "") continue;
@@ -86,7 +113,12 @@ export class EpayV1Client {
     }
     payload["sign"] = this.signParams(payload);
     payload["sign_type"] = "MD5";
-    const query = Object.entries(payload)
+    return payload;
+  }
+
+  /** 带签名参数的 GET 地址（部分网关接受；主要用 payParams 做表单提交）。 */
+  payUrl(params: Record<string, unknown>): string {
+    const query = Object.entries(this.payParams(params))
       .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`)
       .join("&");
     return `${this.submitUrl()}?${query}`;

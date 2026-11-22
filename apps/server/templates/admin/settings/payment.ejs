@@ -193,7 +193,7 @@
     <div class="field">
       <label class="label">商户密钥（MD5 Key）</label>
       <input class="input" type="text" name="epay_v1_key" value="" placeholder="<%= locals.epay_v1_key_configured ? '已配置（留空则不修改）' : '未配置' %>" autocomplete="off">
-      <div class="hint">用于 V1 页面支付与异步通知的 MD5 签名，与 V2 的 RSA 密钥互不影响。</div>
+      <div class="hint">用于 V1 页面支付与异步通知的 MD5 签名，与 V2 的 RSA 密钥互不影响。签名默认小写 MD5（彩虹易支付标准）；若网关要求大写，设置环境变量 <code class="inline mono">EPAY_V1_SIGN_CASE=upper</code>。</div>
     </div>
     <div class="form-grid">
       <div class="field">

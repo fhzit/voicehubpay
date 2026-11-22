@@ -1406,3 +1406,31 @@ test("routes: GET /payments/sg65/return — public URL, private data (404 for st
   const guessed = await app.inject({ method: "GET", url: "/payments/sg65/return?out_trade_no=000000000000000000000000", headers });
   assert.equal(guessed.statusCode, 404);
 });
+
+test("routes: 易支付V1 支付返回自动 POST 到 submit.php 的表单页（含 MD5 签名）", async () => {
+  const { harness, app, headers, product, userId, deps } = await routeHarness();
+  // 通过调整路由使用的配置打开 V1 通道（模拟后台已启用）。
+  const values = (deps.config as unknown as { values: Map<string, string | boolean | number> }).values;
+  values.set("EPAY_V1_ENABLED", "1");
+  values.set("EPAY_V1_PID", "1001");
+  values.set("EPAY_V1_KEY", "secret");
+  values.set("EPAY_V1_BASE_URL", "https://666.hboqy.cn/xpay/epay");
+
+  const shop = await freshShop(harness);
+  const order = await shop.createOrder(userId, Number(product["id"]), 1);
+  const res = await app.inject({
+    method: "POST",
+    url: `/orders/${order["order_no"]}/pay`,
+    headers,
+    payload: { pay_type: "alipay", channel: "epayv1", _csrf: "test-csrf-token" },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.match(String(res.headers["content-type"]), /text\/html/);
+  assert.match(res.body, /<form id="epay-form" method="post" action="https:\/\/666\.hboqy\.cn\/xpay\/epay\/submit\.php">/);
+  assert.match(res.body, /name="sign" value="[0-9a-f]{32}"/);
+  assert.match(res.body, /name="out_trade_no"/);
+  assert.match(res.body, /name="sign_type" value="MD5"/);
+  assert.match(res.body, /\.submit\(\)/);
+  await app.close();
+});
