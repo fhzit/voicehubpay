@@ -141,6 +141,7 @@ curl -s https://你的域名/api/bot/coupon-query \
     "fulfilled_at": "2026-11-22T07:32:00.000Z",
     "expires_at": "2026-11-22T08:00:00.000Z",
     "items": [{ "name": "点歌券", "quantity": 1, "unit_price_cents": 990, "delivery_mode": "voicehub" }],
+    "buyer": { "username": "buyer01", "display_name": "下单同学", "email": "buyer01@example.com" },
     "afdian": null
   },
   "coupons": [
@@ -160,6 +161,7 @@ curl -s https://你的域名/api/bot/coupon-query \
 
 - 查询顺序：商城 `orders.order_no` → `afdian_orders.out_trade_no` / `trade_no` → 券码 SHA-256
   反查（`fulfillment_units` / `voicehub_deliveries`）→ `<orderNo>-NNN` 取前缀订单号。
+- `order.buyer` 为下单人 `username/display_name/email`；爱发电订单只有买家名（`buyer_name`），没有邮箱。
 - 金额一律整数分；时间沿用库内 ISO 字符串；`coupons[].code` 为明文、同时给出
   `masked_code`；`voicehub_status=not_required` 的 unit 标 `kind=card`，其余 `kind=voicehub`，
   没有券码的 unit 不出现在 `coupons` 里。
