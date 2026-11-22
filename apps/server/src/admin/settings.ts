@@ -10,7 +10,7 @@
 import type { AdminContext, AdminRouter } from "./router.js";
 import { formBool, formFloat, formInt, formList, formString, formTrimmed } from "./router.js";
 import type { AdminConfigPort, Row } from "./types.js";
-import { parseFeePercent, channelConfigPrefix, type PayChannelId } from "../shop-legacy/pay-channels.js";
+import { parseFeePercent } from "../shop-legacy/pay-channels.js";
 
 
 /** 易支付V2 下单地址：后台只填到 /xpay/epayn 时自动补 /api/pay/submit。 */
@@ -166,16 +166,6 @@ export function registerSettingsRoutes(router: AdminRouter): void {
       epay_v1_submit_url: epayV1SubmitUrl(config),
       epay_v1_notify_url: `${appUrl(config)}/payments/epayv1/notify`,
       epay_v1_return_url: `${appUrl(config)}/payments/epayv1/return`,
-      channel_settings: (["sg65", "epayv2", "epayv1"] as PayChannelId[]).map((id) => {
-        const prefix = channelConfigPrefix(id);
-        return {
-          id,
-          name: config.get(`${prefix}_NAME`, ""),
-          remark: config.get(`${prefix}_REMARK`, ""),
-          fee_percent: config.get(`${prefix}_FEE_PERCENT`, "0"),
-          enabled: config.bool(`${id === "sg65" ? "SG65" : id === "epayv2" ? "EPAY_V2" : "EPAY_V1"}_ENABLED`, false),
-        };
-      }),
     });
   });
 
@@ -199,6 +189,9 @@ export function registerSettingsRoutes(router: AdminRouter): void {
       SG65_DEFAULT_METHOD: formString(body, "sg65_default_method", "jump") === "web" ? "web" : "jump",
       SG65_ENABLED_TYPES: enabledTypes.join(","),
       SHOP_FEE_PERCENT: String(Math.min(100, Math.max(0, formFloat(body, "shop_fee_percent", 3)))),
+      PAY_CHANNEL_SG65_NAME: formTrimmed(body, "channel_name").slice(0, 32),
+      PAY_CHANNEL_SG65_REMARK: formTrimmed(body, "channel_remark").slice(0, 120),
+      PAY_CHANNEL_SG65_FEE_PERCENT: String(parseFeePercent(formString(body, "channel_fee_percent", "0"))),
     });
     if (!saved) return context.reply;
     await maybeSaveSecret(router, "SG65_MERCHANT_PRIVATE_KEY", formTrimmed(body, "sg65_merchant_private_key"));
@@ -222,77 +215,54 @@ export function registerSettingsRoutes(router: AdminRouter): void {
   });
 
   // ---------------------------------------------------------------- auth
+  // 易支付 V1 + V2 合并保存：一张表单包含两种协议与各自的展示/手续费配置。
   router.post("/admin/settings/payment/epay", async (context) => {
     if (!(await context.requireCsrf())) return context.reply;
     const body = context.body;
+
+    // ---- V2（RSA 接口支付）
     const pid = formTrimmed(body, "epay_pid");
     const base = (formTrimmed(body, "epay_base_url") || "https://666.hboqy.cn/xpay/epayn").replace(/\/+$/, "");
-    if (!isHttpBaseUrl(base)) return context.redirect("/admin/settings/payment", "易支付地址必须是合法的 HTTP(S) 地址。", "error");
+    if (!isHttpBaseUrl(base)) return context.redirect("/admin/settings/payment", "易支付V2 地址必须是合法的 HTTP(S) 地址。", "error");
     const posted = formList(body, "epay_types").filter((entry) => ["alipay", "wxpay", "qqpay"].includes(entry));
     const types = posted.length > 0 ? posted : ["alipay"];
     let defaultType = formString(body, "epay_default_type", types[0]!);
     if (!types.includes(defaultType)) defaultType = types[0]!;
+
+    // ---- V1（MD5 页面支付）
+    const v1Pid = formTrimmed(body, "epay_v1_pid");
+    const v1Base = (formTrimmed(body, "epay_v1_base_url") || "https://666.hboqy.cn/xpay/epay").replace(/\/+$/, "");
+    if (!isHttpBaseUrl(v1Base)) return context.redirect("/admin/settings/payment", "易支付V1 地址必须是合法的 HTTP(S) 地址。", "error");
+    const v1Posted = formList(body, "epay_v1_types").filter((entry) => ["alipay", "wxpay", "qqpay"].includes(entry));
+    const v1Types = v1Posted.length > 0 ? v1Posted : ["alipay"];
+    let v1DefaultType = formString(body, "epay_v1_default_type", v1Types[0]!);
+    if (!v1Types.includes(v1DefaultType)) v1DefaultType = v1Types[0]!;
+
     const saved = await saveSettings(router, context, {
       EPAY_V2_ENABLED: formBool(body, "epay_enabled") ? "1" : "0",
       EPAY_V2_BASE_URL: base,
       EPAY_V2_PID: pid,
       EPAY_V2_DEFAULT_TYPE: defaultType,
       EPAY_V2_ENABLED_TYPES: types.join(","),
+      EPAY_V1_ENABLED: formBool(body, "epay_v1_enabled") ? "1" : "0",
+      EPAY_V1_BASE_URL: v1Base,
+      EPAY_V1_PID: v1Pid,
+      EPAY_V1_DEFAULT_TYPE: v1DefaultType,
+      EPAY_V1_ENABLED_TYPES: v1Types.join(","),
+      PAY_CHANNEL_EPAYV2_NAME: formTrimmed(body, "epay_v2_channel_name").slice(0, 32),
+      PAY_CHANNEL_EPAYV2_REMARK: formTrimmed(body, "epay_v2_channel_remark").slice(0, 120),
+      PAY_CHANNEL_EPAYV2_FEE_PERCENT: String(parseFeePercent(formString(body, "epay_v2_channel_fee_percent", "0"))),
+      PAY_CHANNEL_EPAYV1_NAME: formTrimmed(body, "epay_v1_channel_name").slice(0, 32),
+      PAY_CHANNEL_EPAYV1_REMARK: formTrimmed(body, "epay_v1_channel_remark").slice(0, 120),
+      PAY_CHANNEL_EPAYV1_FEE_PERCENT: String(parseFeePercent(formString(body, "epay_v1_channel_fee_percent", "0"))),
     });
     if (!saved) return context.reply;
     await maybeSaveSecret(router, "EPAY_V2_MERCHANT_PRIVATE_KEY", formTrimmed(body, "epay_merchant_private_key"));
     await maybeSaveSecret(router, "EPAY_V2_PLATFORM_PUBLIC_KEY", formTrimmed(body, "epay_platform_public_key"));
-    await reload(router);
-    await context.audit("settings.epay", "settings", "payment", { pid });
-    return context.redirect("/admin/settings/payment", "易支付V2 设置已保存。");
-  });
-
-  router.post("/admin/settings/payment/epay-v1", async (context) => {
-    if (!(await context.requireCsrf())) return context.reply;
-    const body = context.body;
-    const pid = formTrimmed(body, "epay_v1_pid");
-    const base = (formTrimmed(body, "epay_v1_base_url") || "https://666.hboqy.cn/xpay/epay").replace(/\/+$/, "");
-    if (!isHttpBaseUrl(base)) return context.redirect("/admin/settings/payment", "易支付V1 地址必须是合法的 HTTP(S) 地址。", "error");
-    const posted = formList(body, "epay_v1_types").filter((entry) => ["alipay", "wxpay", "qqpay"].includes(entry));
-    const types = posted.length > 0 ? posted : ["alipay"];
-    let defaultType = formString(body, "epay_v1_default_type", types[0]!);
-    if (!types.includes(defaultType)) defaultType = types[0]!;
-    const saved = await saveSettings(router, context, {
-      EPAY_V1_ENABLED: formBool(body, "epay_v1_enabled") ? "1" : "0",
-      EPAY_V1_BASE_URL: base,
-      EPAY_V1_PID: pid,
-      EPAY_V1_DEFAULT_TYPE: defaultType,
-      EPAY_V1_ENABLED_TYPES: types.join(","),
-    });
-    if (!saved) return context.reply;
     await maybeSaveSecret(router, "EPAY_V1_KEY", formTrimmed(body, "epay_v1_key"));
     await reload(router);
-    await context.audit("settings.epay_v1", "settings", "payment", { pid });
-    return context.redirect("/admin/settings/payment", "易支付V1 设置已保存。");
-  });
-
-  // 通道展示名称 / 备注 / 手续费：每个通道独立表单，只写自己的键。
-  router.post("/admin/settings/payment/channel/:channelId", async (context) => {
-    if (!(await context.requireCsrf())) return context.reply;
-    const rawId = String(context.params["channelId"] ?? "");
-    const allowed: PayChannelId[] = ["sg65", "epayv2", "epayv1"];
-    if (!allowed.includes(rawId as PayChannelId)) {
-      return context.redirect("/admin/settings/payment", "未知的支付通道。", "error");
-    }
-    const id = rawId as PayChannelId;
-    const prefix = channelConfigPrefix(id);
-    const body = context.body;
-    const name = formTrimmed(body, "channel_name").slice(0, 32);
-    const remark = formTrimmed(body, "channel_remark").slice(0, 120);
-    const fee = parseFeePercent(formString(body, "channel_fee_percent", "0"));
-    await saveSettings(router, context, {
-      [`${prefix}_NAME`]: name,
-      [`${prefix}_REMARK`]: remark,
-      [`${prefix}_FEE_PERCENT`]: String(fee),
-    });
-    await reload(router);
-    await context.audit("settings.payment_channel", "settings", id, { name, fee_percent: fee });
-    return context.redirect("/admin/settings/payment", "通道显示与手续费已保存。");
+    await context.audit("settings.epay", "settings", "payment", { pid, v1_pid: v1Pid });
+    return context.redirect("/admin/settings/payment", "易支付设置已保存。");
   });
 
   router.post("/admin/settings/payment/epay-test", async (context) => {

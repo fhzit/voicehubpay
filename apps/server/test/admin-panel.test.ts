@@ -265,6 +265,56 @@ test("settings: invalid general values are rejected", async () => {
   await h.app.close();
 });
 
+test("settings: 易支付合并表单一次保存 V1 与 V2 及通道展示/手续费", async () => {
+  const h = await createHarness();
+  const adminId = await h.seedUser({ username: "root", role: "admin" });
+  await h.login(adminId);
+
+  const res = await h.app.inject({
+    method: "POST",
+    url: "/admin/settings/payment/epay",
+    ...h.form({
+      _csrf: CSRF,
+      epay_enabled: "1",
+      epay_base_url: "https://666.hboqy.cn/xpay/epayn",
+      epay_pid: "2002",
+      epay_types: "alipay",
+      epay_default_type: "alipay",
+      epay_v2_channel_name: "接口支付",
+      epay_v2_channel_remark: "秒到账",
+      epay_v2_channel_fee_percent: "1.5",
+      epay_v1_enabled: "1",
+      epay_v1_base_url: "https://666.hboqy.cn/xpay/epay",
+      epay_v1_pid: "3003",
+      epay_v1_types: "wxpay",
+      epay_v1_default_type: "wxpay",
+      epay_v1_key: "md5-secret-key",
+      epay_v1_channel_name: "页面支付",
+      epay_v1_channel_remark: "支持大额",
+      epay_v1_channel_fee_percent: "2",
+    }),
+  });
+
+  assert.equal(res.statusCode, 303);
+  assert.equal(res.headers.location, "/admin/settings/payment");
+  // 两种协议同时落库
+  assert.equal(h.config.get("EPAY_V2_ENABLED"), "1");
+  assert.equal(h.config.get("EPAY_V2_PID"), "2002");
+  assert.equal(h.config.get("EPAY_V1_ENABLED"), "1");
+  assert.equal(h.config.get("EPAY_V1_PID"), "3003");
+  assert.equal(h.config.get("EPAY_V1_ENABLED_TYPES"), "wxpay");
+  // MD5 密钥真的写进去了（此前因白名单缺失被丢弃）
+  assert.equal(h.config.secret("EPAY_V1_KEY", ""), "md5-secret-key");
+  // 通道展示与手续费随同一张表单保存
+  assert.equal(h.config.get("PAY_CHANNEL_EPAYV2_NAME"), "接口支付");
+  assert.equal(h.config.get("PAY_CHANNEL_EPAYV2_REMARK"), "秒到账");
+  assert.equal(h.config.get("PAY_CHANNEL_EPAYV2_FEE_PERCENT"), "1.5");
+  assert.equal(h.config.get("PAY_CHANNEL_EPAYV1_NAME"), "页面支付");
+  assert.equal(h.config.get("PAY_CHANNEL_EPAYV1_REMARK"), "支持大额");
+  assert.equal(h.config.get("PAY_CHANNEL_EPAYV1_FEE_PERCENT"), "2");
+  await h.app.close();
+});
+
 test("pages: every admin GET route renders inside the admin layout", async () => {
   const h = await createHarness();
   const adminId = await h.seedUser({ username: "root", role: "admin" });
