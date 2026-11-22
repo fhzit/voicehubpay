@@ -9,6 +9,7 @@ import {
   AfdianOrderRepository,
   CryptoService,
   OrderRepository,
+  UserRepository,
   VoiceHubDeliveryRepository,
 } from "../../../packages/db/src/legacy/index.js";
 import { configureBotQuery, tokenMatches, type BotQueryDependencies } from "../src/bot-query.js";
@@ -45,6 +46,17 @@ async function migrateBotSchema(db: Database): Promise<void> {
     paid_at TEXT NULL,
     fulfilled_at TEXT NULL,
     cancelled_at TEXT NULL)`);
+  await db.query(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(64) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NULL,
+    display_name VARCHAR(128) NOT NULL DEFAULT '',
+    avatar_url VARCHAR(512) NOT NULL DEFAULT '',
+    email VARCHAR(255) NOT NULL DEFAULT '',
+    role VARCHAR(16) NOT NULL DEFAULT 'user',
+    status VARCHAR(16) NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL)`);
   await db.query(`CREATE TABLE IF NOT EXISTS order_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL,
@@ -127,6 +139,7 @@ async function buildHarness(token = TOKEN): Promise<Harness> {
   const deps: BotQueryDependencies = {
     orders: new OrderRepository(db),
     afdianOrders: new AfdianOrderRepository(db),
+    users: new UserRepository(db),
     deliveries: new VoiceHubDeliveryRepository(db),
     crypto,
     token,
@@ -184,6 +197,11 @@ async function seedFixtures(harness: Harness): Promise<void> {
   const createdAt = "2026-11-22T07:30:00.000Z";
   const paidAt = "2026-11-22T07:31:00.000Z";
   const fulfilledAt = "2026-11-22T07:32:00.000Z";
+  await db.query(
+    `INSERT INTO users (username, password_hash, display_name, avatar_url, email, role, status, created_at, updated_at)
+     VALUES ('buyer01', NULL, '下单同学', '', 'buyer01@example.com', 'user', 'active', ?, ?)`,
+    [createdAt, createdAt],
+  );
 
   await db.query(
     `INSERT INTO orders (order_no, user_id, source, amount_due_cents, amount_paid_cents, currency, order_status, payment_status, fulfillment_status, created_at, updated_at, expires_at, paid_at, fulfilled_at)
@@ -379,6 +397,11 @@ test("bot-query: 商城订单号返回订单、商品项与每张券（card/voic
     assert.equal(order["amount_cents"], 990);
     assert.equal(order["amount_paid_cents"], 990);
     assert.equal(order["currency"], "CNY");
+    assert.deepEqual(order["buyer"], {
+      username: "buyer01",
+      display_name: "下单同学",
+      email: "buyer01@example.com",
+    });
     assert.equal(order["payment_status"], "paid");
     assert.equal(order["order_status"], "active");
     assert.equal(order["fulfillment_status"], "success");
@@ -535,6 +558,11 @@ test("bot-query: 爱发电订单返回 out_trade_no、sku_detail 商品项、afd
     assert.deepEqual(order["items"], [
       { name: "点歌券x1", quantity: 1, unit_price_cents: 990, delivery_mode: "voicehub" },
     ]);
+    assert.deepEqual(order["buyer"], {
+      username: "爱发电买家",
+      display_name: "",
+      email: "",
+    });
     assert.deepEqual(order["afdian"], {
       trade_no: "TRADE-9988",
       plan_id: "plan-42",

@@ -33,6 +33,11 @@ export interface BotAfdianOrderRepository {
   findByTradeNo(tradeNo: string): Promise<Row | null>;
 }
 
+/** Structural port of `UserRepository` (order buyer identity). */
+export interface BotUserRepository {
+  findById(id: number): Promise<Row | null>;
+}
+
 /** Structural port of `VoiceHubDeliveryRepository`. */
 export interface BotDeliveryRepository {
   findByCodeHash(hash: string): Promise<Row | null>;
@@ -49,10 +54,17 @@ export interface BotCrypto {
 export interface BotQueryDependencies {
   orders: BotOrderRepository;
   afdianOrders: BotAfdianOrderRepository;
+  users: BotUserRepository;
   deliveries: BotDeliveryRepository;
   crypto: BotCrypto;
   /** Shared secret from BOT_QUERY_TOKEN; empty disables the endpoint (503). */
   token: string;
+}
+
+export interface BuyerView {
+  username: string;
+  display_name: string;
+  email: string;
 }
 
 export interface CouponView {
@@ -80,6 +92,7 @@ export interface OrderView {
   fulfilled_at: string | null;
   expires_at: string | null;
   items: Array<{ name: string; quantity: number; unit_price_cents: number; delivery_mode: string }>;
+  buyer: BuyerView;
   afdian: { trade_no: string; plan_id: string; sku_detail: string } | null;
 }
 
@@ -172,7 +185,12 @@ async function shopResult(
   foundBy: BotQueryResult["found_by"],
 ): Promise<BotQueryResult> {
   const orderId = num(order["id"]);
-  const [items, units] = await Promise.all([deps.orders.items(orderId), deps.orders.units(orderId)]);
+  const userId = num(order["user_id"]);
+  const [items, units, user] = await Promise.all([
+    deps.orders.items(orderId),
+    deps.orders.units(orderId),
+    userId > 0 ? deps.users.findById(userId) : Promise.resolve(null),
+  ]);
   return {
     ok: true,
     found_by: foundBy,
@@ -196,6 +214,11 @@ async function shopResult(
         unit_price_cents: num(item["product_price_cents_snapshot"]),
         delivery_mode: String(item["delivery_mode_snapshot"] ?? ""),
       })),
+      buyer: {
+        username: String(user?.["username"] ?? ""),
+        display_name: String(user?.["display_name"] ?? ""),
+        email: String(user?.["email"] ?? ""),
+      },
       afdian: null,
     },
     coupons: shopCoupons(deps, units),
@@ -252,6 +275,11 @@ async function afdianResult(
           delivery_mode: "voicehub",
         },
       ],
+      buyer: {
+        username: String(order["buyer_name"] ?? ""),
+        display_name: "",
+        email: "",
+      },
       afdian: {
         trade_no: String(order["trade_no"] ?? ""),
         plan_id: String(order["plan_id"] ?? ""),
